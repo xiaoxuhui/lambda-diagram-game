@@ -8,3 +8,7 @@ release/*.zip
 release/*-cert.*
 release/apk-manifest.json
 release/apk-check.json
+release/*.html
+release/SHA256SUMS.txt
+__pycache__/
+*.pyc
