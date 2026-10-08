@@ -48,6 +48,7 @@
         <section class="card function-card">
           <div class="section-heading"><div><span class="section-number">ƒ</span><h2>自定义函数</h2></div><span id="function-count" class="mini-label">0 个函数</span></div>
           <p class="function-note">保存后按名称调用，如 <code>ID (λy.y)</code>。</p>
+          <p id="function-edit-status" class="function-note" role="status" hidden></p>
           <form id="function-form"><label for="function-name">函数名称</label><input id="function-name" placeholder="例如 ID、ADD、SUCC" maxlength="32" autocomplete="off" spellcheck="false"><label for="function-source">函数定义</label><textarea id="function-source" placeholder="例如 λx.x" spellcheck="false" autocapitalize="off" aria-describedby="function-error"></textarea><div id="function-keys" class="function-keys" role="group" aria-label="函数定义快捷输入"><button type="button" data-function-insert="λ" aria-label="函数定义插入 λ">λ</button></div><p id="function-error" class="error-message" role="alert" hidden></p><div class="function-actions"><button id="function-use-current" type="button" class="button">使用当前式</button><button id="function-add" type="submit" class="button primary">新增函数 +</button></div></form>
           <div id="function-list" class="function-list"></div><p class="function-foot">定义在保存时展开。删除函数后，已转换的图示仍可运行；再次转换会使用最新函数库。</p>
         </section>

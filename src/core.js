@@ -19,8 +19,8 @@
     }
     return { nodes, depth, vars, abstractions, applications };
   }
-  function tokenize(source) {
-    if (source.length > LIMITS.chars) throw new LambdaError(`输入最多 ${LIMITS.chars} 个字符。`, LIMITS.chars);
+  function tokenize(source, maxChars = LIMITS.chars) {
+    if (source.length > maxChars) throw new LambdaError(`输入最多 ${maxChars} 个字符。`, maxChars);
     const out = [];
     for (let i = 0; i < source.length;) {
       if (/\s/.test(source[i])) { i++; continue; }
@@ -40,8 +40,8 @@
     }
     out.push({ kind: 'end', pos: source.length }); return out;
   }
-  function parse(source) {
-    const tokens = tokenize(source); let at = 0, nesting = 0;
+  function parse(source, maxChars = LIMITS.chars) {
+    const tokens = tokenize(source, maxChars); let at = 0, nesting = 0;
     const peek = () => tokens[at];
     const fail = message => { throw new LambdaError(message, peek().pos); };
     function expr() {

@@ -30,6 +30,8 @@ test('invalid progress, mode, selection and view are rejected',()=>{
 test('duplicate function names cannot enter a snapshot',()=>{const s=sample();s.functions.push(s.functions[0]);assert.throws(()=>S.decode(JSON.stringify(s)),/已存在/);});
 test('AST is copied without arbitrary properties',()=>{const s=sample();s.session.original.injected='ignored';const r=S.decode(JSON.stringify(s));assert.ok(!('injected' in r.term));});
 test('unfinished function editor draft is preserved',()=>{const s=sample();s.functionDraft={name:'NEW',source:'λx.'};assert.deepEqual(S.decode(S.encode(s)).functionDraft,s.functionDraft);});
+test('editing target and changed name survive a snapshot roundtrip',()=>{const s=sample();s.functionDraft={name:'RENAMED',source:'λx.',editing:'ID'};assert.deepEqual(S.decode(S.encode(s)).functionDraft,s.functionDraft);});
+test('unknown or malformed editing target cannot enter a snapshot',()=>{for(const editing of ['MISSING',42,'<bad>']){const s=sample();s.functionDraft={name:'NEW',source:'λx.x',editing};assert.throws(()=>S.decode(JSON.stringify(s)),/正在编辑/);}});
 test('valid generated names are governed by AST budget rather than input budget',()=>{const s=sample();s.session={original:C.V('x'.repeat(1501)),steps:0,dirty:false,halt:''};assert.equal(S.decode(S.encode(s)).term.name.length,1501);});
 test('custom speeds and turbo interval survive snapshot roundtrip',()=>{for(const speed of [1,10,35,60000]){const s=sample();s.view.speed=speed;assert.equal(S.decode(S.encode(s)).view.speed,speed);}});
 test('invalid custom speeds are rejected by snapshot validation',()=>{for(const speed of [-1,0,1.5,60001,'10']){const s=sample();s.view.speed=speed;assert.throws(()=>S.decode(JSON.stringify(s)),/视图设置/);}});

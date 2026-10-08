@@ -1,6 +1,10 @@
 const {test}=require('node:test'),assert=require('node:assert/strict');
 const C=require('../src/core.js'),L=require('../src/library.js');
 const p=C.parse;
+test('fully expanded large function remains editable without truncation',()=>{const f=L.add([],'BIG','1024'),source=C.format(f[0].term);assert.ok(source.length>C.LIMITS.chars);const updated=L.update(f,'BIG','BIG',source+' ');assert.equal(C.churchNumber(updated[0].term),1024);});
+test('editing replaces a function in place without changing the original library',()=>{const f=L.add(L.add([],'ID','λx.x'),'OTHER','λx y.x');const updated=L.update(f,'ID','ID','λx y.y');assert.equal(updated.length,2);assert.deepEqual(updated.map(fn=>fn.name),['ID','OTHER']);assert.ok(C.equal(updated[0].term,p('λx y.y')));assert.ok(C.equal(f[0].term,p('λx.x')));});
+test('editing may rename but rejects collisions and invalid definitions atomically',()=>{const f=L.add(L.add([],'ID','λx.x'),'OTHER','λx y.x');assert.deepEqual(L.update(f,'ID','RENAMED','λz.z').map(fn=>fn.name),['RENAMED','OTHER']);for(const [old,name,source] of [['ID','OTHER','λx.x'],['ID','ID','λx.'],['ID','ID','λx.ID x'],['MISSING','NEW','λx.x']])assert.throws(()=>L.update(f,old,name,source));assert.equal(C.format(f[0].term),'λx.x');});
+test('editing a dependency preserves compiled definitions and capture avoidance',()=>{let f=L.add([],'ID','λx.x');f=L.add(f,'COPY','ID');const updated=L.update(f,'ID','ID','λx.y');assert.ok(C.equal(L.expand(p('COPY'),updated),p('λx.x')));assert.ok(C.equal(L.expand(p('λy.ID'),updated),p('λz.λx.y')));});
 test('named identity expands and runs',()=>{const f=L.add([],'ID','λx.x');assert.ok(C.equal(C.step(L.expand(p('ID (λy.y)'),f)).term,p('λy.y')));});
 test('bound names take precedence over library names',()=>{const f=L.add([],'ID','λx.x');assert.deepEqual(L.expand(p('λID.ID'),f),p('λID.ID'));});
 test('expansion is hygienic for free variables',()=>{const f=L.add([],'F','λx.y');assert.ok(C.equal(L.expand(p('λy.F'),f),p('λz.λx.y')));});

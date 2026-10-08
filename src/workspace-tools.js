@@ -4,9 +4,19 @@
   const AUTO='lambda-lab-v2',CHECKPOINT='lambda-lab-checkpoint-v2',LEGACY='lambda-lab-v1';
   const $=id=>document.getElementById(id);
   function init(api) {
-    let functions=[],checkpoint=null,saveTimer=null,restoring=false;
+    const cancel=document.createElement('button');cancel.id='function-cancel';cancel.type='button';cancel.className='button';cancel.textContent='取消编辑';cancel.hidden=true;
+    $('function-add').before(cancel);
+    let functions=[],checkpoint=null,saveTimer=null,restoring=false,editing=null;
     const feedback=(message,error=false)=>{$('save-feedback').hidden=false;$('save-feedback').textContent=message;$('save-feedback').classList.toggle('error',error);};
-    function captured() {return {...api.capture(),version:2,savedAt:new Date().toISOString(),functions,functionDraft:{name:$('function-name').value,source:$('function-source').value}};}
+    function captured() {return {...api.capture(),version:2,savedAt:new Date().toISOString(),functions,functionDraft:{name:$('function-name').value,source:$('function-source').value,...(editing===null?{}:{editing})}};}
+    function renderEditMode() {
+      $('function-add').textContent=editing===null?'新增函数 +':'保存修改 ✓';
+      $('function-cancel').hidden=editing===null;$('function-edit-status').hidden=editing===null;
+      $('function-edit-status').textContent=editing===null?'':`正在编辑：${editing}`;
+    }
+    function clearEditor() {
+      editing=null;$('function-name').value='';$('function-source').value='';$('function-error').hidden=true;renderEditMode();
+    }
     function storageStatus(ok) {
       $('storage-status').textContent=ok?'当前状态已自动保存':'自动保存不可用，请导出存档备份';$('storage-status').classList.toggle('storage-error',!ok);
     }
@@ -24,14 +34,19 @@
         const buttons=document.createElement('div');buttons.className='function-item-buttons';
         const insert=document.createElement('button');insert.textContent='插入';insert.setAttribute('aria-label',`插入函数 ${fn.name}`);
         insert.addEventListener('mousedown',e=>e.preventDefault());insert.addEventListener('click',()=>api.insertFunction(fn.name));
+        const edit=document.createElement('button');edit.textContent='编辑';edit.setAttribute('aria-label',`编辑函数 ${fn.name}`);
+        edit.addEventListener('click',()=>{
+          editing=fn.name;$('function-name').value=fn.name;$('function-source').value=C.format(fn.term);
+          $('function-error').hidden=true;renderEditMode();persist();$('function-source').focus();$('function-form').scrollIntoView({block:'nearest'});
+        });
         const del=document.createElement('button');del.textContent='删除';del.className='delete-function';del.setAttribute('aria-label',`删除函数 ${fn.name}`);
-        del.addEventListener('click',()=>{functions=L.remove(functions,fn.name);renderLibrary();persist();api.toast(`已删除函数 ${fn.name}`);});
-        buttons.append(insert,del);head.append(title,buttons);const definition=document.createElement('code');definition.textContent=C.format(fn.term);row.append(head,definition);list.append(row);
+        del.addEventListener('click',()=>{functions=L.remove(functions,fn.name);if(editing===fn.name)clearEditor();renderLibrary();persist();api.toast(`已删除函数 ${fn.name}`);});
+        buttons.append(insert,edit,del);head.append(title,buttons);const definition=document.createElement('code');definition.textContent=C.format(fn.term);row.append(head,definition);list.append(row);
       });
     }
     function apply(snapshot) {
       restoring=true;
-      try {functions=snapshot.functions;renderLibrary();api.apply(snapshot);$('function-name').value=snapshot.functionDraft.name;$('function-source').value=snapshot.functionDraft.source;$('function-error').hidden=true;}
+      try {functions=snapshot.functions;renderLibrary();api.apply(snapshot);$('function-name').value=snapshot.functionDraft.name;$('function-source').value=snapshot.functionDraft.source;editing=snapshot.functionDraft.editing??null;renderEditMode();$('function-error').hidden=true;}
       finally{restoring=false;}
     }
     function restoreInitial() {
@@ -45,9 +60,11 @@
     }
     $('function-form').addEventListener('submit',e=>{
       e.preventDefault();$('function-error').hidden=true;
-      try {const name=$('function-name').value.trim();functions=L.add(functions,name,$('function-source').value);renderLibrary();$('function-name').value='';$('function-source').value='';persist();api.toast(`已保存函数 ${name}`);}
+      try {const name=$('function-name').value.trim(),source=$('function-source').value;functions=editing===null?L.add(functions,name,source):L.update(functions,editing,name,source);renderLibrary();clearEditor();persist();api.toast(`已保存函数 ${name}`);}
       catch(error){$('function-error').textContent=error.message;$('function-error').hidden=false;}
     });
+    $('function-cancel').addEventListener('click',()=>{clearEditor();persist();});
+    renderEditMode();
     $('function-use-current').addEventListener('click',()=>{$('function-source').value=api.currentExpression();$('function-error').hidden=true;$('function-name').focus();queueSave();});
     $('function-name').addEventListener('input',queueSave);$('function-source').addEventListener('input',queueSave);
     document.querySelectorAll('[data-function-insert]').forEach(b=>{b.addEventListener('mousedown',e=>e.preventDefault());b.addEventListener('click',()=>{const field=$('function-source');field.setRangeText(b.dataset.functionInsert,field.selectionStart,field.selectionEnd,'end');field.focus();queueSave();});});
