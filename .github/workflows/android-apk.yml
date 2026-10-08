@@ -90,6 +90,7 @@ jobs:
           name: android-build-reports
           path: |
             android/app/build/reports/
+            android/app/build/outputs/apk/debug/app-debug.apk
             ${{ runner.temp }}/gradle-build.log
           if-no-files-found: ignore
   release:

@@ -153,7 +153,10 @@ test("清单声明启动入口且不申请任何权限（离线运行）", async
   const manifest = await read(path.join(APP, "AndroidManifest.xml"));
   assert.match(manifest, /android\.intent\.category\.LAUNCHER/);
   assert.match(manifest, /android:name="\.MainActivity"/);
-  assert.doesNotMatch(manifest, /uses-permission/, "外壳不应申请任何权限");
+  // tools:node=remove 是合并删除标记，不是权限申请；最终 APK 由 CI 的 aapt 另行检查。
+  const requestedManifest = manifest.replace(/<uses-permission\b[^>]*tools:node="remove"[^>]*\/>/g, '');
+  assert.doesNotMatch(requestedManifest, /uses-permission/, "外壳不应申请任何权限");
+  assert.match(manifest, /<uses-permission\b[^>]*DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION[^>]*tools:node="remove"/);
   assert.doesNotMatch(
     manifest,
     /android\.permission\.INTERNET/,
