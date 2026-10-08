@@ -9,7 +9,7 @@
     function walk(t,depth) {
       if(++count>C.LIMITS.nodes||depth>C.LIMITS.depth)fail('表达式结构超过上限。');
       if(!object(t))fail('表达式结构不完整。');
-      const name=n=>{if(typeof n!=='string'||n.length>1500||!/^[A-Za-z][A-Za-z0-9_']*$/.test(n))fail('变量名不合法。');return n;};
+      const name=n=>{if(typeof n!=='string'||n.length>C.LIMITS.nameChars||!/^[A-Za-z][A-Za-z0-9_']*$/.test(n))fail('变量名不合法。');return n;};
       if(t.type==='var')return C.V(name(t.name));
       if(t.type==='abs')return C.L(name(t.param),walk(t.body,depth+1));
       if(t.type==='app')return C.A(walk(t.fn,depth+1),walk(t.arg,depth+1));
@@ -32,10 +32,12 @@
     for(const field of ['autoFit','historyOpen','helpOpen','hintOpen'])if(typeof v[field]!=='boolean')fail('视图开关不合法。');
     const selection=raw.selection;if(!object(selection)||!Number.isInteger(selection.start)||!Number.isInteger(selection.end)||selection.start<0||selection.start>selection.end||selection.end>raw.draft.length)fail('光标位置不合法。');
     if(typeof raw.error!=='string'||raw.error.length>2000)fail('错误信息不合法。');
+    const functionDraft=raw.functionDraft??{name:'',source:''};
+    if(!object(functionDraft)||typeof functionDraft.name!=='string'||functionDraft.name.length>32||typeof functionDraft.source!=='string'||functionDraft.source.length>10000)fail('函数编辑草稿不合法。');
     return {version:2,savedAt:typeof raw.savedAt==='string'&&Number.isFinite(Date.parse(raw.savedAt))?raw.savedAt:new Date().toISOString(),draft:raw.draft,
       functions,completed:[...new Set(raw.completed)],mode:raw.mode,level:raw.level,
       session:{original,steps:s.steps,dirty:s.dirty,halt:s.halt},view:{speed:v.speed,scale:v.scale,autoFit:v.autoFit,historyOpen:v.historyOpen,helpOpen:v.helpOpen,hintOpen:v.hintOpen},
-      selection:{start:selection.start,end:selection.end},error:raw.error};
+      selection:{start:selection.start,end:selection.end},error:raw.error,functionDraft:{name:functionDraft.name,source:functionDraft.source}};
   }
   function replay(s) {
     const history=s.session.original?[{term:s.session.original,change:null}]:[];let term=s.session.original;
