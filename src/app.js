@@ -33,12 +33,10 @@
     $('char-count').textContent=`${input.value.length} / ${C.LIMITS.chars}`;
     save(); render();
   }
-  function insert(text, pair=false) {
+  function insert(text) {
     const start=input.selectionStart,end=input.selectionEnd;
-    const selected=input.value.slice(start,end), insertion=pair?`(${selected})`:text;
-    input.setRangeText(insertion,start,end,'end');
+    input.setRangeText(text,start,end,'end');
     input.focus();
-    if(pair) input.setSelectionRange(start+1,start+1+selected.length);
     changed();
   }
   function convert() {
@@ -183,7 +181,6 @@
     b.addEventListener('mousedown',e=>e.preventDefault());
     b.addEventListener('click',()=>insert(b.dataset.insert));
   });
-  $('pair-key').addEventListener('mousedown',e=>e.preventDefault());$('pair-key').addEventListener('click',()=>insert('',true));
   P.examples.forEach((e,i)=>{const option=document.createElement('option');option.value=i;option.textContent=e.name;$('examples').append(option);});
   $('examples').addEventListener('change',()=>{const value=$('examples').value;if(value==='')return;setSource(P.examples[Number(value)].term);$('examples').value='';});
   $('convert').addEventListener('click',convert);$('step').addEventListener('click',advance);$('run').addEventListener('click',run);

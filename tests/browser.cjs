@@ -42,11 +42,14 @@ const C=require('../src/core.js'),P=require('../src/presets.js');
       await page.locator('[data-insert="λ"]').click();
       assert.equal(await page.locator('#expression').inputValue(),'aλc');
     });
-    await check('paired brackets wrap selected text',async()=>{
-      await page.locator('#expression').fill('λx.x');
-      await page.locator('#expression').evaluate(el=>{el.focus();el.setSelectionRange(0,4);});
-      await page.locator('#pair-key').click();assert.equal(await page.locator('#expression').inputValue(),'(λx.x)');
-      assert.deepEqual(await page.locator('#expression').evaluate(el=>[el.selectionStart,el.selectionEnd]),[1,5]);
+    await check('both shortcut bars contain only lambda; ordinary symbols remain typeable',async()=>{
+      assert.equal(await page.locator('#symbol-toolbar button').count(),1);
+      assert.equal(await page.locator('#function-keys button').count(),1);
+      assert.equal(await page.locator('[data-insert]').count(),1);
+      assert.equal(await page.locator('#symbol-toolbar button').textContent(),'λ');
+      assert.equal(await page.locator('#function-keys button').textContent(),'λ');
+      await source('(λx.x) (λy.y)');
+      assert.equal(await page.locator('#current-expression').textContent(),'(λx.x) (λy.y)');
     });
     await check('Ctrl+Enter converts without losing editor content',async()=>{
       await page.locator('#expression').fill('λx.x');await page.locator('#expression').press('Control+Enter');
