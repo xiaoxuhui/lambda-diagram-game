@@ -102,7 +102,7 @@
   <script>
 (function (root) {
   'use strict';
-  const LIMITS = Object.freeze({ chars: 1500, nodes: 4000, depth: 300, steps: 200, nameChars:30000 });
+  const LIMITS = Object.freeze({ chars: 1500, nodes: Infinity, depth: Infinity, steps: Infinity, nameChars:Infinity });
   const V = name => ({ type: 'var', name });
   const L = (param, body) => ({ type: 'abs', param, body });
   const A = (fn, arg) => ({ type: 'app', fn, arg });
@@ -115,12 +115,9 @@
     const stack = [[term, 1]];
     while (stack.length) {
       const [t, d] = stack.pop(); nodes++; depth = Math.max(depth, d);
-      if (nodes > LIMITS.nodes) throw new LambdaError(`表达式超过 ${LIMITS.nodes} 个节点，请缩小表达式。`);
-      if (d > LIMITS.depth) throw new LambdaError(`嵌套超过 ${LIMITS.depth} 层，请简化表达式。`);
       if (t.type === 'var') { vars++; nameChars += t.name.length; }
       else if (t.type === 'abs') { abstractions++; nameChars += t.param.length; stack.push([t.body, d + 1]); }
       else { applications++; stack.push([t.fn, d + 1], [t.arg, d + 1]); }
-      if (nameChars > LIMITS.nameChars) throw new LambdaError('展开后的变量名文本过长，已暂停。请使用较短的变量名。');
     }
     return { nodes, depth, vars, abstractions, applications };
   }
@@ -135,8 +132,8 @@
       const numeric=/^[0-9]+/.exec(source.slice(i));
       if(numeric) {
         if(source[i+numeric[0].length]==='.') throw new LambdaError('丘奇数只支持非负整数，不能输入小数。',i);
-        const value=Number(numeric[0]),max=LIMITS.depth-3;
-        if(!Number.isSafeInteger(value)||value>max) throw new LambdaError(`数字过大：当前单个丘奇数支持 0 到 ${max}，以避免展开超限。`,i);
+        const value=Number(numeric[0]);
+        if(!Number.isSafeInteger(value)) throw new LambdaError('数字超出可精确表示的整数范围。',i);
         out.push({kind:'number',value,pos:i});i+=numeric[0].length;continue;
       }
       const m = /^[a-zA-Z][a-zA-Z0-9_']*/.exec(source.slice(i));
@@ -150,7 +147,7 @@
     const peek = () => tokens[at];
     const fail = message => { throw new LambdaError(message, peek().pos); };
     function expr() {
-      if (++nesting > LIMITS.depth) fail(`嵌套超过 ${LIMITS.depth} 层。`);
+      ++nesting;
       let result;
       if (peek().kind === 'λ') {
         at++; const params = [];
@@ -213,16 +210,11 @@
   }
   function substitute(t, name, argument) {
     const argFree = freeVars(argument), used = allNames(t, allNames(argument)); used.add(name);
-    const argSize = inspect(argument).nodes; let cost = 0;
-    function charge(n = 1) {
-      cost += n;
-      if (cost > LIMITS.nodes) throw new LambdaError(`这一步会超过 ${LIMITS.nodes} 个节点，已暂停。`);
-    }
     function sub(node) {
-      if (node.type === 'var') { charge(node.name === name ? argSize : 1); return node.name === name ? argument : node; }
-      if (node.type === 'app') { charge(); return A(sub(node.fn), sub(node.arg)); }
-      if (node.param === name || !freeVars(node.body).has(name)) { charge(inspect(node).nodes); return node; }
-      charge(); let param = node.param, body = node.body;
+      if (node.type === 'var') return node.name === name ? argument : node;
+      if (node.type === 'app') return A(sub(node.fn), sub(node.arg));
+      if (node.param === name || !freeVars(node.body).has(name)) return node;
+      let param = node.param, body = node.body;
       if (argFree.has(param)) {
         let i = 1; while (used.has(`${param}${i}`)) i++;
         const fresh = `${param}${i}`; used.add(fresh); body = renameBound(body, param, fresh); param = fresh;
@@ -325,7 +317,7 @@
     const model = layout(term, redexPath), { width, height } = model;
     const backgrounds = options.export ? `<rect width="100%" height="100%" fill="#131c2d"/>` : '';
     const shapes = model.lines.map(l => `<line x1="${l.x1}" y1="${l.y1}" x2="${l.x2}" y2="${l.y2}" stroke="${l.active ? '#ff91b7' : l.color}" stroke-width="${l.active ? 5 : 3}" stroke-linecap="square" ${l.free ? 'stroke-dasharray="5 5"' : ''} data-kind="${l.kind}" ${l.active ? 'data-active="true"' : ''}><title>${esc(l.kind==='abstraction' ? `λ${l.name}：绑定横线` : l.kind==='variable' ? `${l.name}：${l.free?'自由变量':`连接绑定 λ${l.name}`}` : l.kind==='application' ? '函数应用：连接左右子项最左变量' : '延伸到外层应用')}</title></line>`).join('');
-    const labels = model.labels.map(l=>`<text x="${l.x}" y="${l.y}" text-anchor="middle" fill="#bac5d8" font-size="10" font-family="monospace"><title>${esc(l.text)}</title>${esc(l.text.length>6?l.text.slice(0,5)+'…':l.text)}</text>`).join('');
+    const labels = model.labels.map(l=>`<text x="${l.x}" y="${l.y}" text-anchor="middle" fill="#bac5d8" font-size="10" font-family="monospace"><title>${esc(l.text)}</title>${esc(l.text)}</text>`).join('');
     return { model, markup:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="John Tromp Lambda 图示"><title>John Tromp Lambda 图示</title>${backgrounds}${shapes}${labels}</svg>` };
   }
   const API = { layout, svg, COLORS };
@@ -365,7 +357,7 @@
 (function(root) {
   'use strict';
   const C=root.LambdaCore || require('./core.js');
-  const LIMITS={count:32,nodes:16000,nameChars:120000};
+  const LIMITS={count:32,nodes:Infinity,nameChars:Infinity};
   const validName=name=>typeof name==='string'&&/^[A-Za-z][A-Za-z0-9_']{0,31}$/.test(name);
   function names(t,out=new Set()) {
     if(t.type==='var')out.add(t.name);
@@ -381,7 +373,6 @@
       seen.add(fn.name);nodes+=C.inspect(fn.term).nodes;
       const stack=[fn.term];while(stack.length){const t=stack.pop();if(t.type==='var')nameChars+=t.name.length;else if(t.type==='abs'){nameChars+=t.param.length;stack.push(t.body);}else stack.push(t.fn,t.arg);}
     }
-    if(nodes>LIMITS.nodes||nameChars>LIMITS.nameChars)throw new C.LambdaError('函数库总大小已达上限，请先删除一些函数。');
     return functions;
   }
   function expand(term,functions) {
@@ -419,7 +410,7 @@
   function ast(raw) {
     let count=0;
     function walk(t,depth) {
-      if(++count>C.LIMITS.nodes||depth>C.LIMITS.depth)fail('表达式结构超过上限。');
+      ++count;
       if(!object(t))fail('表达式结构不完整。');
       const name=n=>{if(typeof n!=='string'||n.length>C.LIMITS.nameChars||!/^[A-Za-z][A-Za-z0-9_']*$/.test(n))fail('变量名不合法。');return n;};
       if(t.type==='var')return C.V(name(t.name));
@@ -437,7 +428,7 @@
     if(!Array.isArray(raw.completed)||raw.completed.length>5||raw.completed.some(i=>!Number.isInteger(i)||i<1||i>5))fail('通关进度不合法。');
     if(raw.mode!=='free'&&raw.mode!=='challenge')fail('游戏模式不合法。');
     if(!Number.isInteger(raw.level)||raw.level<0||raw.level>4)fail('关卡编号不合法。');
-    const s=raw.session;if(!object(s)||!Number.isInteger(s.steps)||s.steps<0||s.steps>C.LIMITS.steps||typeof s.dirty!=='boolean')fail('归约状态不合法。');
+    const s=raw.session;if(!object(s)||!Number.isSafeInteger(s.steps)||s.steps<0||typeof s.dirty!=='boolean')fail('归约状态不合法。');
     const original=s.original===null?null:ast(s.original);if(!original&&s.steps!==0)fail('没有起始表达式，无法恢复归约。');
     if(typeof s.halt!=='string'||s.halt.length>500)fail('暂停信息不合法。');
     const v=raw.view;if(!object(v)||!Number.isInteger(v.speed)||v.speed<1||v.speed>60000||!Number.isFinite(v.scale)||v.scale<.02||v.scale>16)fail('视图设置不合法。');
@@ -629,7 +620,7 @@
   const input=$('expression');
   const state={ term:null, original:null, history:[], dirty:false, running:false, timer:null,
     mode:'free', level:0, completed:new Set(), halt:'', scale:1, autoFit:true, model:null, speed:600 };
-  let toastTimer,workspace,viewer;
+  let toastTimer,workspace,viewer,renderedHistory=[];
   function save() { workspace?.queueSave(); }
   function capture() {
     return {draft:input.value,completed:[...state.completed],mode:state.mode,level:state.level,
@@ -712,12 +703,12 @@
   function code(text) { const el=document.createElement('code'); el.textContent=text; return el; }
   function render() {
     const ready=state.term&&!state.dirty, redex=state.term?C.findRedex(state.term):null;
-    const count=Math.max(0,state.history.length-1), exhausted=count>=C.LIMITS.steps;
+    const count=Math.max(0,state.history.length-1);
     $('char-count').textContent=`${input.value.length} / ${C.LIMITS.chars}`;
     $('step-count').textContent=count; $('run-label').textContent=state.running?'暂停':'运行';
     $('run').firstElementChild.textContent=state.running?'Ⅱ':'▶';
-    $('run').disabled=!ready||!redex||exhausted||(!state.running&&!!state.halt);
-    $('step').disabled=!ready||!redex||exhausted||state.running;
+    $('run').disabled=!ready||!redex;
+    $('step').disabled=!ready||!redex||state.running;
     $('back').disabled=!ready||count===0||state.running;
     $('reset').disabled=!ready||state.running||count===0;
     $('export-svg').disabled=!ready; $('zoom-in').disabled=!state.term; $('zoom-out').disabled=!state.term; $('fit').disabled=!state.term;$('actual-size').disabled=!state.term;
@@ -737,25 +728,26 @@
       next.append('下一步：用 ',code(C.format(redex.term.arg)),' 替换函数体中自由出现的 ',code(redex.term.fn.param),'。必要时自动改名，避免变量捕获。');
     } else if(ready) next.textContent='正规形表示归约完成；可以换个表达式，或进入闯关模式。';
     $('history-count').textContent=`${count} 次替换`;
-    const history=$('history-list'); history.replaceChildren();
+    const history=$('history-list');
+    if(renderedHistory.length>state.history.length||renderedHistory.some((entry,i)=>entry!==state.history[i])) {
+      history.replaceChildren();renderedHistory=[];
+    }
     state.history.forEach((entry,i)=>{
+      if(i<renderedHistory.length)return;
       const li=document.createElement('li'),num=document.createElement('span'),body=document.createElement('div');
       num.textContent=String(i).padStart(2,'0');body.append(code(C.format(entry.term)));
       if(entry.change) { const note=document.createElement('small'); note.textContent=`${entry.change.param} ← ${C.format(entry.change.argument)}`;body.append(note); }
-      li.append(num,body);history.append(li);
+      li.append(num,body);history.append(li);renderedHistory.push(entry);
     });
     renderDiagram(redex);
     save();
   }
   function advance() {
-    if(!state.term||state.dirty||state.history.length-1>=C.LIMITS.steps) return false;
+    if(!state.term||state.dirty) return false;
     try {
       const result=C.step(state.term); if(!result){stop();render();return false;}
-      const k=C.key(result.term), repeats=state.history.some(h=>C.key(h.term)===k);
       state.term=result.term;state.history.push({term:result.term,change:result});state.halt='';
-      if(repeats) { stop();state.halt='检测到重复的归约状态，可能无限循环。自动运行已暂停，可单步观察或回退。'; }
-      else if(state.history.length-1>=C.LIMITS.steps && C.findRedex(state.term)) {stop();state.halt=`已达到 ${C.LIMITS.steps} 步上限。可回退、重置或简化表达式。`;}
-      else if(!C.findRedex(state.term)) stop();
+      if(!C.findRedex(state.term)) stop();
       render(); return !state.halt&&!!C.findRedex(state.term);
     } catch(e) {stop();state.halt=e.message;render();return false;}
   }
@@ -772,8 +764,8 @@
   }
   function run() {
     if(state.running){stop();render();return;}
-    if(!state.term||state.dirty||!C.findRedex(state.term)||state.halt) return;
-    state.running=true;render();schedule();
+    if(!state.term||state.dirty||!C.findRedex(state.term)) return;
+    state.halt='';state.running=true;render();schedule();
   }
   function setSource(source) { input.value=source; changed(); convert(); }
   function renderLevels() {

@@ -18,10 +18,11 @@ test('bad JSON and unknown version are rejected',()=>{assert.throws(()=>S.decode
 test('oversized file is rejected before parsing',()=>assert.throws(()=>S.decode(' '.repeat(S.MAX_BYTES+1)),/2 MiB/));
 test('multibyte text obeys byte budget, not just character count',()=>assert.throws(()=>S.decode('汉'.repeat(800000)),/2 MiB/));
 test('malformed AST and executable-looking nodes are rejected',()=>{for(const term of [{type:'eval',code:'alert(1)'},{type:'abs',param:'x'},{type:'var',name:'<script>'}]){const s=sample();s.session.original=term;assert.throws(()=>S.decode(JSON.stringify(s)),/存档无效/);}});
-test('overdeep AST is rejected',()=>{let t=C.V('x');for(let i=0;i<301;i++)t=C.L('x',t);const s=sample();s.session.original=t;assert.throws(()=>S.decode(JSON.stringify(s)),/上限/);});
-test('oversized AST cannot sneak through shared JSON branches',()=>{let t=C.V('x');for(let i=0;i<12;i++)t=C.A(t,t);const s=sample();s.session.original=t;assert.throws(()=>S.decode(JSON.stringify(s)),/上限/);});
+test('deep AST roundtrips without the old depth quota',()=>{let t=C.V('x');for(let i=0;i<301;i++)t=C.L('x',t);const s=sample();s.session={original:t,steps:0,dirty:false,halt:''};assert.equal(C.inspect(S.decode(S.encode(s)).term).depth,302);});
+test('all AST occurrences survive beyond the old node quota',()=>{let t=C.V('x');for(let i=0;i<12;i++)t=C.A(t,t);const s=sample();s.session={original:t,steps:0,dirty:false,halt:''};assert.equal(C.inspect(S.decode(S.encode(s)).term).nodes,8191);});
 test('impossible replay steps are rejected',()=>{const s=sample();s.session.steps=2;assert.throws(()=>S.decode(JSON.stringify(s)),/步数/);});
-test('negative or too many steps are rejected',()=>{for(const steps of [-1,201,1.5]){const s=sample();s.session.steps=steps;assert.throws(()=>S.decode(JSON.stringify(s)),/归约状态/);}});
+test('negative, fractional or inexact step counts are rejected',()=>{for(const steps of [-1,Number.MAX_SAFE_INTEGER+1,1.5]){const s=sample();s.session.steps=steps;assert.throws(()=>S.decode(JSON.stringify(s)),/归约状态/);}});
+test('more than 200 actual steps restore without a fixed cutoff',()=>{const s=sample();s.session={original:C.parse('(λx.x x)(λx.x x)'),steps:250,dirty:false,halt:''};assert.equal(S.decode(S.encode(s)).history.length,251);});
 test('invalid progress, mode, selection and view are rejected',()=>{
   for(const mutate of [s=>s.completed=[6],s=>s.mode='other',s=>s.level=5,s=>s.selection.end=100,s=>s.view.scale=100,s=>s.view.speed=0,s=>s.view.autoFit='yes']){const s=sample();mutate(s);assert.throws(()=>S.decode(JSON.stringify(s)),/存档无效/);}
 });

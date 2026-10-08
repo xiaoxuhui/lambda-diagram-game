@@ -1,6 +1,6 @@
 (function (root) {
   'use strict';
-  const LIMITS = Object.freeze({ chars: 1500, nodes: 4000, depth: 300, steps: 200, nameChars:30000 });
+  const LIMITS = Object.freeze({ chars: 1500, nodes: Infinity, depth: Infinity, steps: Infinity, nameChars:Infinity });
   const V = name => ({ type: 'var', name });
   const L = (param, body) => ({ type: 'abs', param, body });
   const A = (fn, arg) => ({ type: 'app', fn, arg });
@@ -13,12 +13,9 @@
     const stack = [[term, 1]];
     while (stack.length) {
       const [t, d] = stack.pop(); nodes++; depth = Math.max(depth, d);
-      if (nodes > LIMITS.nodes) throw new LambdaError(`表达式超过 ${LIMITS.nodes} 个节点，请缩小表达式。`);
-      if (d > LIMITS.depth) throw new LambdaError(`嵌套超过 ${LIMITS.depth} 层，请简化表达式。`);
       if (t.type === 'var') { vars++; nameChars += t.name.length; }
       else if (t.type === 'abs') { abstractions++; nameChars += t.param.length; stack.push([t.body, d + 1]); }
       else { applications++; stack.push([t.fn, d + 1], [t.arg, d + 1]); }
-      if (nameChars > LIMITS.nameChars) throw new LambdaError('展开后的变量名文本过长，已暂停。请使用较短的变量名。');
     }
     return { nodes, depth, vars, abstractions, applications };
   }
@@ -33,8 +30,8 @@
       const numeric=/^[0-9]+/.exec(source.slice(i));
       if(numeric) {
         if(source[i+numeric[0].length]==='.') throw new LambdaError('丘奇数只支持非负整数，不能输入小数。',i);
-        const value=Number(numeric[0]),max=LIMITS.depth-3;
-        if(!Number.isSafeInteger(value)||value>max) throw new LambdaError(`数字过大：当前单个丘奇数支持 0 到 ${max}，以避免展开超限。`,i);
+        const value=Number(numeric[0]);
+        if(!Number.isSafeInteger(value)) throw new LambdaError('数字超出可精确表示的整数范围。',i);
         out.push({kind:'number',value,pos:i});i+=numeric[0].length;continue;
       }
       const m = /^[a-zA-Z][a-zA-Z0-9_']*/.exec(source.slice(i));
@@ -48,7 +45,7 @@
     const peek = () => tokens[at];
     const fail = message => { throw new LambdaError(message, peek().pos); };
     function expr() {
-      if (++nesting > LIMITS.depth) fail(`嵌套超过 ${LIMITS.depth} 层。`);
+      ++nesting;
       let result;
       if (peek().kind === 'λ') {
         at++; const params = [];
@@ -111,16 +108,11 @@
   }
   function substitute(t, name, argument) {
     const argFree = freeVars(argument), used = allNames(t, allNames(argument)); used.add(name);
-    const argSize = inspect(argument).nodes; let cost = 0;
-    function charge(n = 1) {
-      cost += n;
-      if (cost > LIMITS.nodes) throw new LambdaError(`这一步会超过 ${LIMITS.nodes} 个节点，已暂停。`);
-    }
     function sub(node) {
-      if (node.type === 'var') { charge(node.name === name ? argSize : 1); return node.name === name ? argument : node; }
-      if (node.type === 'app') { charge(); return A(sub(node.fn), sub(node.arg)); }
-      if (node.param === name || !freeVars(node.body).has(name)) { charge(inspect(node).nodes); return node; }
-      charge(); let param = node.param, body = node.body;
+      if (node.type === 'var') return node.name === name ? argument : node;
+      if (node.type === 'app') return A(sub(node.fn), sub(node.arg));
+      if (node.param === name || !freeVars(node.body).has(name)) return node;
+      let param = node.param, body = node.body;
       if (argFree.has(param)) {
         let i = 1; while (used.has(`${param}${i}`)) i++;
         const fresh = `${param}${i}`; used.add(fresh); body = renameBound(body, param, fresh); param = fresh;

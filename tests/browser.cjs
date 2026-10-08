@@ -91,10 +91,12 @@ const C=require('../src/core.js'),P=require('../src/presets.js');
     await check('input size limit is explained',async()=>{
       await source('x'.repeat(1501));assert.match(await page.locator('#error-message').textContent(),/1500/);
     });
-    await check('cycle auto-stops after first repeated state',async()=>{
+    await check('repeated states keep running until manually paused',async()=>{
       await source('(λx.x x)(λx.x x)');await page.locator('#speed').selectOption('180');await page.locator('#run').click();
-      await page.waitForFunction(()=>document.getElementById('run-status').textContent.includes('重复'));
-      assert.equal(await page.locator('#step-count').textContent(),'1');assert.equal(await page.locator('#run-label').textContent(),'运行');
+      await page.waitForFunction(()=>Number(document.getElementById('step-count').textContent)>=3);
+      assert.equal(await page.locator('#run-label').textContent(),'暂停');await page.locator('#run').click();
+      const steps=await page.locator('#step-count').textContent();await page.waitForTimeout(250);
+      assert.equal(await page.locator('#step-count').textContent(),steps);
       assert.ok(await page.locator('#step').isEnabled());
     });
     await check('zoom controls and fit change SVG size',async()=>{
@@ -157,7 +159,7 @@ const C=require('../src/core.js'),P=require('../src/presets.js');
     await check('long variable label cannot escape diagram',async()=>{
       await page.locator('#mode-free').click();await source('variable'.repeat(100));
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
-      assert.ok((await page.locator('#diagram-mount text').textContent()).includes('…'));
+      assert.equal(await page.locator('#diagram-mount text').evaluate(el=>[...el.childNodes].filter(n=>n.nodeType===Node.TEXT_NODE).map(n=>n.textContent).join('')),'variable'.repeat(100));
     });
     await check('offline built HTML runs without network requests',async()=>{
       const offline=await context.newPage();const requests=[];

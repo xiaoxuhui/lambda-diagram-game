@@ -4,6 +4,8 @@ const C = require('../src/core.js');
 const D = require('../src/diagram.js');
 const P = require('../src/presets.js');
 const model = s => D.layout(C.parse(s));
+test('large numeral emits every line without compression',()=>{const m=D.svg(C.parse('1024'));assert.equal(m.model.leaves.length,1025);assert.equal(m.model.lines.length,4099);assert.equal((m.markup.match(/<line /g)||[]).length,4099);});
+test('long free-variable labels stay complete',()=>assert.ok(D.svg(C.parse('variableName')).markup.includes('>variableName</text>')));
 test('identity has one horizontal binder and one bound wire', () => {
   const m=model('λx.x'); assert.equal(m.binders.length,1); assert.equal(m.leaves.length,1);
   assert.equal(m.leaves[0].y1,m.binders[0].y); assert.equal(m.leaves[0].binder,0);

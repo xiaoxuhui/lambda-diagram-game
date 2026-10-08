@@ -7,7 +7,7 @@
   function ast(raw) {
     let count=0;
     function walk(t,depth) {
-      if(++count>C.LIMITS.nodes||depth>C.LIMITS.depth)fail('表达式结构超过上限。');
+      ++count;
       if(!object(t))fail('表达式结构不完整。');
       const name=n=>{if(typeof n!=='string'||n.length>C.LIMITS.nameChars||!/^[A-Za-z][A-Za-z0-9_']*$/.test(n))fail('变量名不合法。');return n;};
       if(t.type==='var')return C.V(name(t.name));
@@ -25,7 +25,7 @@
     if(!Array.isArray(raw.completed)||raw.completed.length>5||raw.completed.some(i=>!Number.isInteger(i)||i<1||i>5))fail('通关进度不合法。');
     if(raw.mode!=='free'&&raw.mode!=='challenge')fail('游戏模式不合法。');
     if(!Number.isInteger(raw.level)||raw.level<0||raw.level>4)fail('关卡编号不合法。');
-    const s=raw.session;if(!object(s)||!Number.isInteger(s.steps)||s.steps<0||s.steps>C.LIMITS.steps||typeof s.dirty!=='boolean')fail('归约状态不合法。');
+    const s=raw.session;if(!object(s)||!Number.isSafeInteger(s.steps)||s.steps<0||typeof s.dirty!=='boolean')fail('归约状态不合法。');
     const original=s.original===null?null:ast(s.original);if(!original&&s.steps!==0)fail('没有起始表达式，无法恢复归约。');
     if(typeof s.halt!=='string'||s.halt.length>500)fail('暂停信息不合法。');
     const v=raw.view;if(!object(v)||!Number.isInteger(v.speed)||v.speed<1||v.speed>60000||!Number.isFinite(v.scale)||v.scale<.02||v.scale>16)fail('视图设置不合法。');

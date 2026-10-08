@@ -39,7 +39,7 @@
     const model = layout(term, redexPath), { width, height } = model;
     const backgrounds = options.export ? `<rect width="100%" height="100%" fill="#131c2d"/>` : '';
     const shapes = model.lines.map(l => `<line x1="${l.x1}" y1="${l.y1}" x2="${l.x2}" y2="${l.y2}" stroke="${l.active ? '#ff91b7' : l.color}" stroke-width="${l.active ? 5 : 3}" stroke-linecap="square" ${l.free ? 'stroke-dasharray="5 5"' : ''} data-kind="${l.kind}" ${l.active ? 'data-active="true"' : ''}><title>${esc(l.kind==='abstraction' ? `λ${l.name}：绑定横线` : l.kind==='variable' ? `${l.name}：${l.free?'自由变量':`连接绑定 λ${l.name}`}` : l.kind==='application' ? '函数应用：连接左右子项最左变量' : '延伸到外层应用')}</title></line>`).join('');
-    const labels = model.labels.map(l=>`<text x="${l.x}" y="${l.y}" text-anchor="middle" fill="#bac5d8" font-size="10" font-family="monospace"><title>${esc(l.text)}</title>${esc(l.text.length>6?l.text.slice(0,5)+'…':l.text)}</text>`).join('');
+    const labels = model.labels.map(l=>`<text x="${l.x}" y="${l.y}" text-anchor="middle" fill="#bac5d8" font-size="10" font-family="monospace"><title>${esc(l.text)}</title>${esc(l.text)}</text>`).join('');
     return { model, markup:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="John Tromp Lambda 图示"><title>John Tromp Lambda 图示</title>${backgrounds}${shapes}${labels}</svg>` };
   }
   const API = { layout, svg, COLORS };

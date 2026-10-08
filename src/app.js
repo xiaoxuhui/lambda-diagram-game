@@ -5,7 +5,7 @@
   const input=$('expression');
   const state={ term:null, original:null, history:[], dirty:false, running:false, timer:null,
     mode:'free', level:0, completed:new Set(), halt:'', scale:1, autoFit:true, model:null, speed:600 };
-  let toastTimer,workspace,viewer;
+  let toastTimer,workspace,viewer,renderedHistory=[];
   function save() { workspace?.queueSave(); }
   function capture() {
     return {draft:input.value,completed:[...state.completed],mode:state.mode,level:state.level,
@@ -88,12 +88,12 @@
   function code(text) { const el=document.createElement('code'); el.textContent=text; return el; }
   function render() {
     const ready=state.term&&!state.dirty, redex=state.term?C.findRedex(state.term):null;
-    const count=Math.max(0,state.history.length-1), exhausted=count>=C.LIMITS.steps;
+    const count=Math.max(0,state.history.length-1);
     $('char-count').textContent=`${input.value.length} / ${C.LIMITS.chars}`;
     $('step-count').textContent=count; $('run-label').textContent=state.running?'暂停':'运行';
     $('run').firstElementChild.textContent=state.running?'Ⅱ':'▶';
-    $('run').disabled=!ready||!redex||exhausted||(!state.running&&!!state.halt);
-    $('step').disabled=!ready||!redex||exhausted||state.running;
+    $('run').disabled=!ready||!redex;
+    $('step').disabled=!ready||!redex||state.running;
     $('back').disabled=!ready||count===0||state.running;
     $('reset').disabled=!ready||state.running||count===0;
     $('export-svg').disabled=!ready; $('zoom-in').disabled=!state.term; $('zoom-out').disabled=!state.term; $('fit').disabled=!state.term;$('actual-size').disabled=!state.term;
@@ -113,25 +113,26 @@
       next.append('下一步：用 ',code(C.format(redex.term.arg)),' 替换函数体中自由出现的 ',code(redex.term.fn.param),'。必要时自动改名，避免变量捕获。');
     } else if(ready) next.textContent='正规形表示归约完成；可以换个表达式，或进入闯关模式。';
     $('history-count').textContent=`${count} 次替换`;
-    const history=$('history-list'); history.replaceChildren();
+    const history=$('history-list');
+    if(renderedHistory.length>state.history.length||renderedHistory.some((entry,i)=>entry!==state.history[i])) {
+      history.replaceChildren();renderedHistory=[];
+    }
     state.history.forEach((entry,i)=>{
+      if(i<renderedHistory.length)return;
       const li=document.createElement('li'),num=document.createElement('span'),body=document.createElement('div');
       num.textContent=String(i).padStart(2,'0');body.append(code(C.format(entry.term)));
       if(entry.change) { const note=document.createElement('small'); note.textContent=`${entry.change.param} ← ${C.format(entry.change.argument)}`;body.append(note); }
-      li.append(num,body);history.append(li);
+      li.append(num,body);history.append(li);renderedHistory.push(entry);
     });
     renderDiagram(redex);
     save();
   }
   function advance() {
-    if(!state.term||state.dirty||state.history.length-1>=C.LIMITS.steps) return false;
+    if(!state.term||state.dirty) return false;
     try {
       const result=C.step(state.term); if(!result){stop();render();return false;}
-      const k=C.key(result.term), repeats=state.history.some(h=>C.key(h.term)===k);
       state.term=result.term;state.history.push({term:result.term,change:result});state.halt='';
-      if(repeats) { stop();state.halt='检测到重复的归约状态，可能无限循环。自动运行已暂停，可单步观察或回退。'; }
-      else if(state.history.length-1>=C.LIMITS.steps && C.findRedex(state.term)) {stop();state.halt=`已达到 ${C.LIMITS.steps} 步上限。可回退、重置或简化表达式。`;}
-      else if(!C.findRedex(state.term)) stop();
+      if(!C.findRedex(state.term)) stop();
       render(); return !state.halt&&!!C.findRedex(state.term);
     } catch(e) {stop();state.halt=e.message;render();return false;}
   }
@@ -148,8 +149,8 @@
   }
   function run() {
     if(state.running){stop();render();return;}
-    if(!state.term||state.dirty||!C.findRedex(state.term)||state.halt) return;
-    state.running=true;render();schedule();
+    if(!state.term||state.dirty||!C.findRedex(state.term)) return;
+    state.halt='';state.running=true;render();schedule();
   }
   function setSource(source) { input.value=source; changed(); convert(); }
   function renderLevels() {

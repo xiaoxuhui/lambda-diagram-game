@@ -21,4 +21,4 @@ test('invalid definitions leave library unchanged',()=>{const f=[];assert.throws
 test('direct self-reference is rejected but bound same name is valid',()=>{assert.throws(()=>L.add([],'F','λx.F x'),/自身/);assert.equal(L.add([],'F','λF.F').length,1);});
 test('function count budget is explicit',()=>{let f=[];for(let i=0;i<32;i++)f=L.add(f,`F${i}`,'λx.x');assert.throws(()=>L.add(f,'More','λx.x'),/32/);});
 test('placeholders cannot collide with source names',()=>{const f=L.add([],'F','λx.lambdaMacro1');assert.ok(C.equal(L.expand(p('λlambdaMacro2.F lambdaMacro1'),f),p('λz.(λx.lambdaMacro1) lambdaMacro1')));});
-test('expanded expression obeys the core output budget',()=>{let t=C.V('x');for(let i=0;i<11;i++)t=C.A(t,t);assert.throws(()=>L.expand(p('F F'),[{name:'F',term:t}]),/4000/);});
+test('expanded expression retains all nodes beyond the old quota',()=>{let t=C.V('x');for(let i=0;i<11;i++)t=C.A(t,t);assert.equal(C.inspect(L.expand(p('F F'),[{name:'F',term:t}])).nodes,8191);});

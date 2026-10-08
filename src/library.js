@@ -1,7 +1,7 @@
 (function(root) {
   'use strict';
   const C=root.LambdaCore || require('./core.js');
-  const LIMITS={count:32,nodes:16000,nameChars:120000};
+  const LIMITS={count:32,nodes:Infinity,nameChars:Infinity};
   const validName=name=>typeof name==='string'&&/^[A-Za-z][A-Za-z0-9_']{0,31}$/.test(name);
   function names(t,out=new Set()) {
     if(t.type==='var')out.add(t.name);
@@ -17,7 +17,6 @@
       seen.add(fn.name);nodes+=C.inspect(fn.term).nodes;
       const stack=[fn.term];while(stack.length){const t=stack.pop();if(t.type==='var')nameChars+=t.name.length;else if(t.type==='abs'){nameChars+=t.param.length;stack.push(t.body);}else stack.push(t.fn,t.arg);}
     }
-    if(nodes>LIMITS.nodes||nameChars>LIMITS.nameChars)throw new C.LambdaError('函数库总大小已达上限，请先删除一些函数。');
     return functions;
   }
   function expand(term,functions) {
