@@ -1,3 +1,10 @@
 node_modules/
 tests/artifacts/
 *.log
+*.keystore
+!android/app/debug.keystore
+release/*.apk
+release/*.zip
+release/*-cert.*
+release/apk-manifest.json
+release/apk-check.json

@@ -1,0 +1,121 @@
+name: Android APK
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+    paths:
+      - 'android/**'
+      - 'src/**'
+      - 'index.html'
+      - 'dist/lambda-lab.html'
+      - 'scripts/**'
+      - 'tests/**'
+      - 'package.json'
+      - '.github/workflows/**'
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    name: Build and verify offline APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - run: npm run build && npm run sync:android && npm run check:android && npm test
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-34 build-tools;34.0.0'
+      - name: Build APK
+        working-directory: android
+        run: |
+          set -o pipefail
+          gradle assembleDebug --no-daemon --stacktrace 2>&1 | tee "$RUNNER_TEMP/gradle-build.log"
+      - name: Annotate build errors
+        if: failure()
+        run: |
+          if [ -f "$RUNNER_TEMP/gradle-build.log" ]; then
+            grep -E '^e: |FAILURE|What went wrong|Could not' "$RUNNER_TEMP/gradle-build.log" | head -40 | while IFS= read -r line; do
+              echo "::error::$line"
+            done
+          fi
+      - name: Verify packaged webpage, signing certificate and APK identity
+        run: |
+          APK=android/app/build/outputs/apk/debug/app-debug.apk
+          unzip -p "$APK" assets/lambda-lab.html > "$RUNNER_TEMP/apk-page.html"
+          cmp "$RUNNER_TEMP/apk-page.html" dist/lambda-lab.html
+          python scripts/apk-v2-cert.py "$APK" "$RUNNER_TEMP/apk-cert.der"
+          openssl pkcs12 -in android/app/debug.keystore -nokeys -clcerts -passin pass:android -out "$RUNNER_TEMP/keystore-cert.pem"
+          openssl x509 -in "$RUNNER_TEMP/keystore-cert.pem" -outform DER -out "$RUNNER_TEMP/keystore-cert.der"
+          cmp "$RUNNER_TEMP/apk-cert.der" "$RUNNER_TEMP/keystore-cert.der"
+          python scripts/apk-manifest.py "$APK" | tee "$RUNNER_TEMP/apk-manifest.txt"
+          "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --verbose --print-certs "$APK"
+          python - <<'PY'
+          import json, subprocess, os
+          package = json.load(open('package.json'))
+          output = subprocess.check_output([os.environ['ANDROID_HOME']+'/build-tools/34.0.0/aapt', 'dump', 'badging', 'android/app/build/outputs/apk/debug/app-debug.apk'], text=True)
+          assert "name='com.xiaoxuhui.lambda'" in output
+          assert "versionCode='1'" in output
+          assert "versionName='"+package['version']+"'" in output
+          assert "sdkVersion:'24'" in output
+          assert "uses-permission:" not in output
+          print('APK package, version, minimum SDK and no-permission checks passed.')
+          PY
+      - name: Package release assets
+        run: |
+          mkdir -p release-upload
+          VERSION=$(node -p "require('./package.json').version")
+          cp android/app/build/outputs/apk/debug/app-debug.apk "release-upload/lambda-lab-android-${VERSION}-debug.apk"
+          cp dist/lambda-lab.html release-upload/
+          cd release-upload
+          sha256sum *.apk *.html > SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lambda-lab-android
+          path: release-upload/
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: android-build-reports
+          path: |
+            android/app/build/reports/
+            ${{ runner.temp }}/gradle-build.log
+          if-no-files-found: ignore
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: lambda-lab-android
+          path: release-assets
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: 'Lambda 线路实验室 ${{ github.ref_name }} · Android'
+          files: release-assets/*
+          body: |
+            Lambda 线路实验室首个安卓版，内置完整离线游戏。
+            支持 Android 7.0 及以上，包名 com.xiaoxuhui.lambda，使用项目固定 debug 签名。
+
+            下载 lambda-lab-android-0.3.0-debug.apk 安装；系统可能要求允许此来源安装应用。
+            包含完整函数编辑、存档、归约、缩放与运行速度设置，不申请网络或其他权限。
+            JSON 存档与 SVG 图示通过原生接口保存，JSON 导入使用系统文件选择器。
+            Android 10+ 保存到系统下载目录；Android 7–9 保存到应用外部文件目录。
+
+            已完成构建、网页回归、包内资源字节一致和固定签名核验。真机安装、转屏与系统文件选择器待用户确认。
+            lambda-lab.html 为可直接打开的离线网页版；SHA256SUMS.txt 提供文件校验。
+          generate_release_notes: true

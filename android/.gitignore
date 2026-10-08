@@ -1,0 +1,31 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# 本地环境
+local.properties
+captures/
+.externalNativeBuild/
+.cxx/
+
+# 构建产物
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# 注意：app/debug.keystore **必须入库**。
+# 若本项目其他地方有 `*.keystore` 之类的忽略规则，这里要补白名单：
+#     !app/debug.keystore
+# keystore 缺席时 AGP 会为每台构建机随机生成一把 debug key，CI 每次都是新 runner，
+# 于是每个发布包的签名都不同，用户安装新包会被系统拒绝
+# （INSTALL_FAILED_UPDATE_INCOMPATIBLE），现象是「有新版本却一直更新不了」。
+
+# 网页资源由 scripts/sync-android-assets.mjs 从 dist/ 同步，不入库
+app/src/main/assets/
+
+# IDE
+.idea/
+*.iml
+.DS_Store

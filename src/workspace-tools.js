@@ -78,7 +78,7 @@
       catch(e){feedback(e.message,true);}
     });
     $('export-state').addEventListener('click',()=>{
-      try{const text=S.encode(captured());const url=URL.createObjectURL(new Blob([text],{type:'application/json;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download=`lambda-lab-save-${new Date().toISOString().replace(/[-:]/g,'').slice(0,15)}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);feedback('完整存档已导出。可以在另一台设备导入继续。');}
+      try{const text=S.encode(captured());root.LambdaDownload.save(`lambda-lab-save-${new Date().toISOString().replace(/[-:]/g,'').slice(0,15)}.json`,text,'application/json');feedback('完整存档已导出。可以在另一台设备导入继续。');}
       catch(e){feedback(e.message,true);}
     });
     $('import-state').addEventListener('click',()=>$('import-file').click());

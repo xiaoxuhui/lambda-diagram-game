@@ -480,6 +480,20 @@
 })(typeof globalThis!=='undefined'?globalThis:window);
 
 </script><script>
+(function(root){
+  'use strict';
+  function save(name,content,mime) {
+    if(typeof root.LambdaAndroid?.saveFile==='function') {
+      root.LambdaAndroid.saveFile(name,content,mime);return;
+    }
+    const url=URL.createObjectURL(new Blob([content],{type:`${mime};charset=utf-8`}));
+    const anchor=document.createElement('a');anchor.href=url;anchor.download=name;anchor.click();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }
+  root.LambdaDownload={save};
+})(typeof globalThis!=='undefined'?globalThis:window);
+
+</script><script>
 (function(root) {
   'use strict';
   const C=root.LambdaCore,L=root.LambdaLibrary,S=root.LambdaSnapshot;
@@ -560,7 +574,7 @@
       catch(e){feedback(e.message,true);}
     });
     $('export-state').addEventListener('click',()=>{
-      try{const text=S.encode(captured());const url=URL.createObjectURL(new Blob([text],{type:'application/json;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download=`lambda-lab-save-${new Date().toISOString().replace(/[-:]/g,'').slice(0,15)}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);feedback('完整存档已导出。可以在另一台设备导入继续。');}
+      try{const text=S.encode(captured());root.LambdaDownload.save(`lambda-lab-save-${new Date().toISOString().replace(/[-:]/g,'').slice(0,15)}.json`,text,'application/json');feedback('完整存档已导出。可以在另一台设备导入继续。');}
       catch(e){feedback(e.message,true);}
     });
     $('import-state').addEventListener('click',()=>$('import-file').click());
@@ -849,8 +863,7 @@
   $('export-svg').addEventListener('click',()=>{
     if(!state.term||state.dirty)return;
     const content=D.svg(state.term,null,{export:true}).markup;
-    const url=URL.createObjectURL(new Blob([content],{type:'image/svg+xml;charset=utf-8'}));
-    const a=document.createElement('a');a.href=url;a.download='lambda-diagram.svg';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('SVG 图示已导出');
+    window.LambdaDownload.save('lambda-diagram.svg',content,'image/svg+xml');toast('SVG 图示已导出');
   });
   $('mode-free').addEventListener('click',()=>{stop();state.mode='free';renderMode();render();save();});
   $('mode-challenge').addEventListener('click',()=>selectLevel(state.level));

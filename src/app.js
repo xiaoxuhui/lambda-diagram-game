@@ -207,8 +207,7 @@
   $('export-svg').addEventListener('click',()=>{
     if(!state.term||state.dirty)return;
     const content=D.svg(state.term,null,{export:true}).markup;
-    const url=URL.createObjectURL(new Blob([content],{type:'image/svg+xml;charset=utf-8'}));
-    const a=document.createElement('a');a.href=url;a.download='lambda-diagram.svg';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('SVG 图示已导出');
+    window.LambdaDownload.save('lambda-diagram.svg',content,'image/svg+xml');toast('SVG 图示已导出');
   });
   $('mode-free').addEventListener('click',()=>{stop();state.mode='free';renderMode();render();save();});
   $('mode-challenge').addEventListener('click',()=>selectLevel(state.level));
