@@ -1,13 +1,13 @@
 {
   "name": "lambda-diagram-game",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "description": "离线 Lambda 演算与 John Tromp 图示小游戏",
   "scripts": {
     "test": "node --test tests/*.test.cjs",
     "build": "node scripts/build.mjs",
     "serve": "node scripts/serve.cjs",
-    "test:browser": "node tests/browser.cjs && node tests/workspace-browser.cjs"
+    "test:browser": "node tests/browser.cjs && node tests/workspace-browser.cjs && node tests/numerals-browser.cjs"
   },
   "engines": { "node": ">=20" }
 }

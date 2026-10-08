@@ -72,3 +72,12 @@ test('repeated very long names have an explicit output budget', () => {
   let t=C.V('x'.repeat(1000));for(let i=0;i<5;i++) t=C.A(t,t);
   assert.throws(()=>C.inspect(t),/文本过长/);
 });
+test('decimal integer literals represent Church numbers',()=>{for(const n of [0,1,2,3,12,297])assert.equal(C.churchNumber(p(String(n))),n);});
+test('zero and three expand to standard closed terms',()=>{assert.ok(C.equal(p('0'),p('λf x.x')));assert.ok(C.equal(p('3'),p('λf x.f (f (f x))')));assert.equal(C.freeVars(p('3')).size,0);});
+test('numeric literals work as arguments and compute addition',()=>assert.equal(C.churchNumber(normal('(λm n f x.m f (n f x)) 2 3').term),5));
+test('numeric literals inside lambda remain closed under name shadowing',()=>assert.equal(C.churchNumber(normal('(λf.f) 3').term),3));
+test('identifiers with digits are unchanged',()=>assert.equal(p('f2').name,'f2'));
+test('leading zeroes still mean decimal',()=>assert.equal(C.churchNumber(p('003')),3));
+test('oversized integers are rejected before allocation',()=>{for(const s of ['298','9999999999999999999999999'])assert.throws(()=>p(s),e=>e.position===0&&/数字过大/.test(e.message));});
+test('negative and fractional literals have helpful errors',()=>{assert.throws(()=>p('-3'),/负数/);assert.throws(()=>p('3.5'),/小数/);});
+test('whole-expression depth limits still apply to embedded numerals',()=>assert.throws(()=>p('λa.297'),/嵌套/));

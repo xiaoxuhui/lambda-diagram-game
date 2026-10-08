@@ -29,6 +29,14 @@
       if (/\s/.test(source[i])) { i++; continue; }
       const start = i, c = source[i];
       if ('λ\\.()'.includes(c)) { out.push({ kind: c === '\\' ? 'λ' : c, pos: i++ }); continue; }
+      if(c==='-' && /[0-9]/.test(source[i+1]||'')) throw new LambdaError('丘奇数只支持非负整数，不能输入负数。',i);
+      const numeric=/^[0-9]+/.exec(source.slice(i));
+      if(numeric) {
+        if(source[i+numeric[0].length]==='.') throw new LambdaError('丘奇数只支持非负整数，不能输入小数。',i);
+        const value=Number(numeric[0]),max=LIMITS.depth-3;
+        if(!Number.isSafeInteger(value)||value>max) throw new LambdaError(`数字过大：当前单个丘奇数支持 0 到 ${max}，以避免展开超限。`,i);
+        out.push({kind:'number',value,pos:i});i+=numeric[0].length;continue;
+      }
       const m = /^[a-zA-Z][a-zA-Z0-9_']*/.exec(source.slice(i));
       if (m) { out.push({ kind: 'name', value: m[0], pos: start }); i += m[0].length; continue; }
       throw new LambdaError(`无法识别「${c}」，变量请用英文字母开头。`, i);
@@ -51,13 +59,18 @@
         for (let i = params.length - 1; i >= 0; i--) result = L(params[i], result);
       } else {
         result = atom();
-        while (peek().kind === 'name' || peek().kind === '(') result = A(result, atom());
+        while (peek().kind === 'name' || peek().kind === 'number' || peek().kind === '(') result = A(result, atom());
         if (peek().kind === 'λ') fail('作为参数的 λ 表达式需要括号，例如 f (λx.x)。');
       }
       nesting--; return result;
     }
     function atom() {
       if (peek().kind === 'name') return V(tokens[at++].value);
+      if (peek().kind === 'number') {
+        const n=tokens[at++].value;let body=V('x');
+        for(let i=0;i<n;i++)body=A(V('f'),body);
+        return L('f',L('x',body));
+      }
       if (peek().kind === '(') {
         at++; const t = expr();
         if (peek().kind !== ')') fail('缺少右括号「)」。');
