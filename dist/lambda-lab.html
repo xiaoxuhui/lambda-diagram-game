@@ -1,0 +1,548 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#131c2d">
+  <title>Lambda 线路实验室</title>
+  <style>
+:root{color-scheme:light;--ink:#182238;--muted:#737d8a;--paper:#f5f4ef;--border:#e2e5de;--mint:#276e5b;--mint-light:#e7f1e9;--dark:#131c2d;--pink:#ff91b7;--sans:Inter,"Segoe UI","Microsoft YaHei",sans-serif;--mono:"Cascadia Code","Consolas",monospace}
+*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.65}button,input,textarea,select{font:inherit}button,select{cursor:pointer}button{transition:background .15s,border-color .15s,transform .15s}button:active{transform:translateY(1px)}button:disabled{opacity:.4;cursor:not-allowed;transform:none}button:focus-visible,select:focus-visible,a:focus-visible,summary:focus-visible,textarea:focus-visible,[tabindex]:focus-visible{outline:3px solid #6caa91;outline-offset:3px}button{color:inherit}code{font-family:var(--mono)}[hidden]{display:none!important}.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.topbar{height:74px;padding:0 max(28px,calc((100vw - 1400px)/2));display:flex;align-items:center;justify-content:space-between;background:var(--dark);color:#eef3f5;gap:14px}.brand{display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit;font-size:18px;font-weight:650;letter-spacing:.2px}.brand-mark{width:35px;height:35px;display:grid;place-items:center;border:1px solid #6bc7a9;border-radius:9px;color:#78dab7;font-family:Georgia,serif;font-size:30px;line-height:1}.brand-sub{font-size:13px;font-weight:400;color:#a7b6c8;margin-left:9px}.top-right{display:flex;align-items:center;gap:27px}.offline{color:#b0c3c0;font-size:12px;display:flex;align-items:center;gap:7px}.offline i{width:6px;height:6px;background:#7cd2ac;border-radius:50%}.header-button{background:none;color:#d1d9e4;border:0;padding:8px 0;font-size:12px}.header-button span{display:inline-grid;place-items:center;width:17px;height:17px;margin-left:8px;border:1px solid #67748a;border-radius:50%;font-size:11px}
+.shell{max-width:1400px;margin:auto;padding:34px 28px 22px}.intro{display:flex;align-items:center;justify-content:space-between;margin-bottom:30px;gap:20px}.eyebrow{color:var(--mint);font-size:10px;font-weight:700;letter-spacing:2px;margin:0 0 8px}.intro h1{font-size:29px;letter-spacing:-.6px;line-height:1.35;font-weight:650;margin:0 0 10px}.intro-copy{margin:0;color:var(--muted);font-size:13px}.intro-symbol{position:relative;width:155px;height:92px;margin-right:18px;opacity:.7}.intro-symbol span{font-family:Georgia,serif;position:absolute;right:40px;top:-15px;font-size:74px;color:#306b57}.intro-symbol i{position:absolute;background:#b6cabc;height:1px;left:10px;right:0;bottom:10px}.intro-symbol i:nth-child(3){right:55px;bottom:25px}.intro-symbol i:nth-child(4){width:1px;height:80px;left:95px;bottom:10px}
+.mode-row{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);margin-bottom:23px;gap:8px}.mode-tabs{display:flex;gap:24px}.mode-tab{background:none;border:0;border-bottom:2px solid transparent;padding:11px 2px 14px;margin-bottom:-1px;color:#7c858d;font-weight:550;font-size:13px}.mode-tab.active{border-bottom-color:var(--mint);color:var(--mint)}.mode-tab span{background:#e5e9df;font-size:10px;padding:2px 6px;border-radius:4px;margin-left:4px}.progress-label{font-size:11px;color:var(--muted)}
+.workspace{display:grid;grid-template-columns:360px minmax(0,1fr);gap:22px;align-items:start}.editor-column,.visual-column{display:flex;flex-direction:column;gap:18px;min-width:0}.card{background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:0 3px 12px #18223803}.editor-card{padding:23px}.section-heading{display:flex;align-items:center;justify-content:space-between;gap:8px}.section-heading>div{display:flex;align-items:center;gap:9px}.section-heading h2,.diagram-heading h2{font-size:14px;font-weight:650;letter-spacing:.1px;margin:0}.section-number{font-family:var(--mono);font-size:10px;color:#8c969f;letter-spacing:1px}.mini-label{font-size:9px;letter-spacing:1.5px;color:#9aa19f}.editor-wrap{border:1px solid #dce1d9;border-radius:8px;background:#f9faf6;margin-top:20px;overflow:hidden}.editor-wrap:focus-within{border-color:#739f87;box-shadow:0 0 0 3px #e9f2ec}textarea{width:100%;min-height:148px;resize:vertical;padding:17px 14px 9px;border:0;outline:none!important;background:transparent;color:#293c33;font-family:var(--mono);font-size:19px;line-height:1.7;overflow-wrap:anywhere}.editor-bottom{display:flex;justify-content:space-between;gap:8px;padding:8px 13px;border-top:1px solid #e6eae2;color:#8a948c;font-size:10px;letter-spacing:.2px}.toolbar-caption{font-weight:600;font-size:11px;margin:18px 0 9px;display:flex;justify-content:space-between}.toolbar-caption span{font-weight:400;color:#8c958f;font-size:10px}.symbol-toolbar{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:4px}.symbol-toolbar button{height:33px;min-width:0;padding:0;background:white;border:1px solid #dde2dc;border-radius:5px;font-family:var(--mono);font-size:15px}.symbol-toolbar button:hover,.template-toolbar button:hover{background:#eaf2e9;border-color:#89b299}.symbol-toolbar .lambda-key{background:var(--mint-light);color:var(--mint);border-color:#bdd7c4;font-size:23px}.symbol-toolbar button:last-child{font-size:11px}.template-toolbar{display:flex;gap:5px;margin-top:8px;flex-wrap:wrap}.template-toolbar button{background:#f5f6f2;border:1px solid #e9ebe3;border-radius:5px;padding:5px 8px;font-family:var(--mono);font-size:11px;color:#63766a}.template-toolbar small{font-family:var(--sans);font-size:9px;margin-left:3px}.syntax-note{font-size:10px;color:#8b938e;margin:13px 0 16px;line-height:1.8}.syntax-note code{background:#f0f2ed;padding:1px 3px;border-radius:3px;color:#66746d}.button{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid #dce3da;background:white;border-radius:6px;padding:9px 14px;font-size:12px;font-weight:600;white-space:nowrap}.button:hover:not(:disabled){border-color:#93b8a0;background:#f4f8f3}.button.primary{background:var(--mint);color:white;border-color:var(--mint)}.button.primary:hover{background:#225c4c}.convert-button{width:100%;justify-content:space-between;padding:11px 15px}.key-hint{text-align:center;font-size:9px;color:#a1aaa1;margin:8px 0 18px}.example-row{border-top:1px solid #eceee8;padding-top:15px;display:flex;align-items:center;gap:10px}.example-row label{font-size:11px;color:#8b948d;white-space:nowrap}select{background:#fafbf8;border:1px solid #dfe4dd;border-radius:5px;color:#62746a;padding:7px;font-size:11px;min-width:0}.example-row select{width:100%}.error-message{font-size:11px;padding:10px;margin-bottom:12px;color:#a9434b;border:1px solid #ecc5c7;border-radius:6px;background:#fff4f3;overflow-wrap:anywhere}
+.rules-card{padding:21px 23px}.rules-card>.section-heading{margin-bottom:14px}.rule{display:flex;align-items:center;gap:14px;padding:7px 0}.rule p{display:flex;flex-direction:column;margin:0;font-size:10px;color:#909a92}.rule strong{font-size:11px;font-weight:600;color:#5b7063}.legend-line{width:37px;flex:none;position:relative;height:26px;display:block}.lambda-line:before{content:"";position:absolute;top:9px;left:0;right:0;height:2px;background:#3b9978}.var-line:before{content:"";position:absolute;top:0;bottom:0;left:18px;width:2px;background:#bd975b}.var-line:after{content:"";position:absolute;top:0;left:4px;right:3px;height:2px;background:#bd975b}.app-line:before{content:"";position:absolute;left:2px;right:2px;bottom:4px;height:2px;background:#868ec1}.app-line:after{content:"";position:absolute;left:2px;right:2px;bottom:4px;height:17px;border-left:2px solid #868ec1;border-right:2px solid #868ec1}.rules-foot{font-size:9px;color:#a2aba1;border-top:1px solid #eceee8;margin:13px 0 0;padding-top:12px}
+.diagram-card{background:var(--dark);border:1px solid #243247;color:#edf2fa;border-radius:12px;overflow:hidden;box-shadow:0 6px 18px #131c2d10}.diagram-heading{height:60px;display:flex;justify-content:space-between;align-items:center;gap:10px;padding:0 24px;border-bottom:1px solid #ffffff09}.diagram-heading>div{display:flex;align-items:center;gap:10px}.diagram-heading .section-number{color:#6f8199}.diagram-label{font-size:9px;color:#657991;letter-spacing:1.5px;margin-left:7px}.state-badge{padding:3px 8px;background:#223731;color:#86d3b5;border:1px solid #335949;border-radius:4px;font-size:10px;white-space:nowrap}.state-badge.dirty{background:#3f3427;color:#e4c78c;border-color:#60513b}.state-badge.error{background:#412d37;color:#e9a2b1;border-color:#60414f}.diagram-viewport{height:330px;overflow:auto;display:flex;align-items:safe center;justify-content:safe center;position:relative;background-image:radial-gradient(#77899e28 .8px,transparent .8px);background-size:20px 20px;padding:24px;scrollbar-color:#526579 #19283b}.diagram-mount{display:flex;align-items:center;justify-content:center;flex-shrink:0;margin:auto;min-height:100%}.diagram-mount svg{display:block;flex-shrink:0;filter:drop-shadow(0 0 7px #64d8bd0a)}.diagram-mount line{transition:stroke .2s}.diagram-empty{text-align:center;color:#8696ac;margin:auto}.diagram-empty span{font-family:Georgia,serif;font-size:55px;color:#4b6475}.diagram-empty p{font-size:14px;margin:0 0 5px}.diagram-empty small{font-size:11px}.diagram-footer{min-height:51px;border-top:1px solid #ffffff09;display:flex;align-items:center;justify-content:space-between;padding:9px 17px 9px 24px;gap:8px;flex-wrap:wrap}.diagram-legend{display:flex;gap:15px;font-size:9px;color:#8496ad}.diagram-legend>span{display:flex;align-items:center;gap:5px}.dot{height:5px;width:5px;border-radius:50%;display:inline-block}.mint{background:#64d8bd}.pink{background:var(--pink)}.zoom-controls{display:flex;align-items:center;gap:2px;color:#b6c7d8}.zoom-controls button{background:transparent;border:1px solid transparent;color:#b6c7d8;padding:3px 7px;font-size:11px;border-radius:4px;min-width:25px}.zoom-controls button:hover{background:#253247;border-color:#40536c}.zoom-controls #zoom-label{font-size:9px;color:#7489a4;min-width:36px;text-align:center}.zoom-controls #export-svg{border-left:1px solid #344157;padding-left:10px;margin-left:4px;font-size:9px}
+.execution-card{padding:20px 23px}.execution-top{display:flex;align-items:center;justify-content:space-between;gap:10px}.speed-label{font-size:10px;color:#98a18f;display:flex;align-items:center;gap:7px}.speed-label select{padding:4px 6px;font-size:10px}.run-controls{display:flex;align-items:center;gap:8px;margin-top:17px;flex-wrap:wrap}.run-button{background:var(--mint-light);color:var(--mint);border-color:#c0d9c8;min-width:92px}.reset-button{color:#8b978d;margin-left:2px}.step-counter{margin-left:auto;color:#9ba298;font-size:10px}.step-counter b{font-family:var(--mono);font-size:19px;font-weight:500;color:#46674f;margin-right:4px}.run-status{font-size:11px;color:#85917f;margin:12px 0 14px;overflow-wrap:anywhere;min-height:18px}.current-term{background:#f6f8f2;border:1px solid #e8ede2;padding:12px 14px;border-radius:7px}.current-term>div{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:9px;color:#899580;margin-bottom:6px}.current-term>code{display:block;font-size:15px;color:#3c5541;overflow-wrap:anywhere;max-height:132px;overflow:auto;line-height:1.8}.decoded{font-size:9px;color:var(--mint);text-align:right}.next-explanation{margin-top:12px;font-size:10px;color:#929d8b;overflow-wrap:anywhere;line-height:1.9}.next-explanation code{color:#6d8467;font-size:10px}.history-details{border-top:1px solid #eaeee5;margin-top:16px;padding-top:12px}.history-details summary{font-size:11px;color:#71826b;cursor:pointer}.history-details summary>span{float:right;color:#a1ac9b;font-size:10px}.history-list{list-style:none;margin:13px 0 0;padding:0;max-height:225px;overflow:auto}.history-list li{display:grid;grid-template-columns:25px minmax(0,1fr);gap:8px;padding:9px 0;border-top:1px solid #eff2ec}.history-list li>span{font-family:var(--mono);font-size:10px;color:#a2ad9b}.history-list code{font-size:11px;color:#5d7754;overflow-wrap:anywhere}.history-list small{display:block;color:#a0aa9a;font-size:9px;overflow-wrap:anywhere;margin-top:3px}
+.page-footer{margin-top:28px;display:flex;justify-content:space-between;gap:12px;border-top:1px solid var(--border);padding-top:18px;color:#a4ab9e;font-size:10px}.page-footer b{font-family:Georgia,serif;font-size:16px;color:#7f9781;margin-right:8px}.help-panel{border:1px solid #d8e2d6;background:#edf2e8;border-radius:10px;padding:21px 25px;margin-bottom:23px;display:grid;grid-template-columns:1fr 1.6fr;gap:30px;color:#61735c}.help-panel h2{font-size:13px;margin:0 0 9px}.help-panel p{font-size:11px;margin:5px 0;line-height:1.9}.help-panel code{color:#2d6346}.help-panel a{color:#316c52;white-space:nowrap}
+.challenge-panel{background:#fff;border:1px solid #d8e2d6;border-radius:12px;margin-bottom:22px;padding:20px 23px}.level-list{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}.level-list button{font-size:11px;padding:6px 12px;background:#f6f7f1;border:1px solid #e3e8db;border-radius:5px;color:#8a977f}.level-list button.active{background:var(--mint);color:white;border-color:var(--mint)}.level-list button.completed:after{content:' ✓';color:#6eb293}.level-list button.active.completed:after{color:#a5efd0}.challenge-body{display:flex;justify-content:space-between;align-items:center;gap:30px}.challenge-body h2{font-size:18px;margin:0 0 5px}.challenge-body p{font-size:12px;color:#8b9982;margin:0}.challenge-body .eyebrow{font-size:9px;color:#739068;margin-bottom:5px}.challenge-target{padding:12px 17px;border-left:2px solid #d8e5d2;max-width:45%;display:flex;flex-direction:column;gap:3px}.challenge-target span{font-size:9px;color:#9ba68f}.challenge-target strong{font-size:12px;color:#5c8253;font-weight:600}.challenge-target code{font-size:11px;color:#7e9972;overflow-wrap:anywhere}.challenge-footer{display:flex;align-items:center;gap:14px;margin-top:19px;flex-wrap:wrap}.challenge-footer #check-answer{margin-left:auto}.text-button{background:none;border:0;color:#829675;font-size:11px;padding:6px 0;text-decoration:underline;text-underline-offset:3px}.challenge-footer p{font-size:11px;color:#8c9e7e;margin:0;flex:1;min-width:130px}.challenge-feedback{font-size:12px;color:#487b42;margin:10px 0 0}.challenge-feedback:empty{display:none}.toast{position:fixed;bottom:25px;left:50%;transform:translateX(-50%);background:#254d3c;color:#fff;padding:11px 21px;border-radius:7px;box-shadow:0 8px 24px #0002;font-size:12px;z-index:10;max-width:90vw}
+@media(min-width:1600px){.diagram-viewport{height:390px}.shell{padding-top:43px}.intro{margin-bottom:35px}.workspace{grid-template-columns:380px minmax(0,1fr)}}
+@media(max-width:1100px){.workspace{grid-template-columns:320px minmax(0,1fr);gap:16px}.editor-card{padding:20px}.diagram-label{display:none}.diagram-footer{padding:10px 15px}.diagram-legend{gap:10px}.execution-card{padding:19px}.button{padding:9px 11px}.reset-button{margin-left:0}.run-controls{gap:6px}.shell{padding:27px 22px}.topbar{padding:0 22px}}
+@media(max-width:800px){.workspace{grid-template-columns:minmax(0,1fr)}.rules-card{display:none}.editor-wrap{margin-top:15px}textarea{min-height:112px}.editor-card{padding:20px}.editor-column{gap:0}.intro{margin-bottom:20px}.intro h1{font-size:25px}.intro-symbol{width:110px;margin-right:0}.intro-symbol i:nth-child(4){left:75px}.visual-column{gap:16px}.symbol-toolbar{gap:6px}.symbol-toolbar button{height:37px}.diagram-viewport{height:330px}.help-panel{grid-template-columns:1fr;gap:12px}.example-row{padding-top:13px}.key-hint{margin-bottom:13px}.page-footer{font-size:9px}.challenge-body{gap:15px}.challenge-target{max-width:45%}.challenge-footer #check-answer{margin-left:auto}}
+@media(max-width:480px){.topbar{height:62px;padding:0 17px}.brand{font-size:16px;gap:9px}.brand-mark{width:30px;height:30px;font-size:26px}.brand-sub{display:block;margin:0;font-size:9px;line-height:1.3}.offline{display:none}.top-right{gap:0}.header-button{font-size:10px}.shell{padding:24px 14px 18px}.eyebrow{font-size:8px;letter-spacing:1.5px}.intro h1{font-size:22px;margin-bottom:8px}.intro-copy{font-size:11px}.intro-symbol{display:none}.mode-tabs{gap:19px}.mode-tab{font-size:12px}.progress-label{font-size:9px}.mode-row{margin-bottom:18px}.diagram-heading{padding:0 16px;height:56px}.diagram-heading h2{font-size:13px}.diagram-heading>div{gap:7px}.diagram-footer{gap:9px;justify-content:center;padding:9px 10px}.diagram-legend{font-size:8px}.zoom-controls{margin-left:auto}.zoom-controls button{font-size:10px;padding:3px 5px}.zoom-controls #zoom-label{min-width:29px}.zoom-controls #export-svg{font-size:8px;padding-left:6px;margin-left:1px}.execution-card{padding:18px 15px}.run-controls{gap:5px}.run-controls .button{font-size:11px;padding:8px 9px}.run-button{min-width:76px}.step-counter{font-size:9px}.step-counter b{font-size:17px}.page-footer{flex-direction:column;gap:4px;margin-top:20px;padding-top:12px}.challenge-panel{padding:17px 16px}.level-list{gap:5px;margin-bottom:15px}.level-list button{padding:6px 8px;font-size:10px}.challenge-body{flex-direction:column;align-items:stretch;gap:13px}.challenge-target{max-width:100%;padding:7px 12px}.challenge-body h2{font-size:16px}.challenge-body p{font-size:11px}.challenge-footer{gap:10px}.challenge-footer p{flex-basis:100%;order:3}.current-term>code{font-size:14px}.help-panel{padding:17px}.editor-bottom{font-size:9px}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#"><span class="brand-mark">λ</span><span>Lambda <span class="brand-sub">线路实验室</span></span></a>
+    <div class="top-right"><span class="offline"><i></i> 离线可用</span><button id="help-toggle" class="header-button" aria-expanded="false" aria-controls="help-panel">玩法与语法 <span>?</span></button></div>
+  </header>
+  <main class="shell">
+    <section class="intro">
+      <div><p class="eyebrow">LAMBDA CALCULUS / PLAYGROUND</p><h1>写一段 λ，看函数如何流动。</h1><p class="intro-copy">从表达式到 Tromp 图示，一步一步，看见计算。</p></div>
+      <div class="intro-symbol" aria-hidden="true"><span>λ</span><i></i><i></i><i></i></div>
+    </section>
+    <section id="help-panel" class="help-panel" hidden>
+      <div><h2>三个积木，就能计算</h2><p><code>x</code> 是变量；<code>λx.x</code> 是函数；<code>f x</code> 把 x 交给 f。<code>(λx.x) y → y</code> 是一次 β 归约。</p></div>
+      <div><h2>怎么写、怎么看</h2><p>用快捷栏插入 λ；也可用 <code>\</code>。<code>λx y.x</code> 等同 <code>λx.λy.x</code>。变量之间用空格：<code>xy</code> 是一个名字。λ 的作用域延伸到右侧，作为参数时需加括号。</p><p>同色竖线连接绑定横线；应用横线连接子式最左变量。粉色标记下一步归约，自由变量以虚线显示。采用左最外正常序，包含函数内部归约。<a href="https://tromp.github.io/cl/diagrams.html" target="_blank" rel="noopener">John Tromp 原始说明 ↗</a></p></div>
+    </section>
+    <nav class="mode-row" aria-label="游戏模式"><div class="mode-tabs"><button id="mode-free" class="mode-tab active" aria-pressed="true">自由实验</button><button id="mode-challenge" class="mode-tab" aria-pressed="false">闯关模式 <span>5</span></button></div><span id="progress-text" class="progress-label">探索 · 输入 · 归约</span></nav>
+    <section id="challenge-panel" class="challenge-panel" hidden>
+      <div class="level-list" id="level-list" aria-label="选择关卡"></div>
+      <div class="challenge-body"><div><p id="level-topic" class="eyebrow"></p><h2 id="level-title"></h2><p id="level-description"></p></div><div class="challenge-target"><span>目标正规形</span><strong id="target-label"></strong><code id="target-expression"></code></div></div>
+      <div class="challenge-footer"><button id="hint-toggle" class="text-button" aria-expanded="false">显示提示</button><p id="hint" hidden></p><button id="check-answer" class="button primary">验证答案 <span>↗</span></button><button id="next-level" class="button" hidden>下一关 →</button></div>
+      <p id="challenge-feedback" class="challenge-feedback" role="status"></p>
+    </section>
+    <div class="workspace">
+      <aside class="editor-column">
+        <section class="card editor-card">
+          <div class="section-heading"><div><span class="section-number">01</span><h2>写下表达式</h2></div><span class="mini-label">INPUT</span></div>
+          <label class="sr-only" for="expression">Lambda 表达式</label>
+          <div class="editor-wrap"><textarea id="expression" spellcheck="false" autocapitalize="off" autocomplete="off" aria-describedby="syntax-note error-message">(λx.x) (λy.y)</textarea><div class="editor-bottom"><span>λ / \ 均可输入</span><span id="char-count">12 / 1500</span></div></div>
+          <p class="toolbar-caption">快捷输入 <span>插入到光标位置</span></p>
+          <div id="symbol-toolbar" class="symbol-toolbar" role="group" aria-label="Lambda 符号快捷栏">
+            <button data-insert="λ" class="lambda-key" aria-label="插入 λ">λ</button><button data-insert="x">x</button><button data-insert="y">y</button><button data-insert="z">z</button><button data-insert="f">f</button><button data-insert=".">.</button><button data-insert="(">(</button><button data-insert=")">)</button><button data-insert=" " aria-label="插入空格">␣</button><button id="pair-key" aria-label="插入成对括号">( )</button>
+          </div>
+          <div class="template-toolbar" role="group" aria-label="函数模板"><button data-insert="λx.x">I <small>恒等</small></button><button data-insert="λx.λy.x">TRUE</button><button data-insert="λx.λy.y">FALSE</button><button data-insert="λf.λx.f (f x)">2 <small>Church</small></button></div>
+          <p id="syntax-note" class="syntax-note">应用用空格分开，例如 <code>f x</code>；函数参数用括号包住。</p>
+          <div id="error-message" class="error-message" role="alert" hidden></div>
+          <button id="convert" class="button primary convert-button">转换成图示 <span>→</span></button>
+          <p class="key-hint">Ctrl / ⌘ + Enter 快速转换</p>
+          <div class="example-row"><label for="examples">试试示例</label><select id="examples"><option value="">选择一个表达式…</option></select></div>
+        </section>
+        <section class="card rules-card"><div class="section-heading"><div><span class="section-number">λ</span><h2>读懂线路</h2></div></div><div class="rule"><span class="legend-line lambda-line"></span><p><strong>抽象</strong><span>一条横线，绑定一个变量。</span></p></div><div class="rule"><span class="legend-line var-line"></span><p><strong>变量</strong><span>竖线连接到它所属的 λ。</span></p></div><div class="rule"><span class="legend-line app-line"></span><p><strong>应用</strong><span>横线连接函数与参数。</span></p></div><p class="rules-foot">颜色辅助追踪绑定；连线结构决定含义。</p></section>
+      </aside>
+      <section class="visual-column">
+        <div class="diagram-card">
+          <div class="diagram-heading"><div><span class="section-number">02</span><h2>Tromp 图示</h2><span class="diagram-label">LIVE STRUCTURE</span></div><span id="state-badge" class="state-badge">可以归约</span></div>
+          <div id="diagram-viewport" class="diagram-viewport" tabindex="0" aria-label="可滚动的图示画布"><div id="diagram-mount" class="diagram-mount"></div><div id="diagram-empty" class="diagram-empty" hidden><span>λ</span><p>等待一个表达式</p><small>写好后，点击「转换成图示」</small></div></div>
+          <div class="diagram-footer"><div class="diagram-legend"><span><i class="dot mint"></i>绑定线路</span><span><i class="dot pink"></i>下一步归约</span></div><div class="zoom-controls"><button id="zoom-out" aria-label="缩小图示">−</button><span id="zoom-label">100%</span><button id="zoom-in" aria-label="放大图示">+</button><button id="fit" aria-label="适配图示">适配</button><button id="export-svg">导出 SVG ↗</button></div></div>
+        </div>
+        <section class="card execution-card">
+          <div class="execution-top"><div class="section-heading"><div><span class="section-number">03</span><h2>运行与归约</h2></div></div><label class="speed-label" for="speed">速度 <select id="speed"><option value="1200">慢速</option><option value="600" selected>正常</option><option value="180">快速</option></select></label></div>
+          <div class="run-controls"><button id="run" class="button run-button"><span>▶</span> <span id="run-label">运行</span></button><button id="step" class="button">单步 →</button><button id="back" class="button">← 回退</button><button id="reset" class="button reset-button">↺ 重置</button><span class="step-counter"><b id="step-count">0</b> 步</span></div>
+          <p id="run-status" class="run-status" role="status" aria-live="polite">准备好了。点击单步，观察一次函数替换。</p>
+          <div class="current-term"><div><span>当前表达式</span><span id="decoded" class="decoded"></span></div><code id="current-expression"></code></div>
+          <div id="next-explanation" class="next-explanation"></div>
+          <details class="history-details" id="history-details"><summary>归约轨迹 <span id="history-count">0 次替换</span></summary><ol id="history-list" class="history-list"></ol></details>
+        </section>
+      </section>
+    </div>
+    <footer class="page-footer"><span><b>λ</b> 只有变量、函数和应用。其余，交给计算。</span><span>正常序 β 归约 · 本地保存</span></footer>
+  </main>
+  <div id="toast" class="toast" role="status" hidden></div>
+  <script>
+(function (root) {
+  'use strict';
+  const LIMITS = Object.freeze({ chars: 1500, nodes: 4000, depth: 300, steps: 200, nameChars:30000 });
+  const V = name => ({ type: 'var', name });
+  const L = (param, body) => ({ type: 'abs', param, body });
+  const A = (fn, arg) => ({ type: 'app', fn, arg });
+
+  class LambdaError extends Error {
+    constructor(message, position = null) { super(message); this.name = 'LambdaError'; this.position = position; }
+  }
+  function inspect(term) {
+    let nodes = 0, depth = 0, vars = 0, abstractions = 0, applications = 0, nameChars = 0;
+    const stack = [[term, 1]];
+    while (stack.length) {
+      const [t, d] = stack.pop(); nodes++; depth = Math.max(depth, d);
+      if (nodes > LIMITS.nodes) throw new LambdaError(`表达式超过 ${LIMITS.nodes} 个节点，请缩小表达式。`);
+      if (d > LIMITS.depth) throw new LambdaError(`嵌套超过 ${LIMITS.depth} 层，请简化表达式。`);
+      if (t.type === 'var') { vars++; nameChars += t.name.length; }
+      else if (t.type === 'abs') { abstractions++; nameChars += t.param.length; stack.push([t.body, d + 1]); }
+      else { applications++; stack.push([t.fn, d + 1], [t.arg, d + 1]); }
+      if (nameChars > LIMITS.nameChars) throw new LambdaError('展开后的变量名文本过长，已暂停。请使用较短的变量名。');
+    }
+    return { nodes, depth, vars, abstractions, applications };
+  }
+  function tokenize(source) {
+    if (source.length > LIMITS.chars) throw new LambdaError(`输入最多 ${LIMITS.chars} 个字符。`, LIMITS.chars);
+    const out = [];
+    for (let i = 0; i < source.length;) {
+      if (/\s/.test(source[i])) { i++; continue; }
+      const start = i, c = source[i];
+      if ('λ\\.()'.includes(c)) { out.push({ kind: c === '\\' ? 'λ' : c, pos: i++ }); continue; }
+      const m = /^[a-zA-Z][a-zA-Z0-9_']*/.exec(source.slice(i));
+      if (m) { out.push({ kind: 'name', value: m[0], pos: start }); i += m[0].length; continue; }
+      throw new LambdaError(`无法识别「${c}」，变量请用英文字母开头。`, i);
+    }
+    out.push({ kind: 'end', pos: source.length }); return out;
+  }
+  function parse(source) {
+    const tokens = tokenize(source); let at = 0, nesting = 0;
+    const peek = () => tokens[at];
+    const fail = message => { throw new LambdaError(message, peek().pos); };
+    function expr() {
+      if (++nesting > LIMITS.depth) fail(`嵌套超过 ${LIMITS.depth} 层。`);
+      let result;
+      if (peek().kind === 'λ') {
+        at++; const params = [];
+        while (peek().kind === 'name') params.push(tokens[at++].value);
+        if (!params.length) fail('λ 后面需要一个变量，例如 λx.x。');
+        if (peek().kind !== '.') fail('变量后面需要一个点「.」。');
+        at++; result = expr();
+        for (let i = params.length - 1; i >= 0; i--) result = L(params[i], result);
+      } else {
+        result = atom();
+        while (peek().kind === 'name' || peek().kind === '(') result = A(result, atom());
+        if (peek().kind === 'λ') fail('作为参数的 λ 表达式需要括号，例如 f (λx.x)。');
+      }
+      nesting--; return result;
+    }
+    function atom() {
+      if (peek().kind === 'name') return V(tokens[at++].value);
+      if (peek().kind === '(') {
+        at++; const t = expr();
+        if (peek().kind !== ')') fail('缺少右括号「)」。');
+        at++; return t;
+      }
+      fail(peek().kind === 'end' ? '这里需要一个表达式。' : '这里需要变量或括号内的表达式。');
+    }
+    if (peek().kind === 'end') fail('先写一个 Lambda 表达式，或选一个示例。');
+    const t = expr();
+    if (peek().kind !== 'end') fail('多余的符号或右括号。');
+    inspect(t); return t;
+  }
+  function format(t, context = 0) {
+    if (t.type === 'var') return t.name;
+    if (t.type === 'abs') {
+      const s = `λ${t.param}.${format(t.body)}`;
+      return context > 0 ? `(${s})` : s;
+    }
+    const s = `${format(t.fn, 1)} ${format(t.arg, 2)}`;
+    return context > 1 ? `(${s})` : s;
+  }
+  function freeVars(t, bound = new Set(), out = new Set()) {
+    if (t.type === 'var') { if (!bound.has(t.name)) out.add(t.name); }
+    else if (t.type === 'abs') { const next = new Set(bound); next.add(t.param); freeVars(t.body, next, out); }
+    else { freeVars(t.fn, bound, out); freeVars(t.arg, bound, out); }
+    return out;
+  }
+  function allNames(t, out = new Set()) {
+    if (t.type === 'var') out.add(t.name);
+    else if (t.type === 'abs') { out.add(t.param); allNames(t.body, out); }
+    else { allNames(t.fn, out); allNames(t.arg, out); }
+    return out;
+  }
+  function renameBound(t, from, to) {
+    if (t.type === 'var') return t.name === from ? V(to) : t;
+    if (t.type === 'abs') return t.param === from ? t : L(t.param, renameBound(t.body, from, to));
+    return A(renameBound(t.fn, from, to), renameBound(t.arg, from, to));
+  }
+  function substitute(t, name, argument) {
+    const argFree = freeVars(argument), used = allNames(t, allNames(argument)); used.add(name);
+    const argSize = inspect(argument).nodes; let cost = 0;
+    function charge(n = 1) {
+      cost += n;
+      if (cost > LIMITS.nodes) throw new LambdaError(`这一步会超过 ${LIMITS.nodes} 个节点，已暂停。`);
+    }
+    function sub(node) {
+      if (node.type === 'var') { charge(node.name === name ? argSize : 1); return node.name === name ? argument : node; }
+      if (node.type === 'app') { charge(); return A(sub(node.fn), sub(node.arg)); }
+      if (node.param === name || !freeVars(node.body).has(name)) { charge(inspect(node).nodes); return node; }
+      charge(); let param = node.param, body = node.body;
+      if (argFree.has(param)) {
+        let i = 1; while (used.has(`${param}${i}`)) i++;
+        const fresh = `${param}${i}`; used.add(fresh); body = renameBound(body, param, fresh); param = fresh;
+      }
+      return L(param, sub(body));
+    }
+    const result = sub(t); inspect(result); return result;
+  }
+  function alphaKey(t, env = []) {
+    if (t.type === 'var') {
+      const i = env.lastIndexOf(t.name);
+      return i < 0 ? ['free', t.name] : ['bound', env.length - 1 - i];
+    }
+    if (t.type === 'abs') return ['abs', alphaKey(t.body, [...env, t.param])];
+    return ['app', alphaKey(t.fn, env), alphaKey(t.arg, env)];
+  }
+  const key = t => JSON.stringify(alphaKey(t));
+  const equal = (a, b) => key(a) === key(b);
+  function findRedex(t, path = []) {
+    if (t.type === 'app') {
+      if (t.fn.type === 'abs') return { term: t, path };
+      return findRedex(t.fn, [...path, 'fn']) || findRedex(t.arg, [...path, 'arg']);
+    }
+    if (t.type === 'abs') return findRedex(t.body, [...path, 'body']);
+    return null;
+  }
+  function replaceAt(t, path, replacement, i = 0) {
+    if (i === path.length) return replacement;
+    const part = path[i];
+    if (part === 'body') return L(t.param, replaceAt(t.body, path, replacement, i + 1));
+    return part === 'fn' ? A(replaceAt(t.fn, path, replacement, i + 1), t.arg) : A(t.fn, replaceAt(t.arg, path, replacement, i + 1));
+  }
+  function step(t) {
+    const redex = findRedex(t); if (!redex) return null;
+    const { fn, arg } = redex.term;
+    const replacement = substitute(fn.body, fn.param, arg);
+    const result = replaceAt(t, redex.path, replacement); inspect(result);
+    return { term: result, path: redex.path, before: redex.term, replacement, param: fn.param, argument: arg };
+  }
+  function normalize(t, max = LIMITS.steps) {
+    const seen = new Set([key(t)]); let steps = 0;
+    while (steps < max) {
+      const s = step(t); if (!s) return { term: t, steps, status: 'normal' };
+      t = s.term; steps++; const k = key(t);
+      if (seen.has(k)) return { term: t, steps, status: 'cycle' };
+      seen.add(k);
+    }
+    return { term: t, steps, status: findRedex(t) ? 'limit' : 'normal' };
+  }
+  function churchNumber(t) {
+    if (t.type !== 'abs' || t.body.type !== 'abs' || t.param === t.body.param) return null;
+    const f = t.param, x = t.body.param; let body = t.body.body, n = 0;
+    while (body.type === 'app' && body.fn.type === 'var' && body.fn.name === f) { n++; body = body.arg; }
+    return body.type === 'var' && body.name === x ? n : null;
+  }
+  const API = { LIMITS, LambdaError, V, L, A, parse, format, inspect, freeVars, substitute, alphaKey, key, equal, findRedex, step, normalize, churchNumber };
+  root.LambdaCore = API;
+  if (typeof module !== 'undefined' && module.exports) module.exports = API;
+})(typeof globalThis !== 'undefined' ? globalThis : window);
+
+</script><script>
+(function (root) {
+  'use strict';
+  const COLORS = ['#64d8bd', '#eabe75', '#9fa6ff', '#f38fac', '#79bcf2', '#c2dd87'];
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&apos;' }[c]));
+  function layout(term, redexPath = null) {
+    const lines = [], labels = [], binders = [], leaves = []; let leaf = 0;
+    const samePath = (a,b) => b !== null && a.length === b.length && a.every((x,i)=>x===b[i]);
+    function draw(t, top, env, path) {
+      const start = leaf;
+      if (t.type === 'var') {
+        const x = leaf++ * 40 + 50, end = top + 32;
+        const binder = [...env].reverse().find(b=>b.name === t.name);
+        const line = { kind:'variable', x1:x, x2:x, y1:binder ? binder.y : 30, y2:end,
+          color:binder ? binder.color : '#aeb9ce', free:!binder, name:t.name, binder:binder ? binder.id : null, path };
+        lines.push(line); leaves.push(line);
+        if (!binder) labels.push({ x, y:19, text:t.name, free:true });
+        return { left:x, right:x, bottom:end, start, end:leaf };
+      }
+      if (t.type === 'abs') {
+        const binder = { id:binders.length, name:t.param, y:top, color:COLORS[binders.length % COLORS.length] };
+        binders.push(binder);
+        const body = draw(t.body, top+32, [...env,binder], [...path,'body']);
+        const active = redexPath && samePath(path,[...redexPath,'fn']);
+        lines.push({ kind:'abstraction', x1:body.left-15, x2:body.right+15, y1:top, y2:top, color:binder.color, binder:binder.id, name:t.param, active });
+        return { ...body };
+      }
+      const left = draw(t.fn, top, env, [...path,'fn']);
+      const right = draw(t.arg, top, env, [...path,'arg']);
+      const bottom = Math.max(left.bottom, right.bottom) + 32;
+      lines.push({ kind:'extension', x1:left.left, x2:left.left, y1:left.bottom, y2:bottom, color:leaves[left.start].color });
+      lines.push({ kind:'extension', x1:right.left, x2:right.left, y1:right.bottom, y2:bottom, color:leaves[right.start].color });
+      lines.push({ kind:'application', x1:left.left, x2:right.left, y1:bottom, y2:bottom, color:'#d5dff1', active:samePath(path,redexPath), path });
+      return { left:left.left, right:right.right, bottom, start, end:leaf };
+    }
+    const tree = draw(term, 64, [], []);
+    return { lines, labels, binders, leaves, width:Math.max(140, leaf*40+60), height:tree.bottom+48 };
+  }
+  function svg(term, redexPath = null, options = {}) {
+    const model = layout(term, redexPath), { width, height } = model;
+    const backgrounds = options.export ? `<rect width="100%" height="100%" fill="#131c2d"/>` : '';
+    const shapes = model.lines.map(l => `<line x1="${l.x1}" y1="${l.y1}" x2="${l.x2}" y2="${l.y2}" stroke="${l.active ? '#ff91b7' : l.color}" stroke-width="${l.active ? 5 : 3}" stroke-linecap="square" ${l.free ? 'stroke-dasharray="5 5"' : ''} data-kind="${l.kind}" ${l.active ? 'data-active="true"' : ''}><title>${esc(l.kind==='abstraction' ? `λ${l.name}：绑定横线` : l.kind==='variable' ? `${l.name}：${l.free?'自由变量':`连接绑定 λ${l.name}`}` : l.kind==='application' ? '函数应用：连接左右子项最左变量' : '延伸到外层应用')}</title></line>`).join('');
+    const labels = model.labels.map(l=>`<text x="${l.x}" y="${l.y}" text-anchor="middle" fill="#bac5d8" font-size="10" font-family="monospace"><title>${esc(l.text)}</title>${esc(l.text.length>6?l.text.slice(0,5)+'…':l.text)}</text>`).join('');
+    return { model, markup:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="John Tromp Lambda 图示"><title>John Tromp Lambda 图示</title>${backgrounds}${shapes}${labels}</svg>` };
+  }
+  const API = { layout, svg, COLORS };
+  root.LambdaDiagram = API;
+  if (typeof module !== 'undefined' && module.exports) module.exports = API;
+})(typeof globalThis !== 'undefined' ? globalThis : window);
+
+</script><script>
+(function(root) {
+  'use strict';
+  const I='λx.x', TRUE='λx.λy.x', FALSE='λx.λy.y';
+  const TWO='λf.λx.f (f x)', THREE='λf.λx.f (f (f x))', FIVE='λf.λx.f (f (f (f (f x))))';
+  const ADD='λm.λn.λf.λx.m f (n f x)', SUCC='λn.λf.λx.f (n f x)';
+  const examples = [
+    { name:'恒等函数 I', term:I },
+    { name:'TRUE · 选择第一个', term:TRUE },
+    { name:'FALSE / 数字 0', term:FALSE },
+    { name:'Church 数字 2', term:TWO },
+    { name:'S K K → I', term:`(λx y z.(x z) (y z)) (${TRUE}) (${TRUE})` },
+    { name:'加法 · 2 + 3', term:`(${ADD}) (${TWO}) (${THREE})` },
+    { name:'Ω · 无限循环', term:'(λx.x x) (λx.x x)' },
+    { name:'防止变量捕获', term:'(λx.λy.x) y' }
+  ];
+  const levels = [
+    { id:1, name:'原样返回', topic:'恒等函数', description:'让恒等函数接收一个函数，看看它如何把输入原样返回。', start:'(λx.x) (λy.y)', target:I, targetLabel:'I · 恒等函数', hint:'λx.x 会把参数直接返回。点击「单步」，观察 x 被整个参数替换。' },
+    { id:2, name:'选择第一个', topic:'布尔值', description:'两个函数交给 TRUE；归约后应只留下第一个。', start:`(${TRUE}) (${I}) (${TRUE})`, target:I, targetLabel:'I · 恒等函数', hint:'λx.λy.x 接收两个参数，只保留第一个。第二个参数可以是任意式。' },
+    { id:3, name:'翻转真假', topic:'函数组合', description:'将 TRUE 交给 NOT，把选择第一个变成选择第二个。', start:`(λb.b (${FALSE}) (${TRUE})) (${TRUE})`, target:FALSE, targetLabel:'FALSE · 选择第二个', hint:'布尔值本身是一个选择器。NOT 把 FALSE 放在第一位，把 TRUE 放在第二位。' },
+    { id:4, name:'再走一步', topic:'Church 数', description:'将 2 交给后继函数，让 f 在 x 上连续作用 3 次。', start:`(${SUCC}) (${TWO})`, target:THREE, targetLabel:'Church 数字 3', hint:'数字 n 表示重复 n 次。「加一」会在 n 次作用之外，再套上一层 f。' },
+    { id:5, name:'让函数相加', topic:'Church 加法', description:'不用数字运算，只靠函数，把 2 + 3 归约成 5。', start:`(${ADD}) (${TWO}) (${THREE})`, target:FIVE, targetLabel:'Church 数字 5', hint:'m f (n f x)：先把 f 作用 n 次，再继续作用 m 次。运行到正规形后验证答案。' }
+  ];
+  const API={ examples, levels, I, TRUE, FALSE };
+  root.LambdaPresets=API;
+  if(typeof module !== 'undefined' && module.exports) module.exports=API;
+})(typeof globalThis !== 'undefined' ? globalThis : window);
+
+</script><script>
+(function () {
+  'use strict';
+  const C=window.LambdaCore, D=window.LambdaDiagram, P=window.LambdaPresets;
+  const $=id=>document.getElementById(id);
+  const input=$('expression');
+  const state={ term:null, original:null, history:[], dirty:false, running:false, timer:null,
+    mode:'free', level:0, completed:new Set(), halt:'', scale:1, autoFit:true, model:null };
+  const STORAGE='lambda-lab-v1';
+  let toastTimer;
+  function save() {
+    try { localStorage.setItem(STORAGE,JSON.stringify({version:1,draft:input.value,completed:[...state.completed],mode:state.mode,level:state.level})); }
+    catch { /* Optional storage: the calculator remains usable. */ }
+  }
+  function restore() {
+    try {
+      const s=JSON.parse(localStorage.getItem(STORAGE));
+      if(!s || s.version!==1) return;
+      if(typeof s.draft==='string' && s.draft.length<=C.LIMITS.chars) input.value=s.draft;
+      if(Array.isArray(s.completed)) state.completed=new Set(s.completed.filter(x=>Number.isInteger(x)&&x>=1&&x<=P.levels.length));
+      if(s.mode==='challenge') state.mode='challenge';
+      if(Number.isInteger(s.level)&&s.level>=0&&s.level<P.levels.length) state.level=s.level;
+    } catch { /* Ignore damaged or inaccessible storage. */ }
+  }
+  function toast(message) {
+    clearTimeout(toastTimer); $('toast').textContent=message; $('toast').hidden=false;
+    toastTimer=setTimeout(()=>$('toast').hidden=true,2400);
+  }
+  function stop() { clearTimeout(state.timer); state.timer=null; state.running=false; }
+  function changed() {
+    stop(); state.dirty=true; state.halt=''; $('error-message').hidden=true;
+    $('challenge-feedback').textContent=''; $('next-level').hidden=true;
+    $('char-count').textContent=`${input.value.length} / ${C.LIMITS.chars}`;
+    save(); render();
+  }
+  function insert(text, pair=false) {
+    const start=input.selectionStart,end=input.selectionEnd;
+    const selected=input.value.slice(start,end), insertion=pair?`(${selected})`:text;
+    input.setRangeText(insertion,start,end,'end');
+    input.focus();
+    if(pair) input.setSelectionRange(start+1,start+1+selected.length);
+    changed();
+  }
+  function convert() {
+    stop(); $('error-message').hidden=true; state.halt='';
+    $('challenge-feedback').textContent=''; $('next-level').hidden=true;
+    try {
+      const term=C.parse(input.value);
+      state.term=term; state.original=term; state.history=[{term,change:null}]; state.dirty=false;
+      state.autoFit=true; render(); save(); return true;
+    } catch(e) {
+      state.term=null; state.original=null; state.history=[]; state.dirty=true;
+      $('error-message').textContent=(e.position!==null&&e.position!==undefined?`第 ${e.position+1} 个字符：`:'')+e.message;
+      $('error-message').hidden=false; render(); input.focus();
+      if(e.position!==null&&e.position!==undefined) input.setSelectionRange(e.position,e.position+1);
+      return false;
+    }
+  }
+  function renderDiagram(redex) {
+    const mount=$('diagram-mount');
+    if(!state.term) { mount.innerHTML=''; $('diagram-empty').hidden=false; state.model=null; return; }
+    $('diagram-empty').hidden=true;
+    const result=D.svg(state.term,state.dirty?null:redex?.path??null);
+    state.model=result.model; mount.innerHTML=result.markup;
+    mount.style.opacity=state.dirty?'0.35':'1';
+    applyScale();
+  }
+  function applyScale() {
+    if(!state.model) return;
+    const viewport=$('diagram-viewport'),m=state.model;
+    if(state.autoFit) state.scale=Math.min(2.2,(viewport.clientWidth-48)/m.width,(viewport.clientHeight-48)/m.height);
+    state.scale=Math.max(.02,Math.min(4,state.scale));
+    const svg=$('diagram-mount').querySelector('svg');
+    svg.setAttribute('width',Math.round(m.width*state.scale)); svg.setAttribute('height',Math.round(m.height*state.scale));
+    $('zoom-label').textContent=`${Math.round(state.scale*100)}%`;
+  }
+  function decode(t) {
+    const number=C.churchNumber(t), isTrue=C.equal(t,C.parse(P.TRUE)), isFalse=C.equal(t,C.parse(P.FALSE));
+    if(isFalse) return 'FALSE / Church 数 0';
+    if(isTrue) return 'TRUE · 选择第一个';
+    if(number!==null) return `Church 数 ${number}`;
+    if(C.equal(t,C.parse(P.I))) return 'I · 恒等函数';
+    const free=[...C.freeVars(t)];
+    return free.length?`${free.length} 个自由变量`:'闭合表达式';
+  }
+  function code(text) { const el=document.createElement('code'); el.textContent=text; return el; }
+  function render() {
+    const ready=state.term&&!state.dirty, redex=state.term?C.findRedex(state.term):null;
+    const count=Math.max(0,state.history.length-1), exhausted=count>=C.LIMITS.steps;
+    $('char-count').textContent=`${input.value.length} / ${C.LIMITS.chars}`;
+    $('step-count').textContent=count; $('run-label').textContent=state.running?'暂停':'运行';
+    $('run').firstElementChild.textContent=state.running?'Ⅱ':'▶';
+    $('run').disabled=!ready||!redex||exhausted||(!state.running&&!!state.halt);
+    $('step').disabled=!ready||!redex||exhausted||state.running;
+    $('back').disabled=!ready||count===0||state.running;
+    $('reset').disabled=!ready||state.running||count===0;
+    $('export-svg').disabled=!ready; $('zoom-in').disabled=!state.term; $('zoom-out').disabled=!state.term; $('fit').disabled=!state.term;
+    const badge=$('state-badge'); badge.className='state-badge';
+    if(!state.term) { badge.textContent='等待输入'; badge.classList.add('dirty'); }
+    else if(state.dirty) { badge.textContent='已编辑 · 请转换'; badge.classList.add('dirty'); }
+    else if(state.running) badge.textContent='正在归约';
+    else if(state.halt) { badge.textContent='已暂停'; badge.classList.add('error'); }
+    else if(!redex) badge.textContent='已到正规形';
+    else badge.textContent='可以归约';
+    $('run-status').textContent=!state.term?'输入有效表达式后，就能开始运行。':state.dirty?'输入已改变。重新转换后开始新的归约。':
+      state.halt|| (state.running?'自动运行中；粉色线路标记下一次函数替换。':!redex?'已到正规形，没有可继续的 β 归约。':count?'可以继续单步，或回退查看上一帧。':'准备好了。点击单步，观察一次函数替换。');
+    $('current-expression').textContent=state.term?C.format(state.term):'—';
+    $('decoded').textContent=ready?decode(state.term):'';
+    const next=$('next-explanation'); next.replaceChildren();
+    if(ready&&redex) {
+      next.append('下一步：用 ',code(C.format(redex.term.arg)),' 替换函数体中自由出现的 ',code(redex.term.fn.param),'。必要时自动改名，避免变量捕获。');
+    } else if(ready) next.textContent='正规形表示归约完成；可以换个表达式，或进入闯关模式。';
+    $('history-count').textContent=`${count} 次替换`;
+    const history=$('history-list'); history.replaceChildren();
+    state.history.forEach((entry,i)=>{
+      const li=document.createElement('li'),num=document.createElement('span'),body=document.createElement('div');
+      num.textContent=String(i).padStart(2,'0');body.append(code(C.format(entry.term)));
+      if(entry.change) { const note=document.createElement('small'); note.textContent=`${entry.change.param} ← ${C.format(entry.change.argument)}`;body.append(note); }
+      li.append(num,body);history.append(li);
+    });
+    renderDiagram(redex);
+  }
+  function advance() {
+    if(!state.term||state.dirty||state.history.length-1>=C.LIMITS.steps) return false;
+    try {
+      const result=C.step(state.term); if(!result){stop();render();return false;}
+      const k=C.key(result.term), repeats=state.history.some(h=>C.key(h.term)===k);
+      state.term=result.term;state.history.push({term:result.term,change:result});state.halt='';
+      if(repeats) { stop();state.halt='检测到重复的归约状态，可能无限循环。自动运行已暂停，可单步观察或回退。'; }
+      else if(state.history.length-1>=C.LIMITS.steps && C.findRedex(state.term)) {stop();state.halt=`已达到 ${C.LIMITS.steps} 步上限。可回退、重置或简化表达式。`;}
+      else if(!C.findRedex(state.term)) stop();
+      render(); return !state.halt&&!!C.findRedex(state.term);
+    } catch(e) {stop();state.halt=e.message;render();return false;}
+  }
+  function schedule() {
+    state.timer=setTimeout(()=>{if(!state.running)return;const more=advance();if(more&&state.running)schedule();},Number($('speed').value));
+  }
+  function run() {
+    if(state.running){stop();render();return;}
+    if(!state.term||state.dirty||!C.findRedex(state.term)||state.halt) return;
+    state.running=true;render();schedule();
+  }
+  function setSource(source) { input.value=source; changed(); convert(); }
+  function renderLevels() {
+    const list=$('level-list');list.replaceChildren();
+    P.levels.forEach((level,index)=>{
+      const b=document.createElement('button');b.textContent=`${level.id} ${level.name}`;
+      b.className=(index===state.level?'active ':'')+(state.completed.has(level.id)?'completed':'');
+      b.setAttribute('aria-pressed',String(index===state.level));b.addEventListener('click',()=>selectLevel(index));list.append(b);
+    });
+    const l=P.levels[state.level];
+    $('level-topic').textContent=`CHALLENGE ${String(l.id).padStart(2,'0')} / ${l.topic}`;
+    $('level-title').textContent=l.name; $('level-description').textContent=l.description;
+    $('target-label').textContent=l.targetLabel;$('target-expression').textContent=l.target;$('hint').textContent=l.hint;
+    $('progress-text').textContent=state.mode==='challenge'?`${state.completed.size} / ${P.levels.length} 关已完成`:'探索 · 输入 · 归约';
+  }
+  function renderMode() {
+    const challenge=state.mode==='challenge';$('challenge-panel').hidden=!challenge;
+    $('mode-free').classList.toggle('active',!challenge);$('mode-challenge').classList.toggle('active',challenge);
+    $('mode-free').setAttribute('aria-pressed',String(!challenge));$('mode-challenge').setAttribute('aria-pressed',String(challenge));
+    renderLevels();
+  }
+  function selectLevel(index) {
+    state.level=index;state.mode='challenge';$('hint').hidden=true;$('hint-toggle').textContent='显示提示';$('hint-toggle').setAttribute('aria-expanded','false');
+    renderMode();setSource(P.levels[index].start);save();
+  }
+  function checkAnswer() {
+    const feedback=$('challenge-feedback');
+    if(!state.term||state.dirty){feedback.textContent='先把当前输入转换成图示，再运行和验证。';return;}
+    if(state.running){feedback.textContent='正在运行，等归约完成后再验证。';return;}
+    if(C.findRedex(state.term)){feedback.textContent='还有可归约的部分。先运行到正规形，再验证答案。';return;}
+    const l=P.levels[state.level];
+    if(!C.equal(state.term,C.parse(l.target))){feedback.textContent='这还不是目标结果。可以修改表达式，或显示提示再试一次。';return;}
+    state.completed.add(l.id);save();renderLevels();
+    feedback.textContent=state.completed.size===P.levels.length?'五关全部完成！现在可以自由实验，组合你自己的函数。':`第 ${l.id} 关完成！结果与目标等价。`;
+    $('next-level').hidden=state.level===P.levels.length-1;
+    toast(`✓ ${l.name} · 挑战完成`);
+  }
+  input.addEventListener('input',changed);
+  input.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();convert();}});
+  document.querySelectorAll('[data-insert]').forEach(b=>{
+    b.addEventListener('mousedown',e=>e.preventDefault());
+    b.addEventListener('click',()=>insert(b.dataset.insert));
+  });
+  $('pair-key').addEventListener('mousedown',e=>e.preventDefault());$('pair-key').addEventListener('click',()=>insert('',true));
+  P.examples.forEach((e,i)=>{const option=document.createElement('option');option.value=i;option.textContent=e.name;$('examples').append(option);});
+  $('examples').addEventListener('change',()=>{const value=$('examples').value;if(value==='')return;setSource(P.examples[Number(value)].term);$('examples').value='';});
+  $('convert').addEventListener('click',convert);$('step').addEventListener('click',advance);$('run').addEventListener('click',run);
+  $('back').addEventListener('click',()=>{if(state.history.length>1){stop();state.history.pop();state.term=state.history.at(-1).term;state.halt='';$('challenge-feedback').textContent='';$('next-level').hidden=true;render();}});
+  $('reset').addEventListener('click',()=>{if(state.original){stop();state.term=state.original;state.history=[{term:state.original,change:null}];state.halt='';$('challenge-feedback').textContent='';$('next-level').hidden=true;render();}});
+  $('speed').addEventListener('change',()=>{if(state.running){clearTimeout(state.timer);schedule();}});
+  $('zoom-in').addEventListener('click',()=>{state.autoFit=false;state.scale*=1.25;applyScale();});
+  $('zoom-out').addEventListener('click',()=>{state.autoFit=false;state.scale/=1.25;applyScale();});
+  $('fit').addEventListener('click',()=>{state.autoFit=true;applyScale();});
+  window.addEventListener('resize',applyScale);
+  $('export-svg').addEventListener('click',()=>{
+    if(!state.term||state.dirty)return;
+    const content=D.svg(state.term,null,{export:true}).markup;
+    const url=URL.createObjectURL(new Blob([content],{type:'image/svg+xml;charset=utf-8'}));
+    const a=document.createElement('a');a.href=url;a.download='lambda-diagram.svg';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('SVG 图示已导出');
+  });
+  $('mode-free').addEventListener('click',()=>{stop();state.mode='free';renderMode();render();save();});
+  $('mode-challenge').addEventListener('click',()=>selectLevel(state.level));
+  $('hint-toggle').addEventListener('click',()=>{const show=$('hint').hidden;$('hint').hidden=!show;$('hint-toggle').textContent=show?'收起提示':'显示提示';$('hint-toggle').setAttribute('aria-expanded',String(show));});
+  $('check-answer').addEventListener('click',checkAnswer);
+  $('next-level').addEventListener('click',()=>selectLevel(Math.min(state.level+1,P.levels.length-1)));
+  $('help-toggle').addEventListener('click',()=>{const show=$('help-panel').hidden;$('help-panel').hidden=!show;$('help-toggle').setAttribute('aria-expanded',String(show));});
+  restore();renderMode();convert();
+})();
+
+</script>
+</body>
+</html>

@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#131c2d">
+  <title>Lambda 线路实验室</title>
+  <link rel="stylesheet" href="src/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#"><span class="brand-mark">λ</span><span>Lambda <span class="brand-sub">线路实验室</span></span></a>
+    <div class="top-right"><span class="offline"><i></i> 离线可用</span><button id="help-toggle" class="header-button" aria-expanded="false" aria-controls="help-panel">玩法与语法 <span>?</span></button></div>
+  </header>
+  <main class="shell">
+    <section class="intro">
+      <div><p class="eyebrow">LAMBDA CALCULUS / PLAYGROUND</p><h1>写一段 λ，看函数如何流动。</h1><p class="intro-copy">从表达式到 Tromp 图示，一步一步，看见计算。</p></div>
+      <div class="intro-symbol" aria-hidden="true"><span>λ</span><i></i><i></i><i></i></div>
+    </section>
+    <section id="help-panel" class="help-panel" hidden>
+      <div><h2>三个积木，就能计算</h2><p><code>x</code> 是变量；<code>λx.x</code> 是函数；<code>f x</code> 把 x 交给 f。<code>(λx.x) y → y</code> 是一次 β 归约。</p></div>
+      <div><h2>怎么写、怎么看</h2><p>用快捷栏插入 λ；也可用 <code>\</code>。<code>λx y.x</code> 等同 <code>λx.λy.x</code>。变量之间用空格：<code>xy</code> 是一个名字。λ 的作用域延伸到右侧，作为参数时需加括号。</p><p>同色竖线连接绑定横线；应用横线连接子式最左变量。粉色标记下一步归约，自由变量以虚线显示。采用左最外正常序，包含函数内部归约。<a href="https://tromp.github.io/cl/diagrams.html" target="_blank" rel="noopener">John Tromp 原始说明 ↗</a></p></div>
+    </section>
+    <nav class="mode-row" aria-label="游戏模式"><div class="mode-tabs"><button id="mode-free" class="mode-tab active" aria-pressed="true">自由实验</button><button id="mode-challenge" class="mode-tab" aria-pressed="false">闯关模式 <span>5</span></button></div><span id="progress-text" class="progress-label">探索 · 输入 · 归约</span></nav>
+    <section id="challenge-panel" class="challenge-panel" hidden>
+      <div class="level-list" id="level-list" aria-label="选择关卡"></div>
+      <div class="challenge-body"><div><p id="level-topic" class="eyebrow"></p><h2 id="level-title"></h2><p id="level-description"></p></div><div class="challenge-target"><span>目标正规形</span><strong id="target-label"></strong><code id="target-expression"></code></div></div>
+      <div class="challenge-footer"><button id="hint-toggle" class="text-button" aria-expanded="false">显示提示</button><p id="hint" hidden></p><button id="check-answer" class="button primary">验证答案 <span>↗</span></button><button id="next-level" class="button" hidden>下一关 →</button></div>
+      <p id="challenge-feedback" class="challenge-feedback" role="status"></p>
+    </section>
+    <div class="workspace">
+      <aside class="editor-column">
+        <section class="card editor-card">
+          <div class="section-heading"><div><span class="section-number">01</span><h2>写下表达式</h2></div><span class="mini-label">INPUT</span></div>
+          <label class="sr-only" for="expression">Lambda 表达式</label>
+          <div class="editor-wrap"><textarea id="expression" spellcheck="false" autocapitalize="off" autocomplete="off" aria-describedby="syntax-note error-message">(λx.x) (λy.y)</textarea><div class="editor-bottom"><span>λ / \ 均可输入</span><span id="char-count">12 / 1500</span></div></div>
+          <p class="toolbar-caption">快捷输入 <span>插入到光标位置</span></p>
+          <div id="symbol-toolbar" class="symbol-toolbar" role="group" aria-label="Lambda 符号快捷栏">
+            <button data-insert="λ" class="lambda-key" aria-label="插入 λ">λ</button><button data-insert="x">x</button><button data-insert="y">y</button><button data-insert="z">z</button><button data-insert="f">f</button><button data-insert=".">.</button><button data-insert="(">(</button><button data-insert=")">)</button><button data-insert=" " aria-label="插入空格">␣</button><button id="pair-key" aria-label="插入成对括号">( )</button>
+          </div>
+          <div class="template-toolbar" role="group" aria-label="函数模板"><button data-insert="λx.x">I <small>恒等</small></button><button data-insert="λx.λy.x">TRUE</button><button data-insert="λx.λy.y">FALSE</button><button data-insert="λf.λx.f (f x)">2 <small>Church</small></button></div>
+          <p id="syntax-note" class="syntax-note">应用用空格分开，例如 <code>f x</code>；函数参数用括号包住。</p>
+          <div id="error-message" class="error-message" role="alert" hidden></div>
+          <button id="convert" class="button primary convert-button">转换成图示 <span>→</span></button>
+          <p class="key-hint">Ctrl / ⌘ + Enter 快速转换</p>
+          <div class="example-row"><label for="examples">试试示例</label><select id="examples"><option value="">选择一个表达式…</option></select></div>
+        </section>
+        <section class="card rules-card"><div class="section-heading"><div><span class="section-number">λ</span><h2>读懂线路</h2></div></div><div class="rule"><span class="legend-line lambda-line"></span><p><strong>抽象</strong><span>一条横线，绑定一个变量。</span></p></div><div class="rule"><span class="legend-line var-line"></span><p><strong>变量</strong><span>竖线连接到它所属的 λ。</span></p></div><div class="rule"><span class="legend-line app-line"></span><p><strong>应用</strong><span>横线连接函数与参数。</span></p></div><p class="rules-foot">颜色辅助追踪绑定；连线结构决定含义。</p></section>
+      </aside>
+      <section class="visual-column">
+        <div class="diagram-card">
+          <div class="diagram-heading"><div><span class="section-number">02</span><h2>Tromp 图示</h2><span class="diagram-label">LIVE STRUCTURE</span></div><span id="state-badge" class="state-badge">可以归约</span></div>
+          <div id="diagram-viewport" class="diagram-viewport" tabindex="0" aria-label="可滚动的图示画布"><div id="diagram-mount" class="diagram-mount"></div><div id="diagram-empty" class="diagram-empty" hidden><span>λ</span><p>等待一个表达式</p><small>写好后，点击「转换成图示」</small></div></div>
+          <div class="diagram-footer"><div class="diagram-legend"><span><i class="dot mint"></i>绑定线路</span><span><i class="dot pink"></i>下一步归约</span></div><div class="zoom-controls"><button id="zoom-out" aria-label="缩小图示">−</button><span id="zoom-label">100%</span><button id="zoom-in" aria-label="放大图示">+</button><button id="fit" aria-label="适配图示">适配</button><button id="export-svg">导出 SVG ↗</button></div></div>
+        </div>
+        <section class="card execution-card">
+          <div class="execution-top"><div class="section-heading"><div><span class="section-number">03</span><h2>运行与归约</h2></div></div><label class="speed-label" for="speed">速度 <select id="speed"><option value="1200">慢速</option><option value="600" selected>正常</option><option value="180">快速</option></select></label></div>
+          <div class="run-controls"><button id="run" class="button run-button"><span>▶</span> <span id="run-label">运行</span></button><button id="step" class="button">单步 →</button><button id="back" class="button">← 回退</button><button id="reset" class="button reset-button">↺ 重置</button><span class="step-counter"><b id="step-count">0</b> 步</span></div>
+          <p id="run-status" class="run-status" role="status" aria-live="polite">准备好了。点击单步，观察一次函数替换。</p>
+          <div class="current-term"><div><span>当前表达式</span><span id="decoded" class="decoded"></span></div><code id="current-expression"></code></div>
+          <div id="next-explanation" class="next-explanation"></div>
+          <details class="history-details" id="history-details"><summary>归约轨迹 <span id="history-count">0 次替换</span></summary><ol id="history-list" class="history-list"></ol></details>
+        </section>
+      </section>
+    </div>
+    <footer class="page-footer"><span><b>λ</b> 只有变量、函数和应用。其余，交给计算。</span><span>正常序 β 归约 · 本地保存</span></footer>
+  </main>
+  <div id="toast" class="toast" role="status" hidden></div>
+  <script src="src/core.js"></script><script src="src/diagram.js"></script><script src="src/presets.js"></script><script src="src/app.js"></script>
+</body>
+</html>
