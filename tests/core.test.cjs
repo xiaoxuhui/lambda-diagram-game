@@ -68,3 +68,7 @@ test('redex path and substitution explanation agree', () => {
   assert.deepEqual(r.path, ['body','arg']); assert.equal(r.param, 'x'); assert.equal(C.format(r.argument), 'z');
 });
 test('normal form has no next step', () => assert.equal(C.step(p('λx.x')), null));
+test('repeated very long names have an explicit output budget', () => {
+  let t=C.V('x'.repeat(1000));for(let i=0;i<5;i++) t=C.A(t,t);
+  assert.throws(()=>C.inspect(t),/文本过长/);
+});

@@ -1,6 +1,6 @@
 (function (root) {
   'use strict';
-  const LIMITS = Object.freeze({ chars: 1500, nodes: 4000, depth: 300, steps: 200 });
+  const LIMITS = Object.freeze({ chars: 1500, nodes: 4000, depth: 300, steps: 200, nameChars:30000 });
   const V = name => ({ type: 'var', name });
   const L = (param, body) => ({ type: 'abs', param, body });
   const A = (fn, arg) => ({ type: 'app', fn, arg });
@@ -9,15 +9,16 @@
     constructor(message, position = null) { super(message); this.name = 'LambdaError'; this.position = position; }
   }
   function inspect(term) {
-    let nodes = 0, depth = 0, vars = 0, abstractions = 0, applications = 0;
+    let nodes = 0, depth = 0, vars = 0, abstractions = 0, applications = 0, nameChars = 0;
     const stack = [[term, 1]];
     while (stack.length) {
       const [t, d] = stack.pop(); nodes++; depth = Math.max(depth, d);
       if (nodes > LIMITS.nodes) throw new LambdaError(`表达式超过 ${LIMITS.nodes} 个节点，请缩小表达式。`);
       if (d > LIMITS.depth) throw new LambdaError(`嵌套超过 ${LIMITS.depth} 层，请简化表达式。`);
-      if (t.type === 'var') vars++;
-      else if (t.type === 'abs') { abstractions++; stack.push([t.body, d + 1]); }
+      if (t.type === 'var') { vars++; nameChars += t.name.length; }
+      else if (t.type === 'abs') { abstractions++; nameChars += t.param.length; stack.push([t.body, d + 1]); }
       else { applications++; stack.push([t.fn, d + 1], [t.arg, d + 1]); }
+      if (nameChars > LIMITS.nameChars) throw new LambdaError('展开后的变量名文本过长，已暂停。请使用较短的变量名。');
     }
     return { nodes, depth, vars, abstractions, applications };
   }
