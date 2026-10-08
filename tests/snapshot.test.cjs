@@ -31,3 +31,6 @@ test('unfinished function editor draft is preserved',()=>{const s=sample();s.fun
 test('valid generated names are governed by AST budget rather than input budget',()=>{const s=sample();s.session={original:C.V('x'.repeat(1501)),steps:0,dirty:false,halt:''};assert.equal(S.decode(S.encode(s)).term.name.length,1501);});
 test('custom speeds and turbo interval survive snapshot roundtrip',()=>{for(const speed of [1,10,35,60000]){const s=sample();s.view.speed=speed;assert.equal(S.decode(S.encode(s)).view.speed,speed);}});
 test('invalid custom speeds are rejected by snapshot validation',()=>{for(const speed of [-1,0,1.5,60001,'10']){const s=sample();s.view.speed=speed;assert.throws(()=>S.decode(JSON.stringify(s)),/视图设置/);}});
+test('enlarged diagram and pan position roundtrip',()=>{const s=sample();s.view.scale=16;s.view.panX=920;s.view.panY=420;const r=S.decode(S.encode(s));assert.equal(r.view.scale,16);assert.equal(r.view.panX,920);assert.equal(r.view.panY,420);});
+test('old snapshots default pan to origin',()=>{const r=S.decode(S.encode(sample()));assert.equal(r.view.panX,0);assert.equal(r.view.panY,0);});
+test('invalid diagram offsets are rejected',()=>{for(const x of [-1,5000001,'20']){const s=sample();s.view.panX=x;assert.throws(()=>S.decode(JSON.stringify(s)),/图示位置/);}});

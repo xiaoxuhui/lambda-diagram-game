@@ -5,12 +5,12 @@
   const input=$('expression');
   const state={ term:null, original:null, history:[], dirty:false, running:false, timer:null,
     mode:'free', level:0, completed:new Set(), halt:'', scale:1, autoFit:true, model:null, speed:600 };
-  let toastTimer,workspace;
+  let toastTimer,workspace,viewer;
   function save() { workspace?.queueSave(); }
   function capture() {
     return {draft:input.value,completed:[...state.completed],mode:state.mode,level:state.level,
       session:{original:state.original,steps:Math.max(0,state.history.length-1),dirty:state.dirty,halt:state.halt},
-      view:{speed:state.speed,scale:state.scale,autoFit:state.autoFit,historyOpen:$('history-details').open,helpOpen:!$('help-panel').hidden,hintOpen:!$('hint').hidden},
+      view:{speed:state.speed,scale:state.scale,autoFit:state.autoFit,panX:$('diagram-viewport').scrollLeft,panY:$('diagram-viewport').scrollTop,historyOpen:$('history-details').open,helpOpen:!$('help-panel').hidden,hintOpen:!$('hint').hidden},
       selection:{start:input.selectionStart,end:input.selectionEnd},error:$('error-message').hidden?'':$('error-message').textContent};
   }
   function applySnapshot(s) {
@@ -21,6 +21,7 @@
     $('hint').hidden=!s.view.hintOpen;$('hint-toggle').textContent=s.view.hintOpen?'收起提示':'显示提示';$('hint-toggle').setAttribute('aria-expanded',String(s.view.hintOpen));
     $('challenge-feedback').textContent='';$('next-level').hidden=true;$('error-message').textContent=s.error;$('error-message').hidden=!s.error;
     renderMode();if(s.hasSession)render();else convert();input.setSelectionRange(s.selection.start,s.selection.end);
+    $('diagram-viewport').scrollLeft=s.view.panX;$('diagram-viewport').scrollTop=s.view.panY;
   }
   function toast(message) {
     clearTimeout(toastTimer); $('toast').textContent=message; $('toast').hidden=false;
@@ -56,21 +57,24 @@
   }
   function renderDiagram(redex) {
     const mount=$('diagram-mount');
+    const anchor=state.autoFit?null:viewer?.anchor();
     if(!state.term) { mount.innerHTML=''; $('diagram-empty').hidden=false; state.model=null; return; }
     $('diagram-empty').hidden=true;
     const result=D.svg(state.term,state.dirty?null:redex?.path??null);
     state.model=result.model; mount.innerHTML=result.markup;
     mount.style.opacity=state.dirty?'0.35':'1';
     applyScale();
+    viewer?.restore(anchor);
   }
   function applyScale() {
     if(!state.model) return;
     const viewport=$('diagram-viewport'),m=state.model;
     if(state.autoFit) state.scale=Math.min(2.2,(viewport.clientWidth-48)/m.width,(viewport.clientHeight-48)/m.height);
-    state.scale=Math.max(.02,Math.min(4,state.scale));
+    state.scale=Math.max(.02,Math.min(16,state.scale));
     const svg=$('diagram-mount').querySelector('svg');
     svg.setAttribute('width',Math.round(m.width*state.scale)); svg.setAttribute('height',Math.round(m.height*state.scale));
     $('zoom-label').textContent=`${Math.round(state.scale*100)}%`;
+    $('fit').setAttribute('aria-pressed',String(state.autoFit));
   }
   function decode(t) {
     const number=C.churchNumber(t), isTrue=C.equal(t,C.parse(P.TRUE)), isFalse=C.equal(t,C.parse(P.FALSE));
@@ -92,7 +96,7 @@
     $('step').disabled=!ready||!redex||exhausted||state.running;
     $('back').disabled=!ready||count===0||state.running;
     $('reset').disabled=!ready||state.running||count===0;
-    $('export-svg').disabled=!ready; $('zoom-in').disabled=!state.term; $('zoom-out').disabled=!state.term; $('fit').disabled=!state.term;
+    $('export-svg').disabled=!ready; $('zoom-in').disabled=!state.term; $('zoom-out').disabled=!state.term; $('fit').disabled=!state.term;$('actual-size').disabled=!state.term;
     const badge=$('state-badge'); badge.className='state-badge';
     if(!state.term) { badge.textContent='等待输入'; badge.classList.add('dirty'); }
     else if(state.dirty) { badge.textContent='已编辑 · 请转换'; badge.classList.add('dirty'); }
@@ -196,9 +200,8 @@
   $('reset').addEventListener('click',()=>{if(state.original){stop();state.term=state.original;state.history=[{term:state.original,change:null}];state.halt='';$('challenge-feedback').textContent='';$('next-level').hidden=true;render();}});
   $('speed').addEventListener('change',()=>{if($('speed').value==='custom'){$('speed-ms').focus();$('speed-ms').select();}else setSpeed(Number($('speed').value));});
   $('speed-ms').addEventListener('input',()=>setSpeed($('speed-ms').value===''?NaN:Number($('speed-ms').value)));
-  $('zoom-in').addEventListener('click',()=>{state.autoFit=false;state.scale*=1.25;applyScale();save();});
-  $('zoom-out').addEventListener('click',()=>{state.autoFit=false;state.scale/=1.25;applyScale();save();});
-  $('fit').addEventListener('click',()=>{state.autoFit=true;applyScale();save();});
+  viewer=window.LambdaViewport.init({getScale:()=>state.scale,canInteract:()=>!!state.model,onChange:save,
+    setScale:scale=>{state.autoFit=false;state.scale=scale;applyScale();},fit:()=>{state.autoFit=true;applyScale();}});
   window.addEventListener('resize',applyScale);
   $('export-svg').addEventListener('click',()=>{
     if(!state.term||state.dirty)return;

@@ -1,11 +1,12 @@
 {
   "name": "lambda-diagram-game",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "private": true,
   "description": "离线 Lambda 演算与 John Tromp 图示小游戏",
   "scripts": {
     "test": "node --test tests/*.test.cjs",
     "build": "node scripts/build.mjs",
+    "test:viewport": "node tests/viewport-browser.cjs",
     "serve": "node scripts/serve.cjs",
     "test:browser": "node tests/browser.cjs && node tests/workspace-browser.cjs && node tests/numerals-browser.cjs"
   },
