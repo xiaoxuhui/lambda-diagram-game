@@ -19,6 +19,6 @@ test('invalid names and overlong names are rejected',()=>{for(const n of ['','1f
 test('names colliding with object prototypes are safe',()=>{const f=L.add([],'constructor','λx.x');assert.ok(C.equal(L.expand(p('constructor'),f),p('λx.x')));});
 test('invalid definitions leave library unchanged',()=>{const f=[];assert.throws(()=>L.add(f,'F','λx.'),/表达式/);assert.deepEqual(f,[]);});
 test('direct self-reference is rejected but bound same name is valid',()=>{assert.throws(()=>L.add([],'F','λx.F x'),/自身/);assert.equal(L.add([],'F','λF.F').length,1);});
-test('function count budget is explicit',()=>{let f=[];for(let i=0;i<32;i++)f=L.add(f,`F${i}`,'λx.x');assert.throws(()=>L.add(f,'More','λx.x'),/32/);});
+test('more than 32 functions can be added, called and deleted',()=>{let f=[];for(let i=0;i<100;i++)f=L.add(f,`F${i}`,'λx.x');assert.equal(f.length,100);assert.ok(C.equal(C.normalize(L.expand(p('F99 (λy.y)'),f)).term,p('λy.y')));f=L.remove(f,'F99');assert.equal(f.length,99);assert.equal(L.expand(p('F98'),f).type,'abs');});
 test('placeholders cannot collide with source names',()=>{const f=L.add([],'F','λx.lambdaMacro1');assert.ok(C.equal(L.expand(p('λlambdaMacro2.F lambdaMacro1'),f),p('λz.(λx.lambdaMacro1) lambdaMacro1')));});
 test('expanded expression retains all nodes beyond the old quota',()=>{let t=C.V('x');for(let i=0;i<11;i++)t=C.A(t,t);assert.equal(C.inspect(L.expand(p('F F'),[{name:'F',term:t}])).nodes,8191);});

@@ -16,7 +16,7 @@
     }
     function queueSave(){if(!restoring){clearTimeout(saveTimer);saveTimer=setTimeout(persist,180);}}
     function renderLibrary() {
-      $('function-count').textContent=`${functions.length} / ${L.LIMITS.count}`;const list=$('function-list');list.replaceChildren();
+      $('function-count').textContent=`${functions.length} 个函数`;const list=$('function-list');list.replaceChildren();
       if(!functions.length){const p=document.createElement('p');p.className='function-empty';p.textContent='还没有自定义函数，先保存一个试试。';list.append(p);}
       functions.forEach(fn=>{
         const row=document.createElement('div');row.className='function-item';row.dataset.name=fn.name;

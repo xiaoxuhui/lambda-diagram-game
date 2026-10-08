@@ -2,6 +2,7 @@ const {test}=require('node:test'),assert=require('node:assert/strict');
 const C=require('../src/core.js'),L=require('../src/library.js'),S=require('../src/snapshot.js');
 function sample(){return {version:2,savedAt:'2026-10-09T00:00:00.000Z',draft:'(λx.x)(λy.y)',functions:L.add([],'ID','λx.x'),completed:[1,3],mode:'challenge',level:2,
   session:{original:C.parse('(λx.x)(λy.y)'),steps:1,dirty:false,halt:''},view:{speed:180,scale:1.5,autoFit:false,historyOpen:true,helpOpen:false,hintOpen:true},selection:{start:2,end:3},error:''};}
+test('large function libraries save and restore every definition',()=>{const s=sample();s.functions=Array.from({length:100},(_,i)=>({name:`F${i}`,term:C.parse('λx.x')}));const r=S.decode(S.encode(s));assert.equal(r.functions.length,100);assert.deepEqual(r.functions,s.functions);});
 test('complete snapshot restores current term and full history',()=>{const s=S.decode(S.encode(sample()));assert.equal(C.format(s.term),'λy.y');assert.equal(s.history.length,2);assert.equal(s.history[1].change.param,'x');assert.deepEqual(s.completed,[1,3]);assert.equal(s.functions[0].name,'ID');assert.equal(s.view.scale,1.5);assert.equal(s.hasSession,true);});
 test('restoration supports expanded AST longer than input budget',()=>{
   const s=sample();let t=C.V('variable'.repeat(50));for(let i=0;i<3;i++)t=C.A(t,t);s.session={original:t,steps:0,dirty:false,halt:''};

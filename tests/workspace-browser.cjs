@@ -99,7 +99,7 @@ const artifacts=path.join(__dirname,'artifacts');fs.mkdirSync(artifacts,{recursi
     });
     await check('legacy v1 imports draft and existing progress',async()=>{
       await upload(JSON.stringify({version:1,draft:'λq.q',mode:'challenge',level:1,completed:[1,2]}));await page.waitForFunction(()=>document.getElementById('save-feedback').textContent.includes('存档已导入'));
-      assert.equal(await page.locator('#expression').inputValue(),'λq.q');assert.equal(await page.locator('#progress-text').textContent(),'2 / 5 关已完成');assert.equal(await page.locator('#function-count').textContent(),'0 / 32');
+      assert.equal(await page.locator('#expression').inputValue(),'λq.q');assert.equal(await page.locator('#progress-text').textContent(),'2 / 5 关已完成');assert.equal(await page.locator('#function-count').textContent(),'0 个函数');
     });
     await check('first-load legacy storage migration preserves progress',async()=>{
       const legacyContext=await browser.newContext();await legacyContext.addInitScript(()=>localStorage.setItem('lambda-lab-v1',JSON.stringify({version:1,draft:'λz.z',mode:'challenge',level:2,completed:[1,3,5]})));
@@ -119,6 +119,19 @@ const artifacts=path.join(__dirname,'artifacts');fs.mkdirSync(artifacts,{recursi
       await page.locator('#save-state').tap();await page.locator('#expression').fill('f');await page.locator('#expression').evaluate(e=>e.setSelectionRange(1,1));await row('ID').getByRole('button',{name:'插入函数 ID'}).tap();assert.equal(await page.locator('#expression').inputValue(),'f ID');
       await row('ID').getByRole('button',{name:'删除函数 ID'}).tap();assert.equal(await row('ID').count(),0);await page.locator('#restore-state').tap();assert.equal(await row('ID').count(),1);
       await page.screenshot({path:path.join(artifacts,'workspace-mobile.png'),fullPage:true});
+    });
+    await check('more than 32 functions can be created, invoked, deleted and restored',async()=>{
+      await page.setViewportSize({width:1440,height:1080});
+      for(let i=0;i<40;i++)await add(`COUNT${i}`,'λx.x');
+      assert.equal(await page.locator('.function-item').count(),41);assert.equal(await page.locator('#function-count').textContent(),'41 个函数');assert.ok(await page.locator('#function-error').isHidden());
+      await source('COUNT39 (λy.y)');await page.locator('#step').click();assert.equal(await page.locator('#current-expression').textContent(),'λy.y');
+      await page.locator('#save-state').click();await page.reload();assert.equal(await page.locator('.function-item').count(),41);
+      const stored=await page.evaluate(()=>localStorage.getItem('lambda-lab-v2'));
+      await row('COUNT39').getByRole('button',{name:'删除函数 COUNT39'}).click();assert.equal(await page.locator('.function-item').count(),40);
+      await page.locator('#restore-state').click();assert.equal(await page.locator('.function-item').count(),41);
+      await row('COUNT39').getByRole('button',{name:'删除函数 COUNT39'}).click();await upload(stored);
+      await page.waitForFunction(()=>document.getElementById('save-feedback').textContent.includes('存档已导入'));
+      assert.equal(await page.locator('.function-item').count(),41);assert.equal(await page.locator('#function-count').textContent(),'41 个函数');
     });
     await check('offline build can add, save, reload, and resume',async()=>{
       const offline=await context.newPage();offline.on('pageerror',e=>errors.push(e.message));await offline.goto(pathToFileURL(path.resolve(__dirname,'../dist/lambda-lab.html')).href);

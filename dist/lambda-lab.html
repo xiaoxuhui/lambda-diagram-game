@@ -71,7 +71,7 @@
           <div class="example-row"><label for="examples">试试示例</label><select id="examples"><option value="">选择一个表达式…</option></select></div>
         </section>
         <section class="card function-card">
-          <div class="section-heading"><div><span class="section-number">ƒ</span><h2>自定义函数</h2></div><span id="function-count" class="mini-label">0 / 32</span></div>
+          <div class="section-heading"><div><span class="section-number">ƒ</span><h2>自定义函数</h2></div><span id="function-count" class="mini-label">0 个函数</span></div>
           <p class="function-note">保存后按名称调用，如 <code>ID (λy.y)</code>。</p>
           <form id="function-form"><label for="function-name">函数名称</label><input id="function-name" placeholder="例如 ID、ADD、SUCC" maxlength="32" autocomplete="off" spellcheck="false"><label for="function-source">函数定义</label><textarea id="function-source" placeholder="例如 λx.x" spellcheck="false" autocapitalize="off" aria-describedby="function-error"></textarea><div id="function-keys" class="function-keys" role="group" aria-label="函数定义快捷输入"><button type="button" data-function-insert="λ" aria-label="函数定义插入 λ">λ</button></div><p id="function-error" class="error-message" role="alert" hidden></p><div class="function-actions"><button id="function-use-current" type="button" class="button">使用当前式</button><button id="function-add" type="submit" class="button primary">新增函数 +</button></div></form>
           <div id="function-list" class="function-list"></div><p class="function-foot">定义在保存时展开。删除函数后，已转换的图示仍可运行；再次转换会使用最新函数库。</p>
@@ -357,7 +357,7 @@
 (function(root) {
   'use strict';
   const C=root.LambdaCore || require('./core.js');
-  const LIMITS={count:32,nodes:Infinity,nameChars:Infinity};
+  const LIMITS={count:Infinity,nodes:Infinity,nameChars:Infinity};
   const validName=name=>typeof name==='string'&&/^[A-Za-z][A-Za-z0-9_']{0,31}$/.test(name);
   function names(t,out=new Set()) {
     if(t.type==='var')out.add(t.name);
@@ -365,7 +365,7 @@
     else{names(t.fn,out);names(t.arg,out);}return out;
   }
   function validate(functions) {
-    if(!Array.isArray(functions)||functions.length>LIMITS.count)throw new C.LambdaError('函数库最多保存 32 个函数。');
+    if(!Array.isArray(functions))throw new C.LambdaError('函数库格式不合法。');
     const seen=new Set();let nodes=0,nameChars=0;
     for(const fn of functions) {
       if(!validName(fn.name))throw new C.LambdaError('函数名需以英文字母开头，最多 32 字符，可含数字、下划线和单引号。');
@@ -423,7 +423,7 @@
   function validate(raw) {
     if(!object(raw)||raw.version!==2)fail('不支持这个存档版本。');
     if(typeof raw.draft!=='string'||raw.draft.length>10000)fail('草稿过长或缺失。');
-    if(!Array.isArray(raw.functions)||raw.functions.length>L.LIMITS.count)fail('函数库不合法。');
+    if(!Array.isArray(raw.functions))fail('函数库不合法。');
     const functions=raw.functions.map(f=>{if(!object(f))fail('函数定义不完整。');return {name:f.name,term:ast(f.term)};});L.validate(functions);
     if(!Array.isArray(raw.completed)||raw.completed.length>5||raw.completed.some(i=>!Number.isInteger(i)||i<1||i>5))fail('通关进度不合法。');
     if(raw.mode!=='free'&&raw.mode!=='challenge')fail('游戏模式不合法。');
@@ -488,7 +488,7 @@
     }
     function queueSave(){if(!restoring){clearTimeout(saveTimer);saveTimer=setTimeout(persist,180);}}
     function renderLibrary() {
-      $('function-count').textContent=`${functions.length} / ${L.LIMITS.count}`;const list=$('function-list');list.replaceChildren();
+      $('function-count').textContent=`${functions.length} 个函数`;const list=$('function-list');list.replaceChildren();
       if(!functions.length){const p=document.createElement('p');p.className='function-empty';p.textContent='还没有自定义函数，先保存一个试试。';list.append(p);}
       functions.forEach(fn=>{
         const row=document.createElement('div');row.className='function-item';row.dataset.name=fn.name;

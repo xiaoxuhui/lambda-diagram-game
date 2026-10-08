@@ -1,7 +1,7 @@
 (function(root) {
   'use strict';
   const C=root.LambdaCore || require('./core.js');
-  const LIMITS={count:32,nodes:Infinity,nameChars:Infinity};
+  const LIMITS={count:Infinity,nodes:Infinity,nameChars:Infinity};
   const validName=name=>typeof name==='string'&&/^[A-Za-z][A-Za-z0-9_']{0,31}$/.test(name);
   function names(t,out=new Set()) {
     if(t.type==='var')out.add(t.name);
@@ -9,7 +9,7 @@
     else{names(t.fn,out);names(t.arg,out);}return out;
   }
   function validate(functions) {
-    if(!Array.isArray(functions)||functions.length>LIMITS.count)throw new C.LambdaError('函数库最多保存 32 个函数。');
+    if(!Array.isArray(functions))throw new C.LambdaError('函数库格式不合法。');
     const seen=new Set();let nodes=0,nameChars=0;
     for(const fn of functions) {
       if(!validName(fn.name))throw new C.LambdaError('函数名需以英文字母开头，最多 32 字符，可含数字、下划线和单引号。');

@@ -20,7 +20,7 @@
   function validate(raw) {
     if(!object(raw)||raw.version!==2)fail('不支持这个存档版本。');
     if(typeof raw.draft!=='string'||raw.draft.length>10000)fail('草稿过长或缺失。');
-    if(!Array.isArray(raw.functions)||raw.functions.length>L.LIMITS.count)fail('函数库不合法。');
+    if(!Array.isArray(raw.functions))fail('函数库不合法。');
     const functions=raw.functions.map(f=>{if(!object(f))fail('函数定义不完整。');return {name:f.name,term:ast(f.term)};});L.validate(functions);
     if(!Array.isArray(raw.completed)||raw.completed.length>5||raw.completed.some(i=>!Number.isInteger(i)||i<1||i>5))fail('通关进度不合法。');
     if(raw.mode!=='free'&&raw.mode!=='challenge')fail('游戏模式不合法。');
