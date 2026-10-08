@@ -4,7 +4,7 @@ const base = fileURLToPath(new URL('../', import.meta.url));
 let html = await readFile(base+'index.html', 'utf8');
 const css = await readFile(base+'src/style.css', 'utf8');
 html = html.replace('<link rel="stylesheet" href="src/style.css">', `<style>\n${css}\n</style>`);
-for (const name of ['core','diagram','presets','app']) {
+for (const name of ['core','diagram','presets','library','snapshot','workspace-tools','app']) {
   const js = await readFile(base+`src/${name}.js`, 'utf8');
   html = html.replace(`<script src="src/${name}.js"></script>`, `<script>\n${js}\n</script>`);
 }

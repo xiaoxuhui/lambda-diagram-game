@@ -22,6 +22,7 @@
       <div><h2>怎么写、怎么看</h2><p>用快捷栏插入 λ；也可用 <code>\</code>。<code>λx y.x</code> 等同 <code>λx.λy.x</code>。变量之间用空格：<code>xy</code> 是一个名字。λ 的作用域延伸到右侧，作为参数时需加括号。</p><p>同色竖线连接绑定横线；应用横线连接子式最左变量。粉色标记下一步归约，自由变量以虚线显示。采用左最外正常序，包含函数内部归约。<a href="https://tromp.github.io/cl/diagrams.html" target="_blank" rel="noopener">John Tromp 原始说明 ↗</a></p></div>
     </section>
     <nav class="mode-row" aria-label="游戏模式"><div class="mode-tabs"><button id="mode-free" class="mode-tab active" aria-pressed="true">自由实验</button><button id="mode-challenge" class="mode-tab" aria-pressed="false">闯关模式 <span>5</span></button></div><span id="progress-text" class="progress-label">探索 · 输入 · 归约</span></nav>
+    <section class="save-bar" aria-label="状态与进度存档"><div class="save-info"><strong>状态与进度</strong><span id="storage-status" role="status">自动保存准备中</span><small>包含函数库、归约轨迹与关卡进度</small></div><div class="save-actions"><button id="save-state" class="button primary">保存当前状态</button><button id="restore-state" class="button" disabled>恢复已保存状态</button><button id="export-state" class="button">导出存档 ↓</button><button id="import-state" class="button">导入存档 ↑</button><input id="import-file" type="file" accept=".json,application/json" hidden></div><p id="save-feedback" class="save-feedback" role="status" hidden></p></section>
     <section id="challenge-panel" class="challenge-panel" hidden>
       <div class="level-list" id="level-list" aria-label="选择关卡"></div>
       <div class="challenge-body"><div><p id="level-topic" class="eyebrow"></p><h2 id="level-title"></h2><p id="level-description"></p></div><div class="challenge-target"><span>目标正规形</span><strong id="target-label"></strong><code id="target-expression"></code></div></div>
@@ -45,6 +46,12 @@
           <p class="key-hint">Ctrl / ⌘ + Enter 快速转换</p>
           <div class="example-row"><label for="examples">试试示例</label><select id="examples"><option value="">选择一个表达式…</option></select></div>
         </section>
+        <section class="card function-card">
+          <div class="section-heading"><div><span class="section-number">ƒ</span><h2>自定义函数</h2></div><span id="function-count" class="mini-label">0 / 32</span></div>
+          <p class="function-note">保存后按名称调用，如 <code>ID (λy.y)</code>。</p>
+          <form id="function-form"><label for="function-name">函数名称</label><input id="function-name" placeholder="例如 ID、ADD、SUCC" maxlength="32" autocomplete="off" spellcheck="false"><label for="function-source">函数定义</label><textarea id="function-source" placeholder="例如 λx.x" spellcheck="false" autocapitalize="off" aria-describedby="function-error"></textarea><div id="function-keys" class="function-keys" role="group" aria-label="函数定义快捷输入"><button type="button" data-function-insert="λ">λ</button><button type="button" data-function-insert="x">x</button><button type="button" data-function-insert="y">y</button><button type="button" data-function-insert="f">f</button><button type="button" data-function-insert=".">.</button><button type="button" data-function-insert="(">(</button><button type="button" data-function-insert=")">)</button><button type="button" data-function-insert=" " aria-label="函数定义插入空格">␣</button></div><p id="function-error" class="error-message" role="alert" hidden></p><div class="function-actions"><button id="function-use-current" type="button" class="button">使用当前式</button><button id="function-add" type="submit" class="button primary">新增函数 +</button></div></form>
+          <div id="function-list" class="function-list"></div><p class="function-foot">定义在保存时展开。删除函数后，已转换的图示仍可运行；再次转换会使用最新函数库。</p>
+        </section>
         <section class="card rules-card"><div class="section-heading"><div><span class="section-number">λ</span><h2>读懂线路</h2></div></div><div class="rule"><span class="legend-line lambda-line"></span><p><strong>抽象</strong><span>一条横线，绑定一个变量。</span></p></div><div class="rule"><span class="legend-line var-line"></span><p><strong>变量</strong><span>竖线连接到它所属的 λ。</span></p></div><div class="rule"><span class="legend-line app-line"></span><p><strong>应用</strong><span>横线连接函数与参数。</span></p></div><p class="rules-foot">颜色辅助追踪绑定；连线结构决定含义。</p></section>
       </aside>
       <section class="visual-column">
@@ -66,6 +73,6 @@
     <footer class="page-footer"><span><b>λ</b> 只有变量、函数和应用。其余，交给计算。</span><span>正常序 β 归约 · 本地保存</span></footer>
   </main>
   <div id="toast" class="toast" role="status" hidden></div>
-  <script src="src/core.js"></script><script src="src/diagram.js"></script><script src="src/presets.js"></script><script src="src/app.js"></script>
+  <script src="src/core.js"></script><script src="src/diagram.js"></script><script src="src/presets.js"></script><script src="src/library.js"></script><script src="src/snapshot.js"></script><script src="src/workspace-tools.js"></script><script src="src/app.js"></script>
 </body>
 </html>

@@ -5,21 +5,22 @@
   const input=$('expression');
   const state={ term:null, original:null, history:[], dirty:false, running:false, timer:null,
     mode:'free', level:0, completed:new Set(), halt:'', scale:1, autoFit:true, model:null };
-  const STORAGE='lambda-lab-v1';
-  let toastTimer;
-  function save() {
-    try { localStorage.setItem(STORAGE,JSON.stringify({version:1,draft:input.value,completed:[...state.completed],mode:state.mode,level:state.level})); }
-    catch { /* Optional storage: the calculator remains usable. */ }
+  let toastTimer,workspace;
+  function save() { workspace?.queueSave(); }
+  function capture() {
+    return {draft:input.value,completed:[...state.completed],mode:state.mode,level:state.level,
+      session:{original:state.original,steps:Math.max(0,state.history.length-1),dirty:state.dirty,halt:state.halt},
+      view:{speed:Number($('speed').value),scale:state.scale,autoFit:state.autoFit,historyOpen:$('history-details').open,helpOpen:!$('help-panel').hidden,hintOpen:!$('hint').hidden},
+      selection:{start:input.selectionStart,end:input.selectionEnd},error:$('error-message').hidden?'':$('error-message').textContent};
   }
-  function restore() {
-    try {
-      const s=JSON.parse(localStorage.getItem(STORAGE));
-      if(!s || s.version!==1) return;
-      if(typeof s.draft==='string' && s.draft.length<=C.LIMITS.chars) input.value=s.draft;
-      if(Array.isArray(s.completed)) state.completed=new Set(s.completed.filter(x=>Number.isInteger(x)&&x>=1&&x<=P.levels.length));
-      if(s.mode==='challenge') state.mode='challenge';
-      if(Number.isInteger(s.level)&&s.level>=0&&s.level<P.levels.length) state.level=s.level;
-    } catch { /* Ignore damaged or inaccessible storage. */ }
+  function applySnapshot(s) {
+    stop();input.value=s.draft;state.completed=new Set(s.completed);state.mode=s.mode;state.level=s.level;
+    state.original=s.session.original;state.term=s.term;state.history=s.history;state.dirty=s.session.dirty;state.halt=s.session.halt;
+    state.scale=s.view.scale;state.autoFit=s.view.autoFit;$('speed').value=String(s.view.speed);
+    $('history-details').open=s.view.historyOpen;$('help-panel').hidden=!s.view.helpOpen;$('help-toggle').setAttribute('aria-expanded',String(s.view.helpOpen));
+    $('hint').hidden=!s.view.hintOpen;$('hint-toggle').textContent=s.view.hintOpen?'收起提示':'显示提示';$('hint-toggle').setAttribute('aria-expanded',String(s.view.hintOpen));
+    $('challenge-feedback').textContent='';$('next-level').hidden=true;$('error-message').textContent=s.error;$('error-message').hidden=!s.error;
+    renderMode();if(s.hasSession)render();else convert();input.setSelectionRange(s.selection.start,s.selection.end);
   }
   function toast(message) {
     clearTimeout(toastTimer); $('toast').textContent=message; $('toast').hidden=false;
@@ -44,7 +45,7 @@
     stop(); $('error-message').hidden=true; state.halt='';
     $('challenge-feedback').textContent=''; $('next-level').hidden=true;
     try {
-      const term=C.parse(input.value);
+      const term=workspace?workspace.expand(C.parse(input.value)):C.parse(input.value);
       state.term=term; state.original=term; state.history=[{term,change:null}]; state.dirty=false;
       state.autoFit=true; render(); save(); return true;
     } catch(e) {
@@ -118,6 +119,7 @@
       li.append(num,body);history.append(li);
     });
     renderDiagram(redex);
+    save();
   }
   function advance() {
     if(!state.term||state.dirty||state.history.length-1>=C.LIMITS.steps) return false;
@@ -188,9 +190,9 @@
   $('back').addEventListener('click',()=>{if(state.history.length>1){stop();state.history.pop();state.term=state.history.at(-1).term;state.halt='';$('challenge-feedback').textContent='';$('next-level').hidden=true;render();}});
   $('reset').addEventListener('click',()=>{if(state.original){stop();state.term=state.original;state.history=[{term:state.original,change:null}];state.halt='';$('challenge-feedback').textContent='';$('next-level').hidden=true;render();}});
   $('speed').addEventListener('change',()=>{if(state.running){clearTimeout(state.timer);schedule();}});
-  $('zoom-in').addEventListener('click',()=>{state.autoFit=false;state.scale*=1.25;applyScale();});
-  $('zoom-out').addEventListener('click',()=>{state.autoFit=false;state.scale/=1.25;applyScale();});
-  $('fit').addEventListener('click',()=>{state.autoFit=true;applyScale();});
+  $('zoom-in').addEventListener('click',()=>{state.autoFit=false;state.scale*=1.25;applyScale();save();});
+  $('zoom-out').addEventListener('click',()=>{state.autoFit=false;state.scale/=1.25;applyScale();save();});
+  $('fit').addEventListener('click',()=>{state.autoFit=true;applyScale();save();});
   window.addEventListener('resize',applyScale);
   $('export-svg').addEventListener('click',()=>{
     if(!state.term||state.dirty)return;
@@ -200,9 +202,19 @@
   });
   $('mode-free').addEventListener('click',()=>{stop();state.mode='free';renderMode();render();save();});
   $('mode-challenge').addEventListener('click',()=>selectLevel(state.level));
-  $('hint-toggle').addEventListener('click',()=>{const show=$('hint').hidden;$('hint').hidden=!show;$('hint-toggle').textContent=show?'收起提示':'显示提示';$('hint-toggle').setAttribute('aria-expanded',String(show));});
+  $('hint-toggle').addEventListener('click',()=>{const show=$('hint').hidden;$('hint').hidden=!show;$('hint-toggle').textContent=show?'收起提示':'显示提示';$('hint-toggle').setAttribute('aria-expanded',String(show));save();});
   $('check-answer').addEventListener('click',checkAnswer);
   $('next-level').addEventListener('click',()=>selectLevel(Math.min(state.level+1,P.levels.length-1)));
-  $('help-toggle').addEventListener('click',()=>{const show=$('help-panel').hidden;$('help-panel').hidden=!show;$('help-toggle').setAttribute('aria-expanded',String(show));});
-  restore();renderMode();convert();
+  $('help-toggle').addEventListener('click',()=>{const show=$('help-panel').hidden;$('help-panel').hidden=!show;$('help-toggle').setAttribute('aria-expanded',String(show));save();});
+  $('history-details').addEventListener('toggle',save);
+  $('speed').addEventListener('change',save);
+  workspace=window.LambdaWorkspace.init({capture,apply:applySnapshot,toast,
+    currentExpression:()=>state.term&&!state.dirty?C.format(state.term):input.value,
+    insertFunction:name=>{const start=input.selectionStart,end=input.selectionEnd;
+      const before=start&&/[A-Za-z0-9_']/.test(input.value[start-1])?' ':'';
+      const after=end<input.value.length&&/[A-Za-z0-9_']/.test(input.value[end])?' ':'';
+      insert(before+name+after);
+    }});
+  if(!workspace.restoreInitial()){renderMode();convert();}
+  workspace.persist();
 })();
