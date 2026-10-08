@@ -4,19 +4,19 @@
   const $=id=>document.getElementById(id);
   const input=$('expression');
   const state={ term:null, original:null, history:[], dirty:false, running:false, timer:null,
-    mode:'free', level:0, completed:new Set(), halt:'', scale:1, autoFit:true, model:null };
+    mode:'free', level:0, completed:new Set(), halt:'', scale:1, autoFit:true, model:null, speed:600 };
   let toastTimer,workspace;
   function save() { workspace?.queueSave(); }
   function capture() {
     return {draft:input.value,completed:[...state.completed],mode:state.mode,level:state.level,
       session:{original:state.original,steps:Math.max(0,state.history.length-1),dirty:state.dirty,halt:state.halt},
-      view:{speed:Number($('speed').value),scale:state.scale,autoFit:state.autoFit,historyOpen:$('history-details').open,helpOpen:!$('help-panel').hidden,hintOpen:!$('hint').hidden},
+      view:{speed:state.speed,scale:state.scale,autoFit:state.autoFit,historyOpen:$('history-details').open,helpOpen:!$('help-panel').hidden,hintOpen:!$('hint').hidden},
       selection:{start:input.selectionStart,end:input.selectionEnd},error:$('error-message').hidden?'':$('error-message').textContent};
   }
   function applySnapshot(s) {
     stop();input.value=s.draft;state.completed=new Set(s.completed);state.mode=s.mode;state.level=s.level;
     state.original=s.session.original;state.term=s.term;state.history=s.history;state.dirty=s.session.dirty;state.halt=s.session.halt;
-    state.scale=s.view.scale;state.autoFit=s.view.autoFit;$('speed').value=String(s.view.speed);
+    state.scale=s.view.scale;state.autoFit=s.view.autoFit;state.speed=s.view.speed;renderSpeed();
     $('history-details').open=s.view.historyOpen;$('help-panel').hidden=!s.view.helpOpen;$('help-toggle').setAttribute('aria-expanded',String(s.view.helpOpen));
     $('hint').hidden=!s.view.hintOpen;$('hint-toggle').textContent=s.view.hintOpen?'收起提示':'显示提示';$('hint-toggle').setAttribute('aria-expanded',String(s.view.hintOpen));
     $('challenge-feedback').textContent='';$('next-level').hidden=true;$('error-message').textContent=s.error;$('error-message').hidden=!s.error;
@@ -132,7 +132,15 @@
     } catch(e) {stop();state.halt=e.message;render();return false;}
   }
   function schedule() {
-    state.timer=setTimeout(()=>{if(!state.running)return;const more=advance();if(more&&state.running)schedule();},Number($('speed').value));
+    state.timer=setTimeout(()=>{if(!state.running)return;const more=advance();if(more&&state.running)schedule();},state.speed);
+  }
+  function renderSpeed() {
+    $('speed').value=[1200,600,180,10].includes(state.speed)?String(state.speed):'custom';
+    $('speed-ms').value=state.speed;$('speed-error').hidden=true;
+  }
+  function setSpeed(value) {
+    if(!Number.isInteger(value)||value<1||value>60000){$('speed-error').textContent='每步间隔请输入 1–60000 的整数毫秒；当前仍使用上次有效速度。';$('speed-error').hidden=false;return;}
+    state.speed=value;renderSpeed();if(state.running){clearTimeout(state.timer);schedule();}save();
   }
   function run() {
     if(state.running){stop();render();return;}
@@ -186,7 +194,8 @@
   $('convert').addEventListener('click',convert);$('step').addEventListener('click',advance);$('run').addEventListener('click',run);
   $('back').addEventListener('click',()=>{if(state.history.length>1){stop();state.history.pop();state.term=state.history.at(-1).term;state.halt='';$('challenge-feedback').textContent='';$('next-level').hidden=true;render();}});
   $('reset').addEventListener('click',()=>{if(state.original){stop();state.term=state.original;state.history=[{term:state.original,change:null}];state.halt='';$('challenge-feedback').textContent='';$('next-level').hidden=true;render();}});
-  $('speed').addEventListener('change',()=>{if(state.running){clearTimeout(state.timer);schedule();}});
+  $('speed').addEventListener('change',()=>{if($('speed').value==='custom'){$('speed-ms').focus();$('speed-ms').select();}else setSpeed(Number($('speed').value));});
+  $('speed-ms').addEventListener('input',()=>setSpeed($('speed-ms').value===''?NaN:Number($('speed-ms').value)));
   $('zoom-in').addEventListener('click',()=>{state.autoFit=false;state.scale*=1.25;applyScale();save();});
   $('zoom-out').addEventListener('click',()=>{state.autoFit=false;state.scale/=1.25;applyScale();save();});
   $('fit').addEventListener('click',()=>{state.autoFit=true;applyScale();save();});

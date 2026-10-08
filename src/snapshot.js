@@ -28,7 +28,7 @@
     const s=raw.session;if(!object(s)||!Number.isInteger(s.steps)||s.steps<0||s.steps>C.LIMITS.steps||typeof s.dirty!=='boolean')fail('归约状态不合法。');
     const original=s.original===null?null:ast(s.original);if(!original&&s.steps!==0)fail('没有起始表达式，无法恢复归约。');
     if(typeof s.halt!=='string'||s.halt.length>500)fail('暂停信息不合法。');
-    const v=raw.view;if(!object(v)||![180,600,1200].includes(v.speed)||!Number.isFinite(v.scale)||v.scale<.02||v.scale>4)fail('视图设置不合法。');
+    const v=raw.view;if(!object(v)||!Number.isInteger(v.speed)||v.speed<1||v.speed>60000||!Number.isFinite(v.scale)||v.scale<.02||v.scale>4)fail('视图设置不合法。');
     for(const field of ['autoFit','historyOpen','helpOpen','hintOpen'])if(typeof v[field]!=='boolean')fail('视图开关不合法。');
     const selection=raw.selection;if(!object(selection)||!Number.isInteger(selection.start)||!Number.isInteger(selection.end)||selection.start<0||selection.start>selection.end||selection.end>raw.draft.length)fail('光标位置不合法。');
     if(typeof raw.error!=='string'||raw.error.length>2000)fail('错误信息不合法。');
