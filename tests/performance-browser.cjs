@@ -25,6 +25,7 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
       assert.equal((await page.locator('#current-expression').textContent()).match(/\bf\b/g).length,1801);assert.equal(await page.locator('#history-list li').count(),2);
       assert.equal(await page.evaluate(()=>originalSvg===document.querySelector('#diagram-mount svg')&&originalLine===document.querySelector('#diagram-mount line')),true);
       await assertDiagram(page);
+      assert.equal(await page.locator('#diagram-mount line').first().evaluate(node=>getComputedStyle(node).transitionDuration),'0s');
     });
     await check('normal attempts and mode refresh reuse all unchanged SVG and history nodes',async()=>{
       await page.evaluate(()=>{window.historyNode=document.querySelector('#history-list li');window.mutations=[];window.observer=new MutationObserver(entries=>mutations.push(...entries));observer.observe(document.getElementById('diagram-mount'),{childList:true,subtree:true});});
