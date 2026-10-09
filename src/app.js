@@ -5,7 +5,9 @@
   const input=$('expression');
   const state={ term:null, original:null, history:[], dirty:false, running:false, timer:null,
     mode:'free', level:0, completed:new Set(), halt:'', scale:1, autoFit:true, model:null, speed:600 };
-  let toastTimer,workspace,viewer,renderedHistory=[];
+  let toastTimer,workspace,viewer,historySource=null,renderedCount=0,diagramTerm=null,diagramRoute=null;
+  const decodedTerms=new WeakMap(),TRUE=C.parse(P.TRUE),FALSE=C.parse(P.FALSE),IDENTITY=C.parse(P.I);
+  const diagramView=window.LambdaDiagramView.init($('diagram-mount'));
   function save() { workspace?.queueSave(); }
   function capture() {
     return {draft:input.value,completed:[...state.completed],mode:state.mode,level:state.level,
@@ -58,11 +60,16 @@
   }
   function renderDiagram(redex) {
     const mount=$('diagram-mount');
+    const route=state.dirty?null:redex?.path??null;
+    mount.style.opacity=state.dirty?'0.35':'1';
+    if(state.term&&diagramTerm===state.term&&(route===diagramRoute||(route&&diagramRoute&&route.length===diagramRoute.length&&route.every((part,i)=>part===diagramRoute[i])))){
+      applyScale();return;
+    }
+    diagramTerm=state.term;diagramRoute=route;
     const anchor=state.autoFit?null:viewer?.anchor();
-    if(!state.term) { mount.innerHTML=''; $('diagram-empty').hidden=false; state.model=null; return; }
+    if(!state.term) { diagramView.clear(); $('diagram-empty').hidden=false; state.model=null; return; }
     $('diagram-empty').hidden=true;
-    const result=D.svg(state.term,state.dirty?null:redex?.path??null);
-    state.model=result.model; mount.innerHTML=result.markup;
+    state.model=D.layout(state.term,route);diagramView.render(state.model);
     mount.style.opacity=state.dirty?'0.35':'1';
     applyScale();
     viewer?.restore(anchor);
@@ -78,13 +85,14 @@
     $('fit').setAttribute('aria-pressed',String(state.autoFit));
   }
   function decode(t) {
-    const number=C.churchNumber(t), isTrue=C.equal(t,C.parse(P.TRUE)), isFalse=C.equal(t,C.parse(P.FALSE));
-    if(isFalse) return 'FALSE / Church 数 0';
-    if(isTrue) return 'TRUE · 选择第一个';
-    if(number!==null) return `Church 数 ${number}`;
-    if(C.equal(t,C.parse(P.I))) return 'I · 恒等函数';
-    const free=[...C.freeVars(t)];
-    return free.length?`${free.length} 个自由变量`:'闭合表达式';
+    if(decodedTerms.has(t))return decodedTerms.get(t);
+    const number=C.churchNumber(t);let text;
+    if(C.equal(t,FALSE))text='FALSE / Church 数 0';
+    else if(C.equal(t,TRUE))text='TRUE · 选择第一个';
+    else if(number!==null)text=`Church 数 ${number}`;
+    else if(C.equal(t,IDENTITY))text='I · 恒等函数';
+    else{const free=C.freeVars(t);text=free.size?`${free.size} 个自由变量`:'闭合表达式';}
+    decodedTerms.set(t,text);return text;
   }
   function code(text) { const el=document.createElement('code'); el.textContent=text; return el; }
   function render() {
@@ -115,16 +123,15 @@
     } else if(ready) next.textContent='归约会检查函数、参数和 λ 函数体。整个表达式都不能归约时，当前式保持不变。';
     $('history-count').textContent=`${count} 次替换`;
     const history=$('history-list');
-    if(renderedHistory.length>state.history.length||renderedHistory.some((entry,i)=>entry!==state.history[i])) {
-      history.replaceChildren();renderedHistory=[];
-    }
-    state.history.forEach((entry,i)=>{
-      if(i<renderedHistory.length)return;
+    if(historySource!==state.history){history.replaceChildren();renderedCount=0;historySource=state.history;}
+    while(renderedCount>state.history.length){history.lastElementChild.remove();renderedCount--;}
+    for(let i=renderedCount;i<state.history.length;i++){
+      const entry=state.history[i];
       const li=document.createElement('li'),num=document.createElement('span'),body=document.createElement('div');
       num.textContent=String(i).padStart(2,'0');body.append(code(C.format(entry.term)));
       if(entry.change) { const note=document.createElement('small'); note.textContent=`${entry.change.param} ← ${C.format(entry.change.argument)}`;body.append(note); }
-      li.append(num,body);history.append(li);renderedHistory.push(entry);
-    });
+      li.append(num,body);history.append(li);renderedCount++;
+    }
     renderDiagram(redex);
     save();
   }

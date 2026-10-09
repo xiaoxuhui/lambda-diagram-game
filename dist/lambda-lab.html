@@ -106,23 +106,31 @@
 (function (root) {
   'use strict';
   const LIMITS = Object.freeze({ chars: 1500, nodes: Infinity, depth: Infinity, steps: Infinity, nameChars:Infinity });
-  const V = name => ({ type: 'var', name });
-  const L = (param, body) => ({ type: 'abs', param, body });
-  const A = (fn, arg) => ({ type: 'app', fn, arg });
+  const V = name => Object.freeze({ type: 'var', name });
+  const L = (param, body) => Object.freeze({ type: 'abs', param, body });
+  const A = (fn, arg) => Object.freeze({ type: 'app', fn, arg });
+  const facts=new WeakMap(),formatted=new WeakMap(),freeSets=new WeakMap(),occurrences=new WeakMap();
 
   class LambdaError extends Error {
     constructor(message, position = null) { super(message); this.name = 'LambdaError'; this.position = position; }
   }
-  function inspect(term) {
-    let nodes = 0, depth = 0, vars = 0, abstractions = 0, applications = 0, nameChars = 0;
-    const stack = [[term, 1]];
-    while (stack.length) {
-      const [t, d] = stack.pop(); nodes++; depth = Math.max(depth, d);
-      if (t.type === 'var') { vars++; nameChars += t.name.length; }
-      else if (t.type === 'abs') { abstractions++; nameChars += t.param.length; stack.push([t.body, d + 1]); }
-      else { applications++; stack.push([t.fn, d + 1], [t.arg, d + 1]); }
+  function analyze(term) {
+    if(facts.has(term))return facts.get(term);
+    const local=new WeakMap(),get=t=>facts.get(t)||local.get(t),stack=[[term,false]];
+    while(stack.length){
+      const [t,done]=stack.pop();if(get(t))continue;
+      if(!done&&t.type!=='var'){stack.push([t,true]);if(t.type==='abs')stack.push([t.body,false]);else stack.push([t.arg,false],[t.fn,false]);continue;}
+      let f;
+      if(t.type==='var')f={nodes:1,depth:1,vars:1,abstractions:0,applications:0,redex:false,stable:Object.isFrozen(t)};
+      else if(t.type==='abs'){const b=get(t.body);f={nodes:1+b.nodes,depth:1+b.depth,vars:b.vars,abstractions:1+b.abstractions,applications:b.applications,redex:b.redex,stable:Object.isFrozen(t)&&b.stable};}
+      else{const a=get(t.fn),b=get(t.arg);f={nodes:1+a.nodes+b.nodes,depth:1+Math.max(a.depth,b.depth),vars:a.vars+b.vars,abstractions:a.abstractions+b.abstractions,applications:1+a.applications+b.applications,redex:t.fn.type==='abs'||a.redex||b.redex,stable:Object.isFrozen(t)&&a.stable&&b.stable};}
+      if(f.stable)facts.set(t,f);else local.set(t,f);
     }
-    return { nodes, depth, vars, abstractions, applications };
+    return get(term);
+  }
+  function inspect(term) {
+    const {nodes,depth,vars,abstractions,applications}=analyze(term);
+    return {nodes,depth,vars,abstractions,applications};
   }
   function tokenize(source, maxChars = LIMITS.chars) {
     if (source.length > maxChars) throw new LambdaError(`输入最多 ${maxChars} 个字符。`, maxChars);
@@ -186,45 +194,78 @@
     inspect(t); return t;
   }
   function format(t, context = 0) {
-    if (t.type === 'var') return t.name;
-    if (t.type === 'abs') {
-      const s = `λ${t.param}.${format(t.body)}`;
-      return context > 0 ? `(${s})` : s;
+    let text=formatted.get(t);
+    if(text===undefined){
+      const parts=[],stack=[[t,0]];
+      while(stack.length){const entry=stack.pop();if(typeof entry==='string'){parts.push(entry);continue;}
+        const [node,ctx]=entry,brackets=node.type==='abs'?ctx>0:node.type==='app'&&ctx>1;
+        if(brackets){parts.push('(');stack.push(')');}
+        if(node.type==='var')parts.push(node.name);
+        else if(node.type==='abs'){parts.push(`λ${node.param}.`);stack.push([node.body,0]);}
+        else stack.push([node.arg,2],' ',[node.fn,1]);
+      }
+      text=parts.join('');if(analyze(t).stable)formatted.set(t,text);
     }
-    const s = `${format(t.fn, 1)} ${format(t.arg, 2)}`;
-    return context > 1 ? `(${s})` : s;
+    return (t.type==='abs'&&context>0)||(t.type==='app'&&context>1)?`(${text})`:text;
   }
   function freeVars(t, bound = new Set(), out = new Set()) {
-    if (t.type === 'var') { if (!bound.has(t.name)) out.add(t.name); }
-    else if (t.type === 'abs') { const next = new Set(bound); next.add(t.param); freeVars(t.body, next, out); }
-    else { freeVars(t.fn, bound, out); freeVars(t.arg, bound, out); }
+    let found=freeSets.get(t);
+    if(!found){found=new Set();const bindings=new Map(),stack=[[t,false]];
+      while(stack.length){const [node,exit]=stack.pop();
+        if(exit){const count=bindings.get(node.param)-1;if(count)bindings.set(node.param,count);else bindings.delete(node.param);continue;}
+        if(node.type==='var'){if(!bindings.has(node.name))found.add(node.name);}
+        else if(node.type==='abs'){bindings.set(node.param,(bindings.get(node.param)||0)+1);stack.push([node,true],[node.body,false]);}
+        else stack.push([node.arg,false],[node.fn,false]);
+      }
+      if(analyze(t).stable)freeSets.set(t,found);
+    }
+    for(const name of found)if(!bound.has(name))out.add(name);
     return out;
   }
   function allNames(t, out = new Set()) {
-    if (t.type === 'var') out.add(t.name);
-    else if (t.type === 'abs') { out.add(t.param); allNames(t.body, out); }
-    else { allNames(t.fn, out); allNames(t.arg, out); }
+    const visited=new WeakSet(),stack=[t];while(stack.length){const node=stack.pop();if(visited.has(node))continue;visited.add(node);
+      if(node.type==='var')out.add(node.name);else if(node.type==='abs'){out.add(node.param);stack.push(node.body);}else stack.push(node.arg,node.fn);
+    }
     return out;
   }
+  function hasFree(t,name) {
+    const local=new WeakMap(),read=node=>occurrences.get(node)?.get(name)??local.get(node),stack=[[t,false]];
+    while(stack.length){const [node,done]=stack.pop();if(read(node)!==undefined)continue;
+      let value;
+      if(node.type==='var')value=node.name===name;
+      else if(node.type==='abs'&&node.param===name)value=false;
+      else if(!done){stack.push([node,true]);if(node.type==='abs')stack.push([node.body,false]);else stack.push([node.arg,false],[node.fn,false]);continue;}
+      else value=node.type==='abs'?read(node.body):read(node.fn)||read(node.arg);
+      if(analyze(node).stable){let names=occurrences.get(node);if(!names){names=new Map();occurrences.set(node,names);}names.set(name,value);}else local.set(node,value);
+    }
+    return read(t);
+  }
   function renameBound(t, from, to) {
-    if (t.type === 'var') return t.name === from ? V(to) : t;
-    if (t.type === 'abs') return t.param === from ? t : L(t.param, renameBound(t.body, from, to));
-    return A(renameBound(t.fn, from, to), renameBound(t.arg, from, to));
+    return rewrite(t,from,V(to),false);
+  }
+  function rewrite(t,name,argument,avoidCapture) {
+    if(!hasFree(t,name))return t;
+    const argFree=avoidCapture?freeVars(argument):new Set(),results=new WeakMap(),stack=[{node:t}],original=t;let used;
+    while(stack.length){const entry=stack.pop(),node=entry.node;if(results.has(node))continue;
+      if(!entry.done){
+        if(!hasFree(node,name)){results.set(node,node);continue;}
+        if(node.type==='var'){results.set(node,argument);continue;}
+        if(node.type==='app'){stack.push({node,done:true},{node:node.arg},{node:node.fn});continue;}
+        let param=node.param,body=node.body;
+        if(argFree.has(param)){
+          if(!used){used=allNames(original,allNames(argument));used.add(name);}
+          let i=1;while(used.has(`${param}${i}`))i++;
+          const fresh=`${param}${i}`;used.add(fresh);body=renameBound(body,param,fresh);param=fresh;
+        }
+        stack.push({node,done:true,param,body},{node:body});
+      }else if(node.type==='app'){
+        const fn=results.get(node.fn),arg=results.get(node.arg);results.set(node,fn===node.fn&&arg===node.arg?node:A(fn,arg));
+      }else{const body=results.get(entry.body);results.set(node,entry.param===node.param&&body===node.body?node:L(entry.param,body));}
+    }
+    return results.get(t);
   }
   function substitute(t, name, argument) {
-    const argFree = freeVars(argument), used = allNames(t, allNames(argument)); used.add(name);
-    function sub(node) {
-      if (node.type === 'var') return node.name === name ? argument : node;
-      if (node.type === 'app') return A(sub(node.fn), sub(node.arg));
-      if (node.param === name || !freeVars(node.body).has(name)) return node;
-      let param = node.param, body = node.body;
-      if (argFree.has(param)) {
-        let i = 1; while (used.has(`${param}${i}`)) i++;
-        const fresh = `${param}${i}`; used.add(fresh); body = renameBound(body, param, fresh); param = fresh;
-      }
-      return L(param, sub(body));
-    }
-    const result = sub(t); inspect(result); return result;
+    const result=rewrite(t,name,argument,true);inspect(result);return result;
   }
   function alphaKey(t, env = []) {
     if (t.type === 'var') {
@@ -235,20 +276,32 @@
     return ['app', alphaKey(t.fn, env), alphaKey(t.arg, env)];
   }
   const key = t => JSON.stringify(alphaKey(t));
-  const equal = (a, b) => key(a) === key(b);
-  function findRedex(t, path = []) {
-    if (t.type === 'app') {
-      if (t.fn.type === 'abs') return { term: t, path };
-      return findRedex(t.fn, [...path, 'fn']) || findRedex(t.arg, [...path, 'arg']);
+  function equal(a,b) {
+    if(a===b)return true;
+    const left=new Map(),right=new Map(),stack=[{a,b}],push=(map,name,id)=>{const list=map.get(name)||[];list.push(id);map.set(name,list);};let id=0;
+    while(stack.length){const entry=stack.pop(),x=entry.a,y=entry.b;
+      if(entry.exit){left.get(x.param).pop();right.get(y.param).pop();continue;}
+      if(x.type!==y.type)return false;
+      if(x.type==='var'){const l=left.get(x.name)?.at(-1),r=right.get(y.name)?.at(-1);if(l!==undefined||r!==undefined){if(l!==r)return false;}else if(x.name!==y.name)return false;}
+      else if(x.type==='abs'){push(left,x.param,++id);push(right,y.param,id);stack.push({a:x,b:y,exit:true},{a:x.body,b:y.body});}
+      else stack.push({a:x.arg,b:y.arg},{a:x.fn,b:y.fn});
     }
-    if (t.type === 'abs') return findRedex(t.body, [...path, 'body']);
-    return null;
+    return true;
+  }
+  function findRedex(t, path = []) {
+    const route=[...path];
+    while(true){
+      if(t.type==='app'&&t.fn.type==='abs')return {term:t,path:route};
+      if(!analyze(t).redex)return null;
+      if(t.type==='abs'){route.push('body');t=t.body;}
+      else if(analyze(t.fn).redex){route.push('fn');t=t.fn;}
+      else{route.push('arg');t=t.arg;}
+    }
   }
   function replaceAt(t, path, replacement, i = 0) {
-    if (i === path.length) return replacement;
-    const part = path[i];
-    if (part === 'body') return L(t.param, replaceAt(t.body, path, replacement, i + 1));
-    return part === 'fn' ? A(replaceAt(t.fn, path, replacement, i + 1), t.arg) : A(t.fn, replaceAt(t.arg, path, replacement, i + 1));
+    const parents=[];for(;i<path.length;i++){const part=path[i];parents.push([t,part]);t=t[part];}
+    for(let j=parents.length-1;j>=0;j--){const [parent,part]=parents[j];replacement=part==='body'?L(parent.param,replacement):part==='fn'?A(replacement,parent.arg):A(parent.fn,replacement);}
+    return replacement;
   }
   function step(t) {
     const redex = findRedex(t); if (!redex) return null;
@@ -283,37 +336,51 @@
   'use strict';
   const COLORS = ['#64d8bd', '#eabe75', '#9fa6ff', '#f38fac', '#79bcf2', '#c2dd87'];
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&apos;' }[c]));
+  const lineTitle=l=>l.kind==='abstraction'?`λ${l.name}：绑定横线`:l.kind==='variable'?`${l.name}：${l.free?'自由变量':`连接绑定 λ${l.name}`}`:l.kind==='application'?'函数应用：连接左右子项最左变量':'延伸到外层应用';
   function layout(term, redexPath = null) {
     const lines = [], labels = [], binders = [], leaves = []; let leaf = 0;
-    const samePath = (a,b) => b !== null && a.length === b.length && a.every((x,i)=>x===b[i]);
-    function draw(t, top, env, path) {
-      const start = leaf;
-      if (t.type === 'var') {
+    const env=new Map(),origin={parent:null,part:null,length:0,matches:true};let tree;
+    const child=(parent,part)=>({parent,part,length:parent.length+1,matches:redexPath!==null&&parent.matches&&redexPath[parent.length]===part});
+    function withPath(line,route){
+      Object.defineProperty(line,'path',{enumerable:true,configurable:true,get(){
+        const path=Array(route.length);for(let i=path.length-1;i>=0;i--){path[i]=route.part;route=route.parent;}
+        Object.defineProperty(line,'path',{value:path,enumerable:true});return path;
+      }});return line;
+    }
+    const stack=[{t:term,top:64,route:origin}];
+    while(stack.length){
+      const entry=stack.pop(),{t,top,route}=entry;
+      if(entry.stage==='abs'){
+        env.get(t.param).pop();const binder=entry.binder;
+        const active=redexPath&&route.part==='fn'&&route.parent.length===redexPath.length&&route.parent.matches;
+        lines.push({kind:'abstraction',x1:tree.left-15,x2:tree.right+15,y1:top,y2:top,color:binder.color,binder:binder.id,name:t.param,active});continue;
+      }
+      if(entry.stage==='left'){
+        stack.push({...entry,stage:'right',left:tree},{t:t.arg,top,route:child(route,'arg')});continue;
+      }
+      if(entry.stage==='right'){
+        const left=entry.left,right=tree,bottom=Math.max(left.bottom,right.bottom)+32;
+        lines.push({kind:'extension',x1:left.left,x2:left.left,y1:left.bottom,y2:bottom,color:leaves[left.start].color});
+        lines.push({kind:'extension',x1:right.left,x2:right.left,y1:right.bottom,y2:bottom,color:leaves[right.start].color});
+        lines.push(withPath({kind:'application',x1:left.left,x2:right.left,y1:bottom,y2:bottom,color:'#d5dff1',active:redexPath!==null&&route.matches&&route.length===redexPath.length},route));
+        tree={left:left.left,right:right.right,bottom,start:entry.start,end:leaf};continue;
+      }
+      const start=leaf;
+      if(t.type==='var'){
         const x = leaf++ * 40 + 50, end = top + 32;
-        const binder = [...env].reverse().find(b=>b.name === t.name);
-        const line = { kind:'variable', x1:x, x2:x, y1:binder ? binder.y : 30, y2:end,
-          color:binder ? binder.color : '#aeb9ce', free:!binder, name:t.name, binder:binder ? binder.id : null, path };
+        const binder=env.get(t.name)?.at(-1);
+        const line = withPath({ kind:'variable', x1:x, x2:x, y1:binder ? binder.y : 30, y2:end,
+          color:binder ? binder.color : '#aeb9ce', free:!binder, name:t.name, binder:binder ? binder.id : null },route);
         lines.push(line); leaves.push(line);
         if (!binder) labels.push({ x, y:19, text:t.name, free:true });
-        return { left:x, right:x, bottom:end, start, end:leaf };
-      }
-      if (t.type === 'abs') {
+        tree={left:x,right:x,bottom:end,start,end:leaf};continue;
+      }else if(t.type==='abs'){
         const binder = { id:binders.length, name:t.param, y:top, color:COLORS[binders.length % COLORS.length] };
         binders.push(binder);
-        const body = draw(t.body, top+32, [...env,binder], [...path,'body']);
-        const active = redexPath && samePath(path,[...redexPath,'fn']);
-        lines.push({ kind:'abstraction', x1:body.left-15, x2:body.right+15, y1:top, y2:top, color:binder.color, binder:binder.id, name:t.param, active });
-        return { ...body };
-      }
-      const left = draw(t.fn, top, env, [...path,'fn']);
-      const right = draw(t.arg, top, env, [...path,'arg']);
-      const bottom = Math.max(left.bottom, right.bottom) + 32;
-      lines.push({ kind:'extension', x1:left.left, x2:left.left, y1:left.bottom, y2:bottom, color:leaves[left.start].color });
-      lines.push({ kind:'extension', x1:right.left, x2:right.left, y1:right.bottom, y2:bottom, color:leaves[right.start].color });
-      lines.push({ kind:'application', x1:left.left, x2:right.left, y1:bottom, y2:bottom, color:'#d5dff1', active:samePath(path,redexPath), path });
-      return { left:left.left, right:right.right, bottom, start, end:leaf };
+        const scope=env.get(t.param)||[];scope.push(binder);env.set(t.param,scope);
+        stack.push({...entry,stage:'abs',binder},{t:t.body,top:top+32,route:child(route,'body')});
+      }else stack.push({...entry,stage:'left',start},{t:t.fn,top,route:child(route,'fn')});
     }
-    const tree = draw(term, 64, [], []);
     return { lines, labels, binders, leaves, width:Math.max(140, leaf*40+60), height:tree.bottom+48 };
   }
   function svg(term, redexPath = null, options = {}) {
@@ -323,10 +390,51 @@
     const labels = model.labels.map(l=>`<text x="${l.x}" y="${l.y}" text-anchor="middle" fill="#bac5d8" font-size="10" font-family="monospace"><title>${esc(l.text)}</title>${esc(l.text)}</text>`).join('');
     return { model, markup:`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img" aria-label="John Tromp Lambda 图示"><title>John Tromp Lambda 图示</title>${backgrounds}${shapes}${labels}</svg>` };
   }
-  const API = { layout, svg, COLORS };
+  const API = { layout, svg, COLORS, lineTitle };
   root.LambdaDiagram = API;
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
 })(typeof globalThis !== 'undefined' ? globalThis : window);
+
+</script><script>
+(function(root){
+  'use strict';
+  const NS='http://www.w3.org/2000/svg',D=root.LambdaDiagram;
+  function init(mount){
+    let svg=null,model=null;const lines=[],labels=[];
+    const element=name=>document.createElementNS(NS,name);
+    function attribute(node,name,value,previous){if(value!==previous){if(value===null)node.removeAttribute(name);else node.setAttribute(name,String(value));}}
+    function render(next){
+      if(!svg){svg=element('svg');svg.setAttribute('xmlns',NS);svg.setAttribute('role','img');svg.setAttribute('aria-label','John Tromp Lambda 图示');
+        const title=element('title');title.textContent='John Tromp Lambda 图示';svg.append(title);mount.replaceChildren(svg);}
+      attribute(svg,'viewBox',`0 0 ${next.width} ${next.height}`,model?`0 0 ${model.width} ${model.height}`:undefined);
+      const newLines=document.createDocumentFragment();
+      for(let i=0;i<next.lines.length;i++){
+        const line=next.lines[i],old=model?.lines[i];let node=lines[i];
+        if(!node){node=element('line');node.append(element('title'));node.setAttribute('stroke-linecap','square');lines.push(node);newLines.append(node);}
+        for(const key of ['x1','x2','y1','y2'])attribute(node,key,line[key],old?.[key]);
+        attribute(node,'stroke',line.active?'#ff91b7':line.color,old?(old.active?'#ff91b7':old.color):undefined);
+        attribute(node,'stroke-width',line.active?5:3,old?(old.active?5:3):undefined);
+        attribute(node,'stroke-dasharray',line.free?'5 5':null,old?(old.free?'5 5':null):undefined);
+        attribute(node,'data-kind',line.kind,old?.kind);attribute(node,'data-active',line.active?'true':null,old?(old.active?'true':null):undefined);
+        const title=D.lineTitle(line);if(!old||title!==D.lineTitle(old))node.firstElementChild.textContent=title;
+      }
+      while(lines.length>next.lines.length)lines.pop().remove();
+      svg.insertBefore(newLines,labels[0]||null);
+      const newLabels=document.createDocumentFragment();
+      for(let i=0;i<next.labels.length;i++){
+        const label=next.labels[i],old=model?.labels[i];let node=labels[i];
+        if(!node){node=element('text');node.setAttribute('text-anchor','middle');node.setAttribute('fill','#bac5d8');node.setAttribute('font-size','10');node.setAttribute('font-family','monospace');
+          node.append(element('title'),document.createTextNode(''));labels.push(node);newLabels.append(node);}
+        attribute(node,'x',label.x,old?.x);attribute(node,'y',label.y,old?.y);
+        if(!old||label.text!==old.text){node.firstElementChild.textContent=label.text;node.lastChild.nodeValue=label.text;}
+      }
+      while(labels.length>next.labels.length)labels.pop().remove();svg.append(newLabels);model=next;
+    }
+    function clear(){mount.replaceChildren();svg=null;model=null;lines.length=0;labels.length=0;}
+    return {render,clear};
+  }
+  root.LambdaDiagramView={init};
+})(typeof globalThis!=='undefined'?globalThis:window);
 
 </script><script>
 (function(root) {
@@ -703,7 +811,9 @@
   const input=$('expression');
   const state={ term:null, original:null, history:[], dirty:false, running:false, timer:null,
     mode:'free', level:0, completed:new Set(), halt:'', scale:1, autoFit:true, model:null, speed:600 };
-  let toastTimer,workspace,viewer,renderedHistory=[];
+  let toastTimer,workspace,viewer,historySource=null,renderedCount=0,diagramTerm=null,diagramRoute=null;
+  const decodedTerms=new WeakMap(),TRUE=C.parse(P.TRUE),FALSE=C.parse(P.FALSE),IDENTITY=C.parse(P.I);
+  const diagramView=window.LambdaDiagramView.init($('diagram-mount'));
   function save() { workspace?.queueSave(); }
   function capture() {
     return {draft:input.value,completed:[...state.completed],mode:state.mode,level:state.level,
@@ -756,11 +866,16 @@
   }
   function renderDiagram(redex) {
     const mount=$('diagram-mount');
+    const route=state.dirty?null:redex?.path??null;
+    mount.style.opacity=state.dirty?'0.35':'1';
+    if(state.term&&diagramTerm===state.term&&(route===diagramRoute||(route&&diagramRoute&&route.length===diagramRoute.length&&route.every((part,i)=>part===diagramRoute[i])))){
+      applyScale();return;
+    }
+    diagramTerm=state.term;diagramRoute=route;
     const anchor=state.autoFit?null:viewer?.anchor();
-    if(!state.term) { mount.innerHTML=''; $('diagram-empty').hidden=false; state.model=null; return; }
+    if(!state.term) { diagramView.clear(); $('diagram-empty').hidden=false; state.model=null; return; }
     $('diagram-empty').hidden=true;
-    const result=D.svg(state.term,state.dirty?null:redex?.path??null);
-    state.model=result.model; mount.innerHTML=result.markup;
+    state.model=D.layout(state.term,route);diagramView.render(state.model);
     mount.style.opacity=state.dirty?'0.35':'1';
     applyScale();
     viewer?.restore(anchor);
@@ -776,13 +891,14 @@
     $('fit').setAttribute('aria-pressed',String(state.autoFit));
   }
   function decode(t) {
-    const number=C.churchNumber(t), isTrue=C.equal(t,C.parse(P.TRUE)), isFalse=C.equal(t,C.parse(P.FALSE));
-    if(isFalse) return 'FALSE / Church 数 0';
-    if(isTrue) return 'TRUE · 选择第一个';
-    if(number!==null) return `Church 数 ${number}`;
-    if(C.equal(t,C.parse(P.I))) return 'I · 恒等函数';
-    const free=[...C.freeVars(t)];
-    return free.length?`${free.length} 个自由变量`:'闭合表达式';
+    if(decodedTerms.has(t))return decodedTerms.get(t);
+    const number=C.churchNumber(t);let text;
+    if(C.equal(t,FALSE))text='FALSE / Church 数 0';
+    else if(C.equal(t,TRUE))text='TRUE · 选择第一个';
+    else if(number!==null)text=`Church 数 ${number}`;
+    else if(C.equal(t,IDENTITY))text='I · 恒等函数';
+    else{const free=C.freeVars(t);text=free.size?`${free.size} 个自由变量`:'闭合表达式';}
+    decodedTerms.set(t,text);return text;
   }
   function code(text) { const el=document.createElement('code'); el.textContent=text; return el; }
   function render() {
@@ -813,16 +929,15 @@
     } else if(ready) next.textContent='归约会检查函数、参数和 λ 函数体。整个表达式都不能归约时，当前式保持不变。';
     $('history-count').textContent=`${count} 次替换`;
     const history=$('history-list');
-    if(renderedHistory.length>state.history.length||renderedHistory.some((entry,i)=>entry!==state.history[i])) {
-      history.replaceChildren();renderedHistory=[];
-    }
-    state.history.forEach((entry,i)=>{
-      if(i<renderedHistory.length)return;
+    if(historySource!==state.history){history.replaceChildren();renderedCount=0;historySource=state.history;}
+    while(renderedCount>state.history.length){history.lastElementChild.remove();renderedCount--;}
+    for(let i=renderedCount;i<state.history.length;i++){
+      const entry=state.history[i];
       const li=document.createElement('li'),num=document.createElement('span'),body=document.createElement('div');
       num.textContent=String(i).padStart(2,'0');body.append(code(C.format(entry.term)));
       if(entry.change) { const note=document.createElement('small'); note.textContent=`${entry.change.param} ← ${C.format(entry.change.argument)}`;body.append(note); }
-      li.append(num,body);history.append(li);renderedHistory.push(entry);
-    });
+      li.append(num,body);history.append(li);renderedCount++;
+    }
     renderDiagram(redex);
     save();
   }

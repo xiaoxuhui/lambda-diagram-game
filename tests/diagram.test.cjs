@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const C = require('../src/core.js');
 const D = require('../src/diagram.js');
 const P = require('../src/presets.js');
+const before=require('./fixtures/diagram-before-performance.cjs');
 const model = s => D.layout(C.parse(s));
 test('large numeral emits every line without compression',()=>{const m=D.svg(C.parse('1024'));assert.equal(m.model.leaves.length,1025);assert.equal(m.model.lines.length,4099);assert.equal((m.markup.match(/<line /g)||[]).length,4099);});
 test('long free-variable labels stay complete',()=>assert.ok(D.svg(C.parse('variableName')).markup.includes('>variableName</text>')));
@@ -55,4 +56,15 @@ test('all five challenges normalize to their declared alpha-equivalent target', 
   for(const l of P.levels) { const r=C.normalize(C.parse(l.start));
     assert.equal(r.status,'normal',l.name); assert.ok(C.equal(r.term,C.parse(l.target)),l.name);
   }
+});
+test('iterative layout and complete SVG are identical to the prior geometry',()=>{
+  for(const source of [...P.examples.map(e=>e.term),'λx.λx.x y','f ((λx.x) y)','λz.f ((λx.x) z)']){
+    const term=C.parse(source),path=C.findRedex(term)?.path??null;
+    assert.deepEqual(D.layout(term,path),before.layout(term,path));assert.equal(D.svg(term,path,{export:true}).markup,before.svg(term,path,{export:true}).markup);
+  }
+});
+test('deep layout retains every binder and the complete variable path without recursion overflow',()=>{
+  let term=C.V('z');for(let i=0;i<10000;i++)term=C.L(`a${i}`,term);
+  const m=D.layout(term);assert.equal(m.binders.length,10000);assert.equal(m.lines.length,10001);assert.equal(m.leaves[0].path.length,10000);
+  assert.ok(m.leaves[0].path.every(part=>part==='body'));assert.equal(m.height,320144);
 });
