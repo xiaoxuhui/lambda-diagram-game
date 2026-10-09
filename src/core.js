@@ -1,23 +1,31 @@
 (function (root) {
   'use strict';
   const LIMITS = Object.freeze({ chars: 1500, nodes: Infinity, depth: Infinity, steps: Infinity, nameChars:Infinity });
-  const V = name => ({ type: 'var', name });
-  const L = (param, body) => ({ type: 'abs', param, body });
-  const A = (fn, arg) => ({ type: 'app', fn, arg });
+  const V = name => Object.freeze({ type: 'var', name });
+  const L = (param, body) => Object.freeze({ type: 'abs', param, body });
+  const A = (fn, arg) => Object.freeze({ type: 'app', fn, arg });
+  const facts=new WeakMap(),formatted=new WeakMap(),freeSets=new WeakMap(),occurrences=new WeakMap();
 
   class LambdaError extends Error {
     constructor(message, position = null) { super(message); this.name = 'LambdaError'; this.position = position; }
   }
-  function inspect(term) {
-    let nodes = 0, depth = 0, vars = 0, abstractions = 0, applications = 0, nameChars = 0;
-    const stack = [[term, 1]];
-    while (stack.length) {
-      const [t, d] = stack.pop(); nodes++; depth = Math.max(depth, d);
-      if (t.type === 'var') { vars++; nameChars += t.name.length; }
-      else if (t.type === 'abs') { abstractions++; nameChars += t.param.length; stack.push([t.body, d + 1]); }
-      else { applications++; stack.push([t.fn, d + 1], [t.arg, d + 1]); }
+  function analyze(term) {
+    if(facts.has(term))return facts.get(term);
+    const local=new WeakMap(),get=t=>facts.get(t)||local.get(t),stack=[[term,false]];
+    while(stack.length){
+      const [t,done]=stack.pop();if(get(t))continue;
+      if(!done&&t.type!=='var'){stack.push([t,true]);if(t.type==='abs')stack.push([t.body,false]);else stack.push([t.arg,false],[t.fn,false]);continue;}
+      let f;
+      if(t.type==='var')f={nodes:1,depth:1,vars:1,abstractions:0,applications:0,redex:false,stable:Object.isFrozen(t)};
+      else if(t.type==='abs'){const b=get(t.body);f={nodes:1+b.nodes,depth:1+b.depth,vars:b.vars,abstractions:1+b.abstractions,applications:b.applications,redex:b.redex,stable:Object.isFrozen(t)&&b.stable};}
+      else{const a=get(t.fn),b=get(t.arg);f={nodes:1+a.nodes+b.nodes,depth:1+Math.max(a.depth,b.depth),vars:a.vars+b.vars,abstractions:a.abstractions+b.abstractions,applications:1+a.applications+b.applications,redex:t.fn.type==='abs'||a.redex||b.redex,stable:Object.isFrozen(t)&&a.stable&&b.stable};}
+      if(f.stable)facts.set(t,f);else local.set(t,f);
     }
-    return { nodes, depth, vars, abstractions, applications };
+    return get(term);
+  }
+  function inspect(term) {
+    const {nodes,depth,vars,abstractions,applications}=analyze(term);
+    return {nodes,depth,vars,abstractions,applications};
   }
   function tokenize(source, maxChars = LIMITS.chars) {
     if (source.length > maxChars) throw new LambdaError(`输入最多 ${maxChars} 个字符。`, maxChars);
@@ -81,45 +89,78 @@
     inspect(t); return t;
   }
   function format(t, context = 0) {
-    if (t.type === 'var') return t.name;
-    if (t.type === 'abs') {
-      const s = `λ${t.param}.${format(t.body)}`;
-      return context > 0 ? `(${s})` : s;
+    let text=formatted.get(t);
+    if(text===undefined){
+      const parts=[],stack=[[t,0]];
+      while(stack.length){const entry=stack.pop();if(typeof entry==='string'){parts.push(entry);continue;}
+        const [node,ctx]=entry,brackets=node.type==='abs'?ctx>0:node.type==='app'&&ctx>1;
+        if(brackets){parts.push('(');stack.push(')');}
+        if(node.type==='var')parts.push(node.name);
+        else if(node.type==='abs'){parts.push(`λ${node.param}.`);stack.push([node.body,0]);}
+        else stack.push([node.arg,2],' ',[node.fn,1]);
+      }
+      text=parts.join('');if(analyze(t).stable)formatted.set(t,text);
     }
-    const s = `${format(t.fn, 1)} ${format(t.arg, 2)}`;
-    return context > 1 ? `(${s})` : s;
+    return (t.type==='abs'&&context>0)||(t.type==='app'&&context>1)?`(${text})`:text;
   }
   function freeVars(t, bound = new Set(), out = new Set()) {
-    if (t.type === 'var') { if (!bound.has(t.name)) out.add(t.name); }
-    else if (t.type === 'abs') { const next = new Set(bound); next.add(t.param); freeVars(t.body, next, out); }
-    else { freeVars(t.fn, bound, out); freeVars(t.arg, bound, out); }
+    let found=freeSets.get(t);
+    if(!found){found=new Set();const bindings=new Map(),stack=[[t,false]];
+      while(stack.length){const [node,exit]=stack.pop();
+        if(exit){const count=bindings.get(node.param)-1;if(count)bindings.set(node.param,count);else bindings.delete(node.param);continue;}
+        if(node.type==='var'){if(!bindings.has(node.name))found.add(node.name);}
+        else if(node.type==='abs'){bindings.set(node.param,(bindings.get(node.param)||0)+1);stack.push([node,true],[node.body,false]);}
+        else stack.push([node.arg,false],[node.fn,false]);
+      }
+      if(analyze(t).stable)freeSets.set(t,found);
+    }
+    for(const name of found)if(!bound.has(name))out.add(name);
     return out;
   }
   function allNames(t, out = new Set()) {
-    if (t.type === 'var') out.add(t.name);
-    else if (t.type === 'abs') { out.add(t.param); allNames(t.body, out); }
-    else { allNames(t.fn, out); allNames(t.arg, out); }
+    const visited=new WeakSet(),stack=[t];while(stack.length){const node=stack.pop();if(visited.has(node))continue;visited.add(node);
+      if(node.type==='var')out.add(node.name);else if(node.type==='abs'){out.add(node.param);stack.push(node.body);}else stack.push(node.arg,node.fn);
+    }
     return out;
   }
+  function hasFree(t,name) {
+    const local=new WeakMap(),read=node=>occurrences.get(node)?.get(name)??local.get(node),stack=[[t,false]];
+    while(stack.length){const [node,done]=stack.pop();if(read(node)!==undefined)continue;
+      let value;
+      if(node.type==='var')value=node.name===name;
+      else if(node.type==='abs'&&node.param===name)value=false;
+      else if(!done){stack.push([node,true]);if(node.type==='abs')stack.push([node.body,false]);else stack.push([node.arg,false],[node.fn,false]);continue;}
+      else value=node.type==='abs'?read(node.body):read(node.fn)||read(node.arg);
+      if(analyze(node).stable){let names=occurrences.get(node);if(!names){names=new Map();occurrences.set(node,names);}names.set(name,value);}else local.set(node,value);
+    }
+    return read(t);
+  }
   function renameBound(t, from, to) {
-    if (t.type === 'var') return t.name === from ? V(to) : t;
-    if (t.type === 'abs') return t.param === from ? t : L(t.param, renameBound(t.body, from, to));
-    return A(renameBound(t.fn, from, to), renameBound(t.arg, from, to));
+    return rewrite(t,from,V(to),false);
+  }
+  function rewrite(t,name,argument,avoidCapture) {
+    if(!hasFree(t,name))return t;
+    const argFree=avoidCapture?freeVars(argument):new Set(),results=new WeakMap(),stack=[{node:t}],original=t;let used;
+    while(stack.length){const entry=stack.pop(),node=entry.node;if(results.has(node))continue;
+      if(!entry.done){
+        if(!hasFree(node,name)){results.set(node,node);continue;}
+        if(node.type==='var'){results.set(node,argument);continue;}
+        if(node.type==='app'){stack.push({node,done:true},{node:node.arg},{node:node.fn});continue;}
+        let param=node.param,body=node.body;
+        if(argFree.has(param)){
+          if(!used){used=allNames(original,allNames(argument));used.add(name);}
+          let i=1;while(used.has(`${param}${i}`))i++;
+          const fresh=`${param}${i}`;used.add(fresh);body=renameBound(body,param,fresh);param=fresh;
+        }
+        stack.push({node,done:true,param,body},{node:body});
+      }else if(node.type==='app'){
+        const fn=results.get(node.fn),arg=results.get(node.arg);results.set(node,fn===node.fn&&arg===node.arg?node:A(fn,arg));
+      }else{const body=results.get(entry.body);results.set(node,entry.param===node.param&&body===node.body?node:L(entry.param,body));}
+    }
+    return results.get(t);
   }
   function substitute(t, name, argument) {
-    const argFree = freeVars(argument), used = allNames(t, allNames(argument)); used.add(name);
-    function sub(node) {
-      if (node.type === 'var') return node.name === name ? argument : node;
-      if (node.type === 'app') return A(sub(node.fn), sub(node.arg));
-      if (node.param === name || !freeVars(node.body).has(name)) return node;
-      let param = node.param, body = node.body;
-      if (argFree.has(param)) {
-        let i = 1; while (used.has(`${param}${i}`)) i++;
-        const fresh = `${param}${i}`; used.add(fresh); body = renameBound(body, param, fresh); param = fresh;
-      }
-      return L(param, sub(body));
-    }
-    const result = sub(t); inspect(result); return result;
+    const result=rewrite(t,name,argument,true);inspect(result);return result;
   }
   function alphaKey(t, env = []) {
     if (t.type === 'var') {
@@ -130,20 +171,32 @@
     return ['app', alphaKey(t.fn, env), alphaKey(t.arg, env)];
   }
   const key = t => JSON.stringify(alphaKey(t));
-  const equal = (a, b) => key(a) === key(b);
-  function findRedex(t, path = []) {
-    if (t.type === 'app') {
-      if (t.fn.type === 'abs') return { term: t, path };
-      return findRedex(t.fn, [...path, 'fn']) || findRedex(t.arg, [...path, 'arg']);
+  function equal(a,b) {
+    if(a===b)return true;
+    const left=new Map(),right=new Map(),stack=[{a,b}],push=(map,name,id)=>{const list=map.get(name)||[];list.push(id);map.set(name,list);};let id=0;
+    while(stack.length){const entry=stack.pop(),x=entry.a,y=entry.b;
+      if(entry.exit){left.get(x.param).pop();right.get(y.param).pop();continue;}
+      if(x.type!==y.type)return false;
+      if(x.type==='var'){const l=left.get(x.name)?.at(-1),r=right.get(y.name)?.at(-1);if(l!==undefined||r!==undefined){if(l!==r)return false;}else if(x.name!==y.name)return false;}
+      else if(x.type==='abs'){push(left,x.param,++id);push(right,y.param,id);stack.push({a:x,b:y,exit:true},{a:x.body,b:y.body});}
+      else stack.push({a:x.arg,b:y.arg},{a:x.fn,b:y.fn});
     }
-    if (t.type === 'abs') return findRedex(t.body, [...path, 'body']);
-    return null;
+    return true;
+  }
+  function findRedex(t, path = []) {
+    const route=[...path];
+    while(true){
+      if(t.type==='app'&&t.fn.type==='abs')return {term:t,path:route};
+      if(!analyze(t).redex)return null;
+      if(t.type==='abs'){route.push('body');t=t.body;}
+      else if(analyze(t.fn).redex){route.push('fn');t=t.fn;}
+      else{route.push('arg');t=t.arg;}
+    }
   }
   function replaceAt(t, path, replacement, i = 0) {
-    if (i === path.length) return replacement;
-    const part = path[i];
-    if (part === 'body') return L(t.param, replaceAt(t.body, path, replacement, i + 1));
-    return part === 'fn' ? A(replaceAt(t.fn, path, replacement, i + 1), t.arg) : A(t.fn, replaceAt(t.arg, path, replacement, i + 1));
+    const parents=[];for(;i<path.length;i++){const part=path[i];parents.push([t,part]);t=t[part];}
+    for(let j=parents.length-1;j>=0;j--){const [parent,part]=parents[j];replacement=part==='body'?L(parent.param,replacement):part==='fn'?A(replacement,parent.arg):A(parent.fn,replacement);}
+    return replacement;
   }
   function step(t) {
     const redex = findRedex(t); if (!redex) return null;
