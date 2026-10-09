@@ -93,8 +93,8 @@
     $('char-count').textContent=`${input.value.length} / ${C.LIMITS.chars}`;
     $('step-count').textContent=count; $('run-label').textContent=state.running?'暂停':'运行';
     $('run').firstElementChild.textContent=state.running?'Ⅱ':'▶';
-    $('run').disabled=!ready||!redex;
-    $('step').disabled=!ready||!redex||state.running;
+    $('run').disabled=!ready;
+    $('step').disabled=!ready||state.running;
     $('back').disabled=!ready||count===0||state.running;
     $('reset').disabled=!ready||state.running||count===0;
     $('export-svg').disabled=!ready; $('zoom-in').disabled=!state.term; $('zoom-out').disabled=!state.term; $('fit').disabled=!state.term;$('actual-size').disabled=!state.term;
@@ -106,13 +106,13 @@
     else if(!redex) badge.textContent='已到正规形';
     else badge.textContent='可以归约';
     $('run-status').textContent=!state.term?'输入有效表达式后，就能开始运行。':state.dirty?'输入已改变。重新转换后开始新的归约。':
-      state.halt|| (state.running?'自动运行中；粉色线路标记下一次函数替换。':!redex?'已到正规形，没有可继续的 β 归约。':count?'可以继续单步，或回退查看上一帧。':'准备好了。点击单步，观察一次函数替换。');
+      state.halt|| (state.running?'自动运行中；粉色线路标记下一次函数替换。':!redex?'已到 β 正规形；可点击单步或运行再次尝试，不能归约时保持当前式。':count?'可以继续单步，或回退查看上一帧。':'准备好了。点击单步，观察一次函数替换。');
     $('current-expression').textContent=state.term?C.format(state.term):'—';
     $('decoded').textContent=ready?decode(state.term):'';
     const next=$('next-explanation'); next.replaceChildren();
     if(ready&&redex) {
       next.append('下一步：用 ',code(C.format(redex.term.arg)),' 替换函数体中自由出现的 ',code(redex.term.fn.param),'。必要时自动改名，避免变量捕获。');
-    } else if(ready) next.textContent='正规形表示归约完成；可以换个表达式，或进入闯关模式。';
+    } else if(ready) next.textContent='归约会检查函数、参数和 λ 函数体。整个表达式都不能归约时，当前式保持不变。';
     $('history-count').textContent=`${count} 次替换`;
     const history=$('history-list');
     if(renderedHistory.length>state.history.length||renderedHistory.some((entry,i)=>entry!==state.history[i])) {
@@ -133,8 +133,7 @@
     try {
       const result=C.step(state.term); if(!result){stop();render();return false;}
       state.term=result.term;state.history.push({term:result.term,change:result});state.halt='';
-      if(!C.findRedex(state.term)) stop();
-      render(); return !state.halt&&!!C.findRedex(state.term);
+      render(); return true;
     } catch(e) {stop();state.halt=e.message;render();return false;}
   }
   function schedule() {
@@ -150,7 +149,7 @@
   }
   function run() {
     if(state.running){stop();render();return;}
-    if(!state.term||state.dirty||!C.findRedex(state.term)) return;
+    if(!state.term||state.dirty) return;
     state.halt='';state.running=true;render();schedule();
   }
   function setSource(source) { input.value=source; changed(); convert(); }

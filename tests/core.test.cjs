@@ -68,6 +68,19 @@ test('redex path and substitution explanation agree', () => {
   assert.deepEqual(r.path, ['body','arg']); assert.equal(r.param, 'x'); assert.equal(C.format(r.argument), 'z');
 });
 test('normal form has no next step', () => assert.equal(C.step(p('λx.x')), null));
+test('a neutral outer application still reduces its argument',()=>{
+  const result=C.step(p('f ((λx.x) y)'));assert.deepEqual(result.path,['arg']);assert.equal(C.format(result.term),'f y');
+});
+test('nested lambda bodies and arguments are searched beyond the outer layer',()=>{
+  const result=C.step(p('λa.λb.f ((λx.x) b)'));assert.deepEqual(result.path,['body','body','arg']);assert.equal(C.format(result.term),'λa.λb.f b');
+});
+test('function subexpression reduces before the argument when the root cannot contract',()=>{
+  const first=C.step(p('((λx.x) f) ((λy.y) z)'));assert.deepEqual(first.path,['fn']);assert.equal(C.format(first.term),'f ((λy.y) z)');
+  const second=C.step(first.term);assert.deepEqual(second.path,['arg']);assert.equal(C.format(second.term),'f z');assert.equal(C.step(second.term),null);
+});
+test('beta normal forms keep their complete structure when an actual attempt has no result',()=>{
+  for(const source of ['λx.x','f y','λf.λx.f (f x)']){const term=p(source),before=JSON.stringify(term);assert.equal(C.step(term),null);assert.equal(JSON.stringify(term),before);}
+});
 test('repeated long names remain complete beyond old text budget', () => {
   let t=C.V('x'.repeat(1000));for(let i=0;i<5;i++) t=C.A(t,t);
   assert.equal(C.inspect(t).vars,32);assert.equal(C.format(t).match(/x/g).length,32000);

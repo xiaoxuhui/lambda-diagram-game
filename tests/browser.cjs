@@ -75,7 +75,8 @@ const C=require('../src/core.js'),P=require('../src/presets.js');
     });
     await check('Church arithmetic runs to 5',async()=>{
       await normal();assert.equal(await page.locator('#decoded').textContent(),'Church 数 5');
-      assert.ok(await page.locator('#step').isDisabled());
+      assert.ok(await page.locator('#step').isEnabled());const count=await page.locator('#step-count').textContent();
+      await page.locator('#step').click();assert.equal(await page.locator('#step-count').textContent(),count);assert.equal(await page.locator('#decoded').textContent(),'Church 数 5');
     });
     await check('editing during execution cancels stale timer and controls',async()=>{
       await source(P.examples[5].term);await page.locator('#speed').selectOption('1200');await page.locator('#run').click();
