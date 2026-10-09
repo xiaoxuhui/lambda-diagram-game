@@ -34,6 +34,7 @@ jobs:
       - run: npm run build && npm run sync:android
       - run: npm run test:browser
       - run: node tests/speed-browser.cjs && node tests/viewport-browser.cjs && node tests/edit-browser.cjs && npm run test:android-bridge
+      - run: node tests/clear-browser.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

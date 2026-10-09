@@ -22,6 +22,7 @@
 @media(max-width:800px){.workspace{grid-template-columns:minmax(0,1fr)}.rules-card{display:none}.editor-wrap{margin-top:15px}textarea{min-height:112px}.editor-card{padding:20px}.editor-column{gap:0}.intro{margin-bottom:20px}.intro h1{font-size:25px}.intro-symbol{width:110px;margin-right:0}.intro-symbol i:nth-child(4){left:75px}.visual-column{gap:16px}.symbol-toolbar{gap:6px}.symbol-toolbar button{height:37px}.diagram-viewport{height:330px}.help-panel{grid-template-columns:1fr;gap:12px}.example-row{padding-top:13px}.key-hint{margin-bottom:13px}.page-footer{font-size:9px}.challenge-body{gap:15px}.challenge-target{max-width:45%}.challenge-footer #check-answer{margin-left:auto}}
 @media(max-width:480px){.topbar{height:62px;padding:0 17px}.brand{font-size:16px;gap:9px}.brand-mark{width:30px;height:30px;font-size:26px}.brand-sub{display:block;margin:0;font-size:9px;line-height:1.3}.offline{display:none}.top-right{gap:0}.header-button{font-size:10px}.shell{padding:24px 14px 18px}.eyebrow{font-size:8px;letter-spacing:1.5px}.intro h1{font-size:22px;margin-bottom:8px}.intro-copy{font-size:11px}.intro-symbol{display:none}.mode-tabs{gap:19px}.mode-tab{font-size:12px}.progress-label{font-size:9px}.mode-row{margin-bottom:18px}.diagram-heading{padding:0 16px;height:56px}.diagram-heading h2{font-size:13px}.diagram-heading>div{gap:7px}.diagram-footer{gap:9px;justify-content:center;padding:9px 10px}.diagram-legend{font-size:8px}.zoom-controls{margin-left:auto}.zoom-controls button{font-size:10px;padding:3px 5px}.zoom-controls #zoom-label{min-width:29px}.zoom-controls #export-svg{font-size:8px;padding-left:6px;margin-left:1px}.execution-card{padding:18px 15px}.run-controls{gap:5px}.run-controls .button{font-size:11px;padding:8px 9px}.run-button{min-width:76px}.step-counter{font-size:9px}.step-counter b{font-size:17px}.page-footer{flex-direction:column;gap:4px;margin-top:20px;padding-top:12px}.challenge-panel{padding:17px 16px}.level-list{gap:5px;margin-bottom:15px}.level-list button{padding:6px 8px;font-size:10px}.challenge-body{flex-direction:column;align-items:stretch;gap:13px}.challenge-target{max-width:100%;padding:7px 12px}.challenge-body h2{font-size:16px}.challenge-body p{font-size:11px}.challenge-footer{gap:10px}.challenge-footer p{flex-basis:100%;order:3}.current-term>code{font-size:14px}.help-panel{padding:17px}.editor-bottom{font-size:9px}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
+.button.danger{color:#a9434b;border-color:#e4b8b9;background:#fff8f6}.button.danger:hover:not(:disabled){background:#ffefeb;border-color:#c58084}.clear-note{flex-basis:100%;margin:0;color:#8b6b66;font-size:10px;line-height:1.6}.save-actions #clear-all{grid-column:1/-1}
 .diagram-viewport{touch-action:none;cursor:grab;user-select:none;overflow-anchor:none}.diagram-viewport.dragging{cursor:grabbing}.diagram-hint{font-size:10px;color:#7d94ad;padding:8px 24px 0;margin:0}.zoom-controls #fit[aria-pressed="true"]{color:#64d8bd;background:#64d8bd10}
 .execution-top{flex-wrap:wrap}.speed-label{flex-wrap:wrap}.speed-label input{width:67px;padding:4px 5px;border:1px solid #dfe4dd;border-radius:5px;background:#fafbf8;color:#486c55;font-size:11px;min-width:0}.execution-card #speed-error{margin:10px 0 0}
 .function-actions{flex-wrap:wrap}.function-item-head{flex-wrap:wrap}.function-item-buttons{margin-left:auto}#function-edit-status{color:var(--mint);overflow-wrap:anywhere}
@@ -48,7 +49,7 @@
       <div><h2>怎么写、怎么看</h2><p>用快捷栏插入 λ；也可用 <code>\</code>。<code>λx y.x</code> 等同 <code>λx.λy.x</code>。变量之间用空格：<code>xy</code> 是一个名字。λ 的作用域延伸到右侧，作为参数时需加括号。</p><p>同色竖线连接绑定横线；应用横线连接子式最左变量。粉色标记下一步归约，自由变量以虚线显示。采用左最外正常序，包含函数内部归约。<a href="https://tromp.github.io/cl/diagrams.html" target="_blank" rel="noopener">John Tromp 原始说明 ↗</a></p></div>
     </section>
     <nav class="mode-row" aria-label="游戏模式"><div class="mode-tabs"><button id="mode-free" class="mode-tab active" aria-pressed="true">自由实验</button><button id="mode-challenge" class="mode-tab" aria-pressed="false">闯关模式 <span>5</span></button></div><span id="progress-text" class="progress-label">探索 · 输入 · 归约</span></nav>
-    <section class="save-bar" aria-label="状态与进度存档"><div class="save-info"><strong>状态与进度</strong><span id="storage-status" role="status">自动保存准备中</span><small>包含函数库、归约轨迹与关卡进度</small></div><div class="save-actions"><button id="save-state" class="button primary">保存当前状态</button><button id="restore-state" class="button" disabled>恢复已保存状态</button><button id="export-state" class="button">导出存档 ↓</button><button id="import-state" class="button">导入存档 ↑</button><input id="import-file" type="file" accept=".json,application/json" hidden></div><p id="save-feedback" class="save-feedback" role="status" hidden></p></section>
+    <section class="save-bar" aria-label="状态与进度存档"><div class="save-info"><strong>状态与进度</strong><span id="storage-status" role="status">自动保存准备中</span><small>包含函数库、归约轨迹与关卡进度</small></div><div class="save-actions"><button id="save-state" class="button primary">保存当前状态</button><button id="restore-state" class="button" disabled>恢复已保存状态</button><button id="export-state" class="button">导出存档 ↓</button><button id="import-state" class="button">导入存档 ↑</button><button id="clear-all" type="button" class="button danger" aria-describedby="clear-note">导出存档并清空</button><input id="import-file" type="file" accept=".json,application/json" hidden></div><p id="clear-note" class="clear-note">清空会删除表达式、函数库、运行记录、关卡进度及保存点，并自动导出备份。</p><p id="save-feedback" class="save-feedback" role="status" hidden></p></section>
     <section id="challenge-panel" class="challenge-panel" hidden>
       <div class="level-list" id="level-list" aria-label="选择关卡"></div>
       <div class="challenge-body"><div><p id="level-topic" class="eyebrow"></p><h2 id="level-title"></h2><p id="level-description"></p></div><div class="challenge-target"><span>目标正规形</span><strong id="target-label"></strong><code id="target-expression"></code></div></div>
@@ -463,6 +464,12 @@
     const text=JSON.stringify(validate(raw));
     if(new TextEncoder().encode(text).length>MAX_BYTES)fail('文件超过 2 MiB 上限。');return text;
   }
+  function encodeBackup(raw,checkpointText) {
+    const backup={...JSON.parse(encode(raw)),checkpoint:checkpointText===null?null:JSON.parse(encode(JSON.parse(checkpointText)))};
+    const text=JSON.stringify(backup);
+    if(new TextEncoder().encode(text).length>MAX_BYTES)fail('文件超过 2 MiB 上限。');
+    return text;
+  }
   function decode(text) {
     if(typeof text!=='string'||text.length>MAX_BYTES||new TextEncoder().encode(text).length>MAX_BYTES)fail('文件超过 2 MiB 上限。');
     let raw;try{raw=JSON.parse(text);}catch{fail('不是有效的 JSON 文件。');}
@@ -473,9 +480,13 @@
         session:{original:null,steps:0,dirty:true,halt:''},view:{speed:600,scale:1,autoFit:true,historyOpen:false,helpOpen:false,hintOpen:false},selection:{start:0,end:0},error:''};
       return {...validate(migrated),history:[],term:null,hasSession:false};
     }
-    return replay(validate(raw));
+    const snapshot=replay(validate(raw));
+    if(Object.prototype.hasOwnProperty.call(raw,'checkpoint')) {
+      snapshot.checkpointText=raw.checkpoint===null?null:encode(replay(validate(raw.checkpoint)));
+    }
+    return snapshot;
   }
-  const API={MAX_BYTES,ast,validate,encode,decode};root.LambdaSnapshot=API;
+  const API={MAX_BYTES,ast,validate,encode,encodeBackup,decode};root.LambdaSnapshot=API;
   if(typeof module!=='undefined'&&module.exports)module.exports=API;
 })(typeof globalThis!=='undefined'?globalThis:window);
 
@@ -490,7 +501,15 @@
     const anchor=document.createElement('a');anchor.href=url;anchor.download=name;anchor.click();
     setTimeout(()=>URL.revokeObjectURL(url),1000);
   }
-  root.LambdaDownload={save};
+  function saveBackup(name,content) {
+    if(typeof root.LambdaAndroid?.saveFile==='function') {
+      if(typeof root.LambdaAndroid.saveFileConfirmed!=='function')throw new Error('当前安卓版无法确认备份保存结果，请更新安卓版后再清空。');
+      if(root.LambdaAndroid.saveFileConfirmed(name,content,'application/json')!==true)throw new Error('存档保存失败，当前内容未清空。');
+      return 'saved';
+    }
+    save(name,content,'application/json');return 'requested';
+  }
+  root.LambdaDownload={save,saveBackup};
 })(typeof globalThis!=='undefined'?globalThis:window);
 
 </script><script>
@@ -577,10 +596,33 @@
       try{const text=S.encode(captured());root.LambdaDownload.save(`lambda-lab-save-${new Date().toISOString().replace(/[-:]/g,'').slice(0,15)}.json`,text,'application/json');feedback('完整存档已导出。可以在另一台设备导入继续。');}
       catch(e){feedback(e.message,true);}
     });
+    $('clear-all').addEventListener('click',()=>{
+      try {
+        const backup=S.encodeBackup(captured(),checkpoint);
+        const empty=S.decode(S.encode({version:2,draft:'',functions:[],functionDraft:{name:'',source:''},completed:[],mode:'free',level:0,
+          session:{original:null,steps:0,dirty:false,halt:''},view:{speed:600,scale:1,autoFit:true,panX:0,panY:0,historyOpen:false,helpOpen:false,hintOpen:false},
+          selection:{start:0,end:0},error:''}));
+        const previous=[AUTO,CHECKPOINT,LEGACY].map(key=>[key,localStorage.getItem(key)]);
+        const result=root.LambdaDownload.saveBackup(`lambda-lab-backup-${new Date().toISOString().replace(/[:.]/g,'-')}.json`,backup);
+        try {localStorage.setItem(AUTO,S.encode(empty));localStorage.removeItem(CHECKPOINT);localStorage.removeItem(LEGACY);}
+        catch(error) {
+          for(const [key,text] of previous){try{if(text===null)localStorage.removeItem(key);else localStorage.setItem(key,text);}catch{/* Storage itself may be unavailable; keep the live scene and exported backup. */}}
+          throw error;
+        }
+        clearTimeout(saveTimer);apply(empty);clearEditor();checkpoint=null;$('restore-state').disabled=true;persist();
+        feedback(result==='saved'?'备份已保存，所有游戏内容已清空。可导入备份恢复。':'已发起备份下载，所有游戏内容已清空。请保留下载的 JSON 文件；浏览器无法确认最终保存结果。');
+        api.toast('已导出备份并清空');
+      }catch(e){feedback(`清空未完成：${e.message}。当前现场保留。`,true);}
+    });
     $('import-state').addEventListener('click',()=>$('import-file').click());
     $('import-file').addEventListener('change',async()=>{
       const file=$('import-file').files[0];$('import-file').value='';if(!file)return;
-      try{if(file.size>S.MAX_BYTES)throw new C.LambdaError('存档文件超过 2 MiB 上限。');const snapshot=S.decode(await file.text());apply(snapshot);persist();feedback('存档已导入，函数库、计算状态和进度均已恢复。');api.toast('存档导入成功');}
+      try{if(file.size>S.MAX_BYTES)throw new C.LambdaError('存档文件超过 2 MiB 上限。');const snapshot=S.decode(await file.text());
+        if(Object.prototype.hasOwnProperty.call(snapshot,'checkpointText')) {
+          if(snapshot.checkpointText===null)localStorage.removeItem(CHECKPOINT);else localStorage.setItem(CHECKPOINT,snapshot.checkpointText);
+          checkpoint=snapshot.checkpointText;$('restore-state').disabled=checkpoint===null;
+        }
+        apply(snapshot);persist();feedback('存档已导入，函数库、计算状态和进度均已恢复。');api.toast('存档导入成功');}
       catch(e){feedback(`导入失败：${e.message}。当前现场未改变。`,true);}
     });
     window.addEventListener('pagehide',persist);
@@ -677,6 +719,7 @@
     $('hint').hidden=!s.view.hintOpen;$('hint-toggle').textContent=s.view.hintOpen?'收起提示':'显示提示';$('hint-toggle').setAttribute('aria-expanded',String(s.view.hintOpen));
     $('challenge-feedback').textContent='';$('next-level').hidden=true;$('error-message').textContent=s.error;$('error-message').hidden=!s.error;
     renderMode();if(s.hasSession)render();else convert();input.setSelectionRange(s.selection.start,s.selection.end);
+    if(!state.term){$('zoom-label').textContent=`${Math.round(state.scale*100)}%`;$('fit').setAttribute('aria-pressed',String(state.autoFit));}
     $('diagram-viewport').scrollLeft=s.view.panX;$('diagram-viewport').scrollTop=s.view.panY;
   }
   function toast(message) {
