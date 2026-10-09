@@ -38,3 +38,22 @@ test('invalid custom speeds are rejected by snapshot validation',()=>{for(const 
 test('enlarged diagram and pan position roundtrip',()=>{const s=sample();s.view.scale=16;s.view.panX=920;s.view.panY=420;const r=S.decode(S.encode(s));assert.equal(r.view.scale,16);assert.equal(r.view.panX,920);assert.equal(r.view.panY,420);});
 test('old snapshots default pan to origin',()=>{const r=S.decode(S.encode(sample()));assert.equal(r.view.panX,0);assert.equal(r.view.panY,0);});
 test('invalid diagram offsets are rejected',()=>{for(const x of [-1,5000001,'20']){const s=sample();s.view.panX=x;assert.throws(()=>S.decode(JSON.stringify(s)),/图示位置/);}});
+test('full backup restores current frame and an independent manual checkpoint',()=>{
+  const current=sample(),checkpoint=sample();checkpoint.draft='λq.q';checkpoint.session={original:C.parse('λq.q'),steps:0,dirty:false,halt:''};
+  const restored=S.decode(S.encodeBackup(current,S.encode(checkpoint)));
+  assert.equal(C.format(restored.term),'λy.y');assert.equal(restored.history.length,2);
+  assert.equal(S.decode(restored.checkpointText).draft,'λq.q');assert.deepEqual(restored.functions,current.functions);
+});
+test('backup distinguishes missing checkpoint from an ordinary snapshot',()=>{
+  assert.equal(S.decode(S.encodeBackup(sample(),null)).checkpointText,null);
+  assert.ok(!Object.prototype.hasOwnProperty.call(S.decode(S.encode(sample())),'checkpointText'));
+});
+test('invalid checkpoint is rejected before any backup can be applied',()=>{
+  const backup=JSON.parse(S.encodeBackup(sample(),S.encode(sample())));backup.checkpoint.session.steps=9;
+  assert.throws(()=>S.decode(JSON.stringify(backup)),/步数/);
+  assert.throws(()=>S.encodeBackup(sample(),'{'),SyntaxError);
+});
+test('full backup applies the file byte budget to current state plus checkpoint',()=>{
+  const current=sample();current.functionDraft={name:'NEXT',source:'x'.repeat(1100000)};
+  const text=S.encode(current);assert.ok(text.length<S.MAX_BYTES);assert.throws(()=>S.encodeBackup(current,text),/2 MiB/);
+});

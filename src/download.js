@@ -8,5 +8,13 @@
     const anchor=document.createElement('a');anchor.href=url;anchor.download=name;anchor.click();
     setTimeout(()=>URL.revokeObjectURL(url),1000);
   }
-  root.LambdaDownload={save};
+  function saveBackup(name,content) {
+    if(typeof root.LambdaAndroid?.saveFile==='function') {
+      if(typeof root.LambdaAndroid.saveFileConfirmed!=='function')throw new Error('当前安卓版无法确认备份保存结果，请更新安卓版后再清空。');
+      if(root.LambdaAndroid.saveFileConfirmed(name,content,'application/json')!==true)throw new Error('存档保存失败，当前内容未清空。');
+      return 'saved';
+    }
+    save(name,content,'application/json');return 'requested';
+  }
+  root.LambdaDownload={save,saveBackup};
 })(typeof globalThis!=='undefined'?globalThis:window);

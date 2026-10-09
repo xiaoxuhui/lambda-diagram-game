@@ -107,6 +107,19 @@ class MainActivity : ComponentActivity() {
         webView.removeJavascriptInterface("LambdaAndroid"); webView.destroy(); super.onDestroy()
     }
     private inner class Bridge {
+        // JavascriptInterface runs on WebView's bridge thread, not the UI thread.
+        @JavascriptInterface
+        fun saveFileConfirmed(name: String, content: String, requestedMime: String): Boolean {
+            return try {
+                require(requestedMime == "application/json") { "备份必须是 JSON 存档" }
+                val destination = writeToDownloads(sanitizeName(name), content, requestedMime)
+                runOnUiThread { Toast.makeText(this@MainActivity, "已保存到「$destination」", Toast.LENGTH_LONG).show() }
+                true
+            } catch (error: Exception) {
+                runOnUiThread { Toast.makeText(this@MainActivity, "保存失败：${error.message ?: "未知错误"}", Toast.LENGTH_LONG).show() }
+                false
+            }
+        }
         @JavascriptInterface
         fun saveFile(name: String, content: String, requestedMime: String) {
             val mime = when (requestedMime) { "image/svg+xml" -> requestedMime; "application/json" -> requestedMime; else -> "text/plain" }

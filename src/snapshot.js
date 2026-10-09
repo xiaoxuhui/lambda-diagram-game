@@ -52,6 +52,12 @@
     const text=JSON.stringify(validate(raw));
     if(new TextEncoder().encode(text).length>MAX_BYTES)fail('文件超过 2 MiB 上限。');return text;
   }
+  function encodeBackup(raw,checkpointText) {
+    const backup={...JSON.parse(encode(raw)),checkpoint:checkpointText===null?null:JSON.parse(encode(JSON.parse(checkpointText)))};
+    const text=JSON.stringify(backup);
+    if(new TextEncoder().encode(text).length>MAX_BYTES)fail('文件超过 2 MiB 上限。');
+    return text;
+  }
   function decode(text) {
     if(typeof text!=='string'||text.length>MAX_BYTES||new TextEncoder().encode(text).length>MAX_BYTES)fail('文件超过 2 MiB 上限。');
     let raw;try{raw=JSON.parse(text);}catch{fail('不是有效的 JSON 文件。');}
@@ -62,8 +68,12 @@
         session:{original:null,steps:0,dirty:true,halt:''},view:{speed:600,scale:1,autoFit:true,historyOpen:false,helpOpen:false,hintOpen:false},selection:{start:0,end:0},error:''};
       return {...validate(migrated),history:[],term:null,hasSession:false};
     }
-    return replay(validate(raw));
+    const snapshot=replay(validate(raw));
+    if(Object.prototype.hasOwnProperty.call(raw,'checkpoint')) {
+      snapshot.checkpointText=raw.checkpoint===null?null:encode(replay(validate(raw.checkpoint)));
+    }
+    return snapshot;
   }
-  const API={MAX_BYTES,ast,validate,encode,decode};root.LambdaSnapshot=API;
+  const API={MAX_BYTES,ast,validate,encode,encodeBackup,decode};root.LambdaSnapshot=API;
   if(typeof module!=='undefined'&&module.exports)module.exports=API;
 })(typeof globalThis!=='undefined'?globalThis:window);
