@@ -831,6 +831,8 @@
     try {
       const result=C.step(state.term); if(!result){stop();render();return false;}
       state.term=result.term;state.history.push({term:result.term,change:result});state.halt='';
+      // The preview is only a hint: confirm with an actual attempt before stopping.
+      if(state.running&&!C.findRedex(state.term)&&C.step(state.term)===null)stop();
       render(); return true;
     } catch(e) {stop();state.halt=e.message;render();return false;}
   }
@@ -848,7 +850,9 @@
   function run() {
     if(state.running){stop();render();return;}
     if(!state.term||state.dirty) return;
-    state.halt='';state.running=true;render();schedule();
+    state.halt='';state.running=true;render();
+    if(!C.findRedex(state.term)){advance();if(!state.running)return;}
+    schedule();
   }
   function setSource(source) { input.value=source; changed(); convert(); }
   function renderLevels() {

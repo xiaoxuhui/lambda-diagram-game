@@ -38,6 +38,15 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
       await page.locator('#expression').fill('λx.');assert.ok(await page.locator('#step').isDisabled());assert.ok(await page.locator('#run').isDisabled());
       await page.locator('#convert').click();assert.ok(await page.locator('#step').isDisabled());assert.ok(await page.locator('#run').isDisabled());
     });
+    await check('normal-form attempts do not wait for a 60000ms interval',async()=>{
+      await source('λx.x');await page.locator('#speed-ms').fill('60000');await page.evaluate(()=>attempts=[]);await page.locator('#run').click();
+      assert.equal(await page.locator('#run-label').textContent(),'运行');assert.deepEqual(await page.evaluate(()=>attempts),[false]);
+    });
+    await check('the final contraction confirms no further result without another idle interval',async()=>{
+      await source('(λx.x) y');await page.locator('#speed-ms').fill('500');await page.evaluate(()=>attempts=[]);await page.locator('#run').click();
+      await page.waitForFunction(()=>document.getElementById('step-count').textContent==='1');assert.equal(await page.locator('#run-label').textContent(),'运行');
+      assert.deepEqual(await page.evaluate(()=>attempts),[true,false]);
+    });
     await check('offline entry also reduces nested bodies and allows normal-form attempts',async()=>{
       const offline=await context.newPage();offline.on('pageerror',error=>errors.push(error.message));await offline.goto(pathToFileURL(path.resolve(__dirname,'../dist/lambda-lab.html')).href);
       await offline.locator('#expression').fill('λz.f ((λx.x) z)');await offline.locator('#convert').click();await offline.locator('#step').click();
