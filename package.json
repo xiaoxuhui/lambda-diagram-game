@@ -1,6 +1,6 @@
 {
   "name": "lambda-diagram-game",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "description": "离线 Lambda 演算与 John Tromp 图示小游戏",
   "license": "MIT",

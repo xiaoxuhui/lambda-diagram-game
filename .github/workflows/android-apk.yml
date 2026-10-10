@@ -61,16 +61,19 @@ jobs:
           python scripts/apk-manifest.py "$APK" | tee "$RUNNER_TEMP/apk-manifest.txt"
           "$ANDROID_HOME/build-tools/34.0.0/apksigner" verify --verbose --print-certs "$APK"
           python - <<'PY'
-          import json, subprocess, os
+          import json, subprocess, os, re
           package = json.load(open('package.json'))
+          codes = re.findall(r'^\s*versionCode\s*=\s*(\d+)\s*$', open('android/app/build.gradle.kts').read(), re.MULTILINE)
+          assert len(codes) == 1, 'Gradle versionCode must be unique'
           output = subprocess.check_output([os.environ['ANDROID_HOME']+'/build-tools/34.0.0/aapt', 'dump', 'badging', 'android/app/build/outputs/apk/debug/app-debug.apk'], text=True)
           assert "name='com.xiaoxuhui.lambda'" in output
-          assert "versionCode='1'" in output
+          assert "versionCode='"+codes[0]+"'" in output
           assert "versionName='"+package['version']+"'" in output
           assert "sdkVersion:'24'" in output
           assert "uses-permission:" not in output
           print('APK package, version, minimum SDK and no-permission checks passed.')
           PY
+          python scripts/verify-apk.py "$APK"
       - name: Package release assets
         run: |
           mkdir -p release-upload
@@ -109,10 +112,12 @@ jobs:
           name: 'Lambda 线路实验室 ${{ github.ref_name }} · Android'
           files: release-assets/*
           body: |
-            Lambda 线路实验室首个安卓版，内置完整离线游戏。
+            Lambda 线路实验室安卓版，内置完整离线游戏。
             支持 Android 7.0 及以上，包名 com.xiaoxuhui.lambda，使用项目固定 debug 签名。
 
-            下载 lambda-lab-android-0.3.0-debug.apk 安装；系统可能要求允许此来源安装应用。
+            下载本页的 APK 安装；系统可能要求允许此来源安装应用。
+            本版优化长表达式归约和完整图示更新，保留所有线条与历史；运行实际检查函数、参数及 λ 内部。
+            新增「导出存档并清空」，确认原生备份写入成功后再清空游戏内容和进度。
             包含完整函数编辑、存档、归约、缩放与运行速度设置，不申请网络或其他权限。
             JSON 存档与 SVG 图示通过原生接口保存，JSON 导入使用系统文件选择器。
             Android 10+ 保存到系统下载目录；Android 7–9 保存到应用外部文件目录。

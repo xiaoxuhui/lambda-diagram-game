@@ -1,10 +1,10 @@
 # Lambda 线路实验室
 
-当前版本：**0.3.0**。许可证：[MIT](LICENSE)。
+当前版本：**0.3.1**。许可证：[MIT](LICENSE)。
 
 ## 安卓 APK
 
-在 [GitHub Releases](https://github.com/xiaoxuhui/lambda-diagram-game/releases) 下载 `lambda-lab-android-0.3.0-debug.apk` 安装。
+在 [GitHub Releases](https://github.com/xiaoxuhui/lambda-diagram-game/releases) 下载 `lambda-lab-android-0.3.1-debug.apk` 安装。
 支持 Android 7.0 及以上，完整网页内置，无需联网、不申请权限。首次安装可能需要允许此来源安装应用。
 APK 使用项目固定 debug 签名；后续升级必须保持相同签名并增加 versionCode，网页与 APK 版本同线。
 
@@ -65,7 +65,7 @@ JSON 存档和 SVG 图示通过原生接口保存：Android 10+ 写入系统下�
 - 导入存档：选择之前导出的文件；验证成功后恢复完整现场。错误文件不改变当前现场。
 - 导出存档并清空：先自动备份当前现场及手动保存点，再清空表达式、函数库、运行轨迹、编辑草稿和关卡进度，设置复位。刷新后仍为空；导入备份可恢复当前现场和保存点。只清理本游戏数据。
 
-浏览器只能确认备份下载已发起，请保留下载的 JSON 文件；序列化、导出或存储清理失败时保留当前现场。安卓清空必须等待原生写入成功；已发布的 v0.3.0 APK 尚不包含此新功能，更新后的原生接口将随下一次 APK 发布提供。
+浏览器只能确认备份下载已发起，请保留下载的 JSON 文件；序列化、导出或存储清理失败时保留当前现场。安卓清空必须等待原生写入成功；v0.3.1 APK 包含此新功能及对应接口。
 
 速度、缩放、展开的归约轨迹和未保存的函数编辑草稿也会保存。兼容旧版 v1 的草稿与关卡进度。文件最多 2 MiB。
 

@@ -3,6 +3,7 @@ import argparse
 import hashlib
 import importlib.util
 import json
+import re
 from pathlib import Path
 import subprocess
 import zipfile
@@ -19,6 +20,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('apk', type=Path)
     parser.add_argument('--openssl', default='openssl')
+    parser.add_argument('--previous-apk', type=Path)
     args = parser.parse_args()
     cert_module = module('apk_certificate', 'apk-v2-cert.py')
     manifest_module = module('apk_manifest', 'apk-manifest.py')
@@ -31,7 +33,9 @@ def main():
         webpage = archive.read('assets/lambda-lab.html')
         assert [name for name in archive.namelist() if name.startswith('assets/') and not name.endswith('/')] == ['assets/lambda-lab.html'], 'APK 内出现额外网页资源'
     expected_version = json.loads((ROOT / 'package.json').read_text(encoding='utf-8'))['version']
-    assert identity == {'versionCode': 1, 'versionName': expected_version, 'package': 'com.xiaoxuhui.lambda'}, identity
+    codes = re.findall(r'^\s*versionCode\s*=\s*(\d+)\s*$', (ROOT / 'android/app/build.gradle.kts').read_text(encoding='utf-8'), re.MULTILINE)
+    assert len(codes) == 1, 'Gradle versionCode 必须唯一'
+    assert identity == {'versionCode': int(codes[0]), 'versionName': expected_version, 'package': 'com.xiaoxuhui.lambda'}, identity
     assert webpage == (ROOT / 'dist/lambda-lab.html').read_bytes(), 'APK 内网页与本次产物不一致'
     certificate_details = subprocess.check_output([args.openssl, 'x509', '-inform', 'DER', '-noout', '-subject', '-dates'], input=cert).decode().strip()
     result = {
@@ -46,6 +50,14 @@ def main():
         'webpageBytes': len(webpage),
         'webpageSha256': hashlib.sha256(webpage).hexdigest(),
     }
+    if args.previous_apk:
+        previous_cert = cert_module.extract_v2_cert(args.previous_apk)
+        with zipfile.ZipFile(args.previous_apk) as archive:
+            previous_identity = manifest_module.extract(archive.read('AndroidManifest.xml'))
+        assert previous_cert == cert, '新旧 APK 证书不一致'
+        assert previous_identity['package'] == identity['package'], '新旧 APK 包名不一致'
+        assert previous_identity['versionCode'] < identity['versionCode'], '新版 versionCode 未递增'
+        result['upgradeStaticChecks'] = {'previousManifest': previous_identity, 'certificateByteEqual': True, 'versionCodeIncreased': True}
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
 if __name__ == '__main__':
