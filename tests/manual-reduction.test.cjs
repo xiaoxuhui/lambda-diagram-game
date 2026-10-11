@@ -18,6 +18,7 @@ test('invalid or non-redex paths never modify a term',()=>{
 test('manual and automatic history replays exactly, including backup checkpoint',()=>{
   const s=sample(),r=S.decode(S.encodeBackup(s,S.encode(s)));assert.equal(C.format(r.term),'z');assert.equal(C.format(r.history[1].term),'(λx.x) z');
   assert.deepEqual(r.session.paths,[['arg'],null]);assert.equal(C.format(S.decode(r.checkpointText).history[1].term),'(λx.x) z');
+  assert.equal(r.version,3);assert.equal(JSON.parse(r.checkpointText).version,3);
 });
 test('old step-only snapshots keep their normal-order history',()=>{
   const s=sample();delete s.session.paths;const r=S.decode(S.encode(s));assert.equal(C.format(r.history[1].term),'(λy.y) z');assert.equal(C.format(r.term),'z');
