@@ -2,12 +2,13 @@
   'use strict';
   const NS='http://www.w3.org/2000/svg',D=root.LambdaDiagram;
   function init(mount){
-    let svg=null,model=null,enabled=true;const lines=[],labels=[],hits=[];
+    let svg=null,model=null,hitLayer=null,enabled=true;const lines=[],labels=[],hits=[];
     const element=name=>document.createElementNS(NS,name);
+    const hitShape=line=>`M ${line.x1} ${line.y1-3} H ${line.x2} V ${line.y1+3} H ${line.x1} Z`;
     function attribute(node,name,value,previous){if(value!==previous){if(value===null)node.removeAttribute(name);else node.setAttribute(name,String(value));}}
     function render(next){
-      if(!svg){svg=element('svg');svg.setAttribute('xmlns',NS);svg.setAttribute('role','img');svg.setAttribute('aria-label','John Tromp Lambda 图示');
-        const title=element('title');title.textContent='John Tromp Lambda 图示';svg.append(title);mount.replaceChildren(svg);}
+      if(!svg){svg=element('svg');svg.setAttribute('xmlns',NS);svg.setAttribute('role','group');svg.setAttribute('aria-label','John Tromp Lambda 图示，可点击顶部横条归约');
+        const title=element('title');title.textContent='John Tromp Lambda 图示';hitLayer=element('g');svg.append(title,hitLayer);mount.replaceChildren(svg);}
       attribute(svg,'viewBox',`0 0 ${next.width} ${next.height}`,model?`0 0 ${model.width} ${model.height}`:undefined);
       const newLines=document.createDocumentFragment();
       for(let i=0;i<next.lines.length;i++){
@@ -35,17 +36,17 @@
       for(const line of next.lines){
         if(!Object.prototype.hasOwnProperty.call(line,'redexPath'))continue;
         let hit=hits[hitCount++];
-        if(!hit){hit=element('path');hit.setAttribute('data-redex-hit','true');hit.setAttribute('role','button');hit.setAttribute('stroke','transparent');hit.setAttribute('stroke-width','18');hit.setAttribute('vector-effect','non-scaling-stroke');hit.setAttribute('fill','none');hit.append(element('title'));hits.push(hit);newHits.append(hit);}
+        if(!hit){hit=element('path');hit.setAttribute('data-redex-hit','true');hit.setAttribute('role','button');hit.setAttribute('stroke','transparent');hit.setAttribute('stroke-width','18');hit.setAttribute('vector-effect','non-scaling-stroke');hit.setAttribute('fill','transparent');hit.append(element('title'));hits.push(hit);newHits.append(hit);}
         const old=hit.reductionLine;
-        attribute(hit,'d',`M ${line.x1} ${line.y1} H ${line.x2}`,old?`M ${old.x1} ${old.y1} H ${old.x2}`:undefined);
+        attribute(hit,'d',hitShape(line),old?hitShape(old):undefined);
         if(!old||old.name!==line.name){const label=`点击 λ${line.name} 顶部横条，归约这一项`;hit.setAttribute('aria-label',label);hit.firstElementChild.textContent=label;}
-        hit.reductionLine=line;hit.setAttribute('tabindex',enabled?'0':'-1');hit.setAttribute('aria-disabled',String(!enabled));hit.style.pointerEvents=enabled?'stroke':'none';
+        hit.reductionLine=line;hit.setAttribute('tabindex',enabled?'0':'-1');hit.setAttribute('aria-disabled',String(!enabled));hit.style.pointerEvents=enabled?'all':'none';
       }
-      while(hits.length>hitCount)hits.pop().remove();svg.append(newHits);
+      while(hits.length>hitCount)hits.pop().remove();hitLayer.append(newHits);svg.append(hitLayer);
     }
-    function setEnabled(value){if(enabled===value)return;enabled=value;for(const hit of hits){hit.setAttribute('tabindex',enabled?'0':'-1');hit.setAttribute('aria-disabled',String(!enabled));hit.style.pointerEvents=enabled?'stroke':'none';}}
+    function setEnabled(value){if(enabled===value)return;enabled=value;for(const hit of hits){hit.setAttribute('tabindex',enabled?'0':'-1');hit.setAttribute('aria-disabled',String(!enabled));hit.style.pointerEvents=enabled?'all':'none';}}
     function selection(target){const hit=target.closest?.('[data-redex-hit]');return enabled&&hit&&mount.contains(hit)?{path:hit.reductionLine.redexPath}:null;}
-    function clear(){mount.replaceChildren();svg=null;model=null;lines.length=0;labels.length=0;hits.length=0;}
+    function clear(){mount.replaceChildren();svg=null;hitLayer=null;model=null;lines.length=0;labels.length=0;hits.length=0;}
     return {render,clear,setEnabled,selection};
   }
   root.LambdaDiagramView={init};

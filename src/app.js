@@ -3,7 +3,7 @@
   const C=window.LambdaCore, D=window.LambdaDiagram, P=window.LambdaPresets;
   const $=id=>document.getElementById(id);
   const input=$('expression');
-  const state={ term:null, original:null, history:[], dirty:false, running:false, timer:null,
+  const state={ term:null, original:null, history:[], paths:null, dirty:false, running:false, timer:null,
     mode:'free', level:0, completed:new Set(), halt:'', scale:1, autoFit:true, model:null, speed:600 };
   let toastTimer,workspace,viewer,historySource=null,renderedCount=0,diagramTerm=null,diagramRoute=null;
   const decodedTerms=new WeakMap(),TRUE=C.parse(P.TRUE),FALSE=C.parse(P.FALSE),IDENTITY=C.parse(P.I);
@@ -11,13 +11,13 @@
   function save() { workspace?.queueSave(); }
   function capture() {
     return {draft:input.value,completed:[...state.completed],mode:state.mode,level:state.level,
-      session:{original:state.original,steps:Math.max(0,state.history.length-1),dirty:state.dirty,halt:state.halt},
+      session:{original:state.original,steps:Math.max(0,state.history.length-1),dirty:state.dirty,halt:state.halt,...(state.paths?{paths:state.paths}:{} )},
       view:{speed:state.speed,scale:state.scale,autoFit:state.autoFit,panX:$('diagram-viewport').scrollLeft,panY:$('diagram-viewport').scrollTop,historyOpen:$('history-details').open,helpOpen:!$('help-panel').hidden,hintOpen:!$('hint').hidden},
       selection:{start:input.selectionStart,end:input.selectionEnd},error:$('error-message').hidden?'':$('error-message').textContent};
   }
   function applySnapshot(s) {
     stop();input.value=s.draft;state.completed=new Set(s.completed);state.mode=s.mode;state.level=s.level;
-    state.original=s.session.original;state.term=s.term;state.history=s.history;state.dirty=s.session.dirty;state.halt=s.session.halt;
+    state.original=s.session.original;state.term=s.term;state.history=s.history;state.paths=s.session.paths??null;state.dirty=s.session.dirty;state.halt=s.session.halt;
     state.scale=s.view.scale;state.autoFit=s.view.autoFit;state.speed=s.view.speed;renderSpeed();
     $('history-details').open=s.view.historyOpen;$('help-panel').hidden=!s.view.helpOpen;$('help-toggle').setAttribute('aria-expanded',String(s.view.helpOpen));
     $('hint').hidden=!s.view.hintOpen;$('hint-toggle').textContent=s.view.hintOpen?'收起提示':'显示提示';$('hint-toggle').setAttribute('aria-expanded',String(s.view.hintOpen));
@@ -48,10 +48,10 @@
     $('challenge-feedback').textContent=''; $('next-level').hidden=true;
     try {
       const term=workspace?workspace.expand(C.parse(input.value)):C.parse(input.value);
-      state.term=term; state.original=term; state.history=[{term,change:null}]; state.dirty=false;
+      state.term=term; state.original=term; state.history=[{term,change:null}]; state.paths=null;state.dirty=false;
       state.autoFit=true; render(); save(); return true;
     } catch(e) {
-      state.term=null; state.original=null; state.history=[]; state.dirty=true;
+      state.term=null; state.original=null; state.history=[];state.paths=null; state.dirty=true;
       $('error-message').textContent=(e.position!==null&&e.position!==undefined?`第 ${e.position+1} 个字符：`:'')+e.message;
       $('error-message').hidden=false; render(); input.focus();
       if(e.position!==null&&e.position!==undefined) input.setSelectionRange(e.position,e.position+1);
@@ -61,6 +61,7 @@
   function renderDiagram(redex) {
     const mount=$('diagram-mount');
     const route=state.dirty?null:redex?.path??null;
+    diagramView.setEnabled(!state.dirty);
     mount.style.opacity=state.dirty?'0.35':'1';
     if(state.term&&diagramTerm===state.term&&(route===diagramRoute||(route&&diagramRoute&&route.length===diagramRoute.length&&route.every((part,i)=>part===diagramRoute[i])))){
       applyScale();return;
@@ -135,16 +136,20 @@
     renderDiagram(redex);
     save();
   }
-  function advance() {
+  function advance(path=null) {
     if(!state.term||state.dirty) return false;
     try {
-      const result=C.step(state.term); if(!result){stop();render();return false;}
+      const selected=Array.isArray(path),result=selected?C.stepAt(state.term,path):C.step(state.term); if(!result){stop();render();return false;}
+      if(selected&&!state.paths)state.paths=Array(state.history.length-1).fill(null);
+      if(state.paths)state.paths.push(selected?result.path:null);
       state.term=result.term;state.history.push({term:result.term,change:result});state.halt='';
       // The preview is only a hint: confirm with an actual attempt before stopping.
       if(state.running&&!C.findRedex(state.term)&&C.step(state.term)===null)stop();
       render(); return true;
     } catch(e) {stop();state.halt=e.message;render();return false;}
   }
+  function captureTap(target){const selection=diagramView.selection(target);return !state.dirty&&selection?{...selection,term:state.term}:null;}
+  function manualStep(selection){if(!selection||state.dirty||selection.term!==state.term)return;stop();advance(selection.path);}
   function schedule() {
     state.timer=setTimeout(()=>{if(!state.running)return;const more=advance();if(more&&state.running)schedule();},state.speed);
   }
@@ -208,11 +213,12 @@
   P.examples.forEach((e,i)=>{const option=document.createElement('option');option.value=i;option.textContent=e.name;$('examples').append(option);});
   $('examples').addEventListener('change',()=>{const value=$('examples').value;if(value==='')return;setSource(P.examples[Number(value)].term);$('examples').value='';});
   $('convert').addEventListener('click',convert);$('step').addEventListener('click',advance);$('run').addEventListener('click',run);
-  $('back').addEventListener('click',()=>{if(state.history.length>1){stop();state.history.pop();state.term=state.history.at(-1).term;state.halt='';$('challenge-feedback').textContent='';$('next-level').hidden=true;render();}});
-  $('reset').addEventListener('click',()=>{if(state.original){stop();state.term=state.original;state.history=[{term:state.original,change:null}];state.halt='';$('challenge-feedback').textContent='';$('next-level').hidden=true;render();}});
+  $('back').addEventListener('click',()=>{if(state.history.length>1){stop();state.history.pop();state.paths?.pop();state.term=state.history.at(-1).term;state.halt='';$('challenge-feedback').textContent='';$('next-level').hidden=true;render();}});
+  $('reset').addEventListener('click',()=>{if(state.original){stop();state.term=state.original;state.history=[{term:state.original,change:null}];state.paths=null;state.halt='';$('challenge-feedback').textContent='';$('next-level').hidden=true;render();}});
   $('speed').addEventListener('change',()=>{if($('speed').value==='custom'){$('speed-ms').focus();$('speed-ms').select();}else setSpeed(Number($('speed').value));});
   $('speed-ms').addEventListener('input',()=>setSpeed($('speed-ms').value===''?NaN:Number($('speed-ms').value)));
-  viewer=window.LambdaViewport.init({getScale:()=>state.scale,canInteract:()=>!!state.model,onChange:save,
+  $('diagram-mount').addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&!e.repeat){const selection=captureTap(e.target);if(selection){e.preventDefault();manualStep(selection);}}});
+  viewer=window.LambdaViewport.init({getScale:()=>state.scale,canInteract:()=>!!state.model,onChange:save,captureTap,onTap:manualStep,
     setScale:scale=>{state.autoFit=false;state.scale=scale;applyScale();},fit:()=>{state.autoFit=true;applyScale();}});
   window.addEventListener('resize',applyScale);
   $('export-svg').addEventListener('click',()=>{
