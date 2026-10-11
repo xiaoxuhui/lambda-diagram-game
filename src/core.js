@@ -198,12 +198,21 @@
     for(let j=parents.length-1;j>=0;j--){const [parent,part]=parents[j];replacement=part==='body'?L(parent.param,replacement):part==='fn'?A(replacement,parent.arg):A(parent.fn,replacement);}
     return replacement;
   }
-  function step(t) {
-    const redex = findRedex(t); if (!redex) return null;
-    const { fn, arg } = redex.term;
+  function stepAt(t, path) {
+    if(!Array.isArray(path))return null;
+    let selected=t;
+    for(const part of path){
+      if(!selected||!((part==='body'&&selected.type==='abs')||((part==='fn'||part==='arg')&&selected.type==='app')))return null;
+      selected=selected[part];
+    }
+    if(!selected||selected.type!=='app'||selected.fn.type!=='abs')return null;
+    const { fn, arg } = selected;
     const replacement = substitute(fn.body, fn.param, arg);
-    const result = replaceAt(t, redex.path, replacement); inspect(result);
-    return { term: result, path: redex.path, before: redex.term, replacement, param: fn.param, argument: arg };
+    const result = replaceAt(t, path, replacement); inspect(result);
+    return { term: result, path: path.slice(), before: selected, replacement, param: fn.param, argument: arg };
+  }
+  function step(t) {
+    const redex=findRedex(t);return redex?stepAt(t,redex.path):null;
   }
   function normalize(t, max = LIMITS.steps) {
     const seen = new Set([key(t)]); let steps = 0;
@@ -221,7 +230,7 @@
     while (body.type === 'app' && body.fn.type === 'var' && body.fn.name === f) { n++; body = body.arg; }
     return body.type === 'var' && body.name === x ? n : null;
   }
-  const API = { LIMITS, LambdaError, V, L, A, parse, format, inspect, freeVars, substitute, alphaKey, key, equal, findRedex, step, normalize, churchNumber };
+  const API = { LIMITS, LambdaError, V, L, A, parse, format, inspect, freeVars, substitute, alphaKey, key, equal, findRedex, step, stepAt, normalize, churchNumber };
   root.LambdaCore = API;
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
 })(typeof globalThis !== 'undefined' ? globalThis : window);

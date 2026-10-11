@@ -27,6 +27,15 @@
     if(!Number.isInteger(raw.level)||raw.level<0||raw.level>4)fail('关卡编号不合法。');
     const s=raw.session;if(!object(s)||!Number.isSafeInteger(s.steps)||s.steps<0||typeof s.dirty!=='boolean')fail('归约状态不合法。');
     const original=s.original===null?null:ast(s.original);if(!original&&s.steps!==0)fail('没有起始表达式，无法恢复归约。');
+    let paths;
+    if(s.paths!==undefined){
+      if(!Array.isArray(s.paths)||s.paths.length!==s.steps)fail('归约路径数量与步数不一致。');
+      paths=s.paths.map(path=>{
+        if(path===null)return null;
+        if(!Array.isArray(path)||path.some(part=>!['body','fn','arg'].includes(part)))fail('归约路径不合法。');
+        return path.slice();
+      });
+    }
     if(typeof s.halt!=='string'||s.halt.length>500)fail('暂停信息不合法。');
     const v=raw.view;if(!object(v)||!Number.isInteger(v.speed)||v.speed<1||v.speed>60000||!Number.isFinite(v.scale)||v.scale<.02||v.scale>16)fail('视图设置不合法。');
     const panX=v.panX??0,panY=v.panY??0;
@@ -40,12 +49,15 @@
     if(editing!==null&&(!L.validName(editing)||!functions.some(fn=>fn.name===editing)))fail('正在编辑的函数不存在或不合法。');
     return {version:2,savedAt:typeof raw.savedAt==='string'&&Number.isFinite(Date.parse(raw.savedAt))?raw.savedAt:new Date().toISOString(),draft:raw.draft,
       functions,completed:[...new Set(raw.completed)],mode:raw.mode,level:raw.level,
-      session:{original,steps:s.steps,dirty:s.dirty,halt:s.halt},view:{speed:v.speed,scale:v.scale,autoFit:v.autoFit,panX,panY,historyOpen:v.historyOpen,helpOpen:v.helpOpen,hintOpen:v.hintOpen},
+      session:{original,steps:s.steps,dirty:s.dirty,halt:s.halt,...(paths===undefined?{}:{paths})},view:{speed:v.speed,scale:v.scale,autoFit:v.autoFit,panX,panY,historyOpen:v.historyOpen,helpOpen:v.helpOpen,hintOpen:v.hintOpen},
       selection:{start:selection.start,end:selection.end},error:raw.error,functionDraft:{name:functionDraft.name,source:functionDraft.source,...(editing===null?{}:{editing})}};
   }
   function replay(s) {
     const history=s.session.original?[{term:s.session.original,change:null}]:[];let term=s.session.original;
-    for(let i=0;i<s.session.steps;i++){const result=C.step(term);if(!result)fail('步数超过实际可归约次数。');term=result.term;history.push({term,change:result});}
+    for(let i=0;i<s.session.steps;i++){
+      const path=s.session.paths?.[i];const result=path==null?C.step(term):C.stepAt(term,path);
+      if(!result)fail(path==null?'步数超过实际可归约次数。':'归约路径未指向可归约项。');term=result.term;history.push({term,change:result});
+    }
     return {...s,term,history,hasSession:true};
   }
   function encode(raw) {
