@@ -6,10 +6,11 @@
   function layout(term, redexPath = null) {
     const lines = [], labels = [], binders = [], leaves = []; let leaf = 0;
     const env=new Map(),origin={parent:null,part:null,length:0,matches:true};let tree;
-    const child=(parent,part)=>({parent,part,length:parent.length+1,matches:redexPath!==null&&parent.matches&&redexPath[parent.length]===part});
+    const child=(parent,part,reducible=false)=>({parent,part,reducible,length:parent.length+1,matches:redexPath!==null&&parent.matches&&redexPath[parent.length]===part});
+    function pathOf(route){const path=Array(route.length);for(let i=path.length-1;i>=0;i--){path[i]=route.part;route=route.parent;}return path;}
     function withPath(line,route){
       Object.defineProperty(line,'path',{enumerable:true,configurable:true,get(){
-        const path=Array(route.length);for(let i=path.length-1;i>=0;i--){path[i]=route.part;route=route.parent;}
+        const path=pathOf(route);
         Object.defineProperty(line,'path',{value:path,enumerable:true});return path;
       }});return line;
     }
@@ -19,7 +20,9 @@
       if(entry.stage==='abs'){
         env.get(t.param).pop();const binder=entry.binder;
         const active=redexPath&&route.part==='fn'&&route.parent.length===redexPath.length&&route.parent.matches;
-        lines.push({kind:'abstraction',x1:tree.left-15,x2:tree.right+15,y1:top,y2:top,color:binder.color,binder:binder.id,name:t.param,active});continue;
+        const line={kind:'abstraction',x1:tree.left-15,x2:tree.right+15,y1:top,y2:top,color:binder.color,binder:binder.id,name:t.param,active};
+        if(route.part==='fn'&&route.reducible)Object.defineProperty(line,'redexPath',{get(){return pathOf(route.parent);}});
+        lines.push(line);continue;
       }
       if(entry.stage==='left'){
         stack.push({...entry,stage:'right',left:tree},{t:t.arg,top,route:child(route,'arg')});continue;
@@ -45,7 +48,7 @@
         binders.push(binder);
         const scope=env.get(t.param)||[];scope.push(binder);env.set(t.param,scope);
         stack.push({...entry,stage:'abs',binder},{t:t.body,top:top+32,route:child(route,'body')});
-      }else stack.push({...entry,stage:'left',start},{t:t.fn,top,route:child(route,'fn')});
+      }else stack.push({...entry,stage:'left',start},{t:t.fn,top,route:child(route,'fn',t.fn.type==='abs')});
     }
     return { lines, labels, binders, leaves, width:Math.max(140, leaf*40+60), height:tree.bottom+48 };
   }

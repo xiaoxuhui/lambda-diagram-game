@@ -3,7 +3,7 @@
   function init(api) {
     const viewport=document.getElementById('diagram-viewport');
     const svg=()=>document.querySelector('#diagram-mount svg');
-    const points=new Map();let gesture=null;
+    const points=new Map();let gesture=null,tap=null;
     function anchor(point) {
       if(!svg())return null;
       const box=viewport.getBoundingClientRect(),image=svg().getBoundingClientRect();
@@ -36,10 +36,12 @@
     }
     viewport.addEventListener('pointerdown',e=>{
       if(!api.canInteract()||(e.pointerType==='mouse'&&e.button!==0))return;
-      e.preventDefault();points.set(e.pointerId,{x:e.clientX,y:e.clientY});viewport.setPointerCapture(e.pointerId);viewport.focus({preventScroll:true});startGesture();
+      e.preventDefault();tap=points.size?null:{id:e.pointerId,x:e.clientX,y:e.clientY,selection:api.captureTap?.(e.target)};
+      points.set(e.pointerId,{x:e.clientX,y:e.clientY});viewport.setPointerCapture(e.pointerId);viewport.focus({preventScroll:true});startGesture();
     });
     viewport.addEventListener('pointermove',e=>{
       if(!points.has(e.pointerId)||!gesture)return;
+      if(tap&&Math.hypot(e.clientX-tap.x,e.clientY-tap.y)>6)tap=null;
       e.preventDefault();points.set(e.pointerId,{x:e.clientX,y:e.clientY});const p=[...points.values()];
       if(p.length>1) {
         const x=(p[0].x+p[1].x)/2,y=(p[0].y+p[1].y)/2,distance=Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y);
@@ -49,8 +51,9 @@
       }else{viewport.scrollLeft-=p[0].x-gesture.x;viewport.scrollTop-=p[0].y-gesture.y;gesture={type:'pan',...p[0]};api.onChange();}
     });
     function end(e){points.delete(e.pointerId);if(viewport.hasPointerCapture(e.pointerId))viewport.releasePointerCapture(e.pointerId);startGesture();}
-    viewport.addEventListener('pointerup',end);viewport.addEventListener('pointercancel',end);
-    viewport.addEventListener('lostpointercapture',e=>{points.delete(e.pointerId);startGesture();});
+    viewport.addEventListener('pointerup',e=>{const selected=tap&&tap.id===e.pointerId&&Math.hypot(e.clientX-tap.x,e.clientY-tap.y)<=6?tap.selection:null;tap=null;end(e);if(selected)api.onTap?.(selected);});
+    viewport.addEventListener('pointercancel',e=>{tap=null;end(e);});
+    viewport.addEventListener('lostpointercapture',e=>{tap=null;points.delete(e.pointerId);startGesture();});
     viewport.addEventListener('scroll',api.onChange,{passive:true});
     viewport.addEventListener('keydown',e=>{
       if(!api.canInteract())return;

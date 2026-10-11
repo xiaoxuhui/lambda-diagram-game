@@ -2,7 +2,7 @@
   'use strict';
   const NS='http://www.w3.org/2000/svg',D=root.LambdaDiagram;
   function init(mount){
-    let svg=null,model=null;const lines=[],labels=[];
+    let svg=null,model=null,enabled=true;const lines=[],labels=[],hits=[];
     const element=name=>document.createElementNS(NS,name);
     function attribute(node,name,value,previous){if(value!==previous){if(value===null)node.removeAttribute(name);else node.setAttribute(name,String(value));}}
     function render(next){
@@ -31,9 +31,22 @@
         if(!old||label.text!==old.text){node.firstElementChild.textContent=label.text;node.lastChild.nodeValue=label.text;}
       }
       while(labels.length>next.labels.length)labels.pop().remove();svg.append(newLabels);model=next;
+      const newHits=document.createDocumentFragment();let hitCount=0;
+      for(const line of next.lines){
+        if(!Object.prototype.hasOwnProperty.call(line,'redexPath'))continue;
+        let hit=hits[hitCount++];
+        if(!hit){hit=element('path');hit.setAttribute('data-redex-hit','true');hit.setAttribute('role','button');hit.setAttribute('stroke','transparent');hit.setAttribute('stroke-width','18');hit.setAttribute('vector-effect','non-scaling-stroke');hit.setAttribute('fill','none');hit.append(element('title'));hits.push(hit);newHits.append(hit);}
+        const old=hit.reductionLine;
+        attribute(hit,'d',`M ${line.x1} ${line.y1} H ${line.x2}`,old?`M ${old.x1} ${old.y1} H ${old.x2}`:undefined);
+        if(!old||old.name!==line.name){const label=`点击 λ${line.name} 顶部横条，归约这一项`;hit.setAttribute('aria-label',label);hit.firstElementChild.textContent=label;}
+        hit.reductionLine=line;hit.setAttribute('tabindex',enabled?'0':'-1');hit.setAttribute('aria-disabled',String(!enabled));hit.style.pointerEvents=enabled?'stroke':'none';
+      }
+      while(hits.length>hitCount)hits.pop().remove();svg.append(newHits);
     }
-    function clear(){mount.replaceChildren();svg=null;model=null;lines.length=0;labels.length=0;}
-    return {render,clear};
+    function setEnabled(value){if(enabled===value)return;enabled=value;for(const hit of hits){hit.setAttribute('tabindex',enabled?'0':'-1');hit.setAttribute('aria-disabled',String(!enabled));hit.style.pointerEvents=enabled?'stroke':'none';}}
+    function selection(target){const hit=target.closest?.('[data-redex-hit]');return enabled&&hit&&mount.contains(hit)?{path:hit.reductionLine.redexPath}:null;}
+    function clear(){mount.replaceChildren();svg=null;model=null;lines.length=0;labels.length=0;hits.length=0;}
+    return {render,clear,setEnabled,selection};
   }
   root.LambdaDiagramView={init};
 })(typeof globalThis!=='undefined'?globalThis:window);

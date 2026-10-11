@@ -27,3 +27,10 @@ test('malformed and non-executable stored paths are rejected',()=>{
     const s=sample();s.session.paths=paths;assert.throws(()=>S.decode(JSON.stringify(s)),/路径/);
   }
 });
+test('only the applied lambda top bars expose selectable redex paths',()=>{
+  const term=C.parse('λz.(λx.x) ((λy.y) z)'),m=D.layout(term),bars=m.lines.filter(line=>Object.hasOwn(line,'redexPath'));
+  assert.equal(bars.length,2);assert.deepEqual(bars.find(line=>line.name==='x').redexPath,['body']);
+  assert.deepEqual(bars.find(line=>line.name==='y').redexPath,['body','arg']);
+  assert.ok(bars.every(line=>line.kind==='abstraction'&&C.stepAt(term,line.redexPath)));
+  assert.equal(D.layout(C.parse('λx.x')).lines.filter(line=>Object.hasOwn(line,'redexPath')).length,0);
+});
