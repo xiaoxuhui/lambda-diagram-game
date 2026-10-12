@@ -183,14 +183,17 @@
     }
     return true;
   }
-  function findRedex(t, path = []) {
+  const STRATEGIES=Object.freeze(['normal','applicative']);
+  function findRedex(t, path = [], strategy='normal') {
+    if(!STRATEGIES.includes(strategy))throw new LambdaError('归约顺序不合法。');
     const route=[...path];
     while(true){
-      if(t.type==='app'&&t.fn.type==='abs')return {term:t,path:route};
+      if(strategy==='normal'&&t.type==='app'&&t.fn.type==='abs')return {term:t,path:route};
       if(!analyze(t).redex)return null;
       if(t.type==='abs'){route.push('body');t=t.body;}
       else if(analyze(t.fn).redex){route.push('fn');t=t.fn;}
-      else{route.push('arg');t=t.arg;}
+      else if(analyze(t.arg).redex){route.push('arg');t=t.arg;}
+      else return {term:t,path:route};
     }
   }
   function replaceAt(t, path, replacement, i = 0) {
@@ -211,18 +214,19 @@
     const result = replaceAt(t, path, replacement); inspect(result);
     return { term: result, path: path.slice(), before: selected, replacement, param: fn.param, argument: arg };
   }
-  function step(t) {
-    const redex=findRedex(t);return redex?stepAt(t,redex.path):null;
+  function step(t,strategy='normal') {
+    const redex=findRedex(t,[],strategy);return redex?stepAt(t,redex.path):null;
   }
-  function normalize(t, max = LIMITS.steps) {
+  function normalize(t, max = LIMITS.steps,strategy='normal') {
+    if(!STRATEGIES.includes(strategy))throw new LambdaError('归约顺序不合法。');
     const seen = new Set([key(t)]); let steps = 0;
     while (steps < max) {
-      const s = step(t); if (!s) return { term: t, steps, status: 'normal' };
+      const s = step(t,strategy); if (!s) return { term: t, steps, status: 'normal' };
       t = s.term; steps++; const k = key(t);
       if (seen.has(k)) return { term: t, steps, status: 'cycle' };
       seen.add(k);
     }
-    return { term: t, steps, status: findRedex(t) ? 'limit' : 'normal' };
+    return { term: t, steps, status: findRedex(t,[],strategy) ? 'limit' : 'normal' };
   }
   function churchNumber(t) {
     if (t.type !== 'abs' || t.body.type !== 'abs' || t.param === t.body.param) return null;
@@ -230,7 +234,7 @@
     while (body.type === 'app' && body.fn.type === 'var' && body.fn.name === f) { n++; body = body.arg; }
     return body.type === 'var' && body.name === x ? n : null;
   }
-  const API = { LIMITS, LambdaError, V, L, A, parse, format, inspect, freeVars, substitute, alphaKey, key, equal, findRedex, step, stepAt, normalize, churchNumber };
+  const API = { LIMITS, STRATEGIES, LambdaError, V, L, A, parse, format, inspect, freeVars, substitute, alphaKey, key, equal, findRedex, step, stepAt, normalize, churchNumber };
   root.LambdaCore = API;
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
 })(typeof globalThis !== 'undefined' ? globalThis : window);
