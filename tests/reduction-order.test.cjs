@@ -29,3 +29,48 @@ test('applicative lookup stays iterative through ten thousand binders and keeps 
   let t=C.parse('(λx.x) z');for(let i=0;i<10000;i++)t=C.L('a',t);const path=C.findRedex(t,[],'applicative').path;assert.equal(path.length,10000);
   assert.deepEqual(C.findRedex(C.parse('(λx.x) z'),['body'],'applicative').path,['body']);
 });
+test('both strategies can choose the right sibling first and still reach the same normal form',()=>{
+  const t=C.parse('((λa.a) u) ((λb.b) v)');
+  for(const strategy of C.STRATEGIES){
+    assert.deepEqual(C.findRedex(t,[],strategy,'left').path,['fn']);
+    assert.deepEqual(C.findRedex(t,[],strategy,'right').path,['arg']);
+    assert.equal(C.format(C.step(t,strategy,'right').term),'(λa.a) u v');
+    for(const direction of C.DIRECTIONS)assert.equal(C.format(C.normalize(t,10,strategy,direction).term),'u v');
+  }
+});
+test('right normal order retains outermost priority',()=>{
+  const t=C.parse('(λx.(λa.a) x) ((λb.b) z)');
+  assert.deepEqual(C.findRedex(t,[],'normal','right').path,[]);
+  assert.equal(C.format(C.step(t,'normal','right').term),'(λa.a) ((λb.b) z)');
+});
+test('right applicative order reduces argument then function body then outer application',()=>{
+  let t=C.parse('(λx.(λa.a) x) ((λb.b) z)');
+  for(const expected of [['arg'],['fn','body'],[]]){const s=C.step(t,'applicative','right');assert.deepEqual(s.path,expected);t=s.term;}
+  assert.equal(C.format(t),'z');
+});
+test('right directions still enter lambda bodies and avoid variable capture through deep iterative search',()=>{
+  for(const strategy of C.STRATEGIES){
+    assert.equal(C.format(C.step(C.parse('λz.(λx.x) z'),strategy,'right').term),'λz.z');
+    assert.ok(C.equal(C.step(C.parse('(λx.λy.x) y'),strategy,'right').term,C.parse('λq.y')));
+  }
+  let t=C.parse('((λa.a) u) ((λb.b) v)');for(let i=0;i<10000;i++)t=C.L('x',t);
+  assert.deepEqual(C.findRedex(t,[],'applicative','right').path,[...Array(10000).fill('body'),'arg']);
+});
+test('mixed directions replay exact paths independently from the latest preference',()=>{
+  for(const direction of C.DIRECTIONS){const s=sample();s.view.direction=direction;
+    const r=S.decode(S.encode(s));assert.equal(r.view.direction,direction);assert.equal(C.format(r.history[1].term),'(λx.x) z');assert.equal(C.format(r.term),'z');
+  }
+});
+test('legacy steps always replay normal left order even if the latest preference is right',()=>{
+  const s=sample();delete s.view.direction;delete s.session.paths;s.session.steps=1;
+  let r=S.decode(S.encode(s));assert.equal(r.view.direction,'left');assert.equal(C.format(r.term),'(λy.y) z');
+  s.view.direction='right';r=S.decode(S.encode(s));assert.equal(r.view.direction,'right');assert.equal(C.format(r.term),'(λy.y) z');
+});
+test('invalid directions are rejected by engine and snapshots',()=>{
+  const s=sample(),t=C.parse('λx.x');for(const direction of [null,'other',3,{},'']){
+    s.view.direction=direction;assert.throws(()=>S.decode(JSON.stringify(s)),/归约方向/);
+    assert.throws(()=>C.findRedex(t,[],'normal',direction),/归约方向/);
+    assert.throws(()=>C.step(t,'normal',direction),/归约方向/);
+    assert.throws(()=>C.normalize(t,0,'normal',direction),/归约方向/);
+  }
+});
