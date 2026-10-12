@@ -72,6 +72,16 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
       await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});assert.equal(await p.locator('#step-count').textContent(),'0');
       assert.ok(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));fs.mkdirSync(path.join(__dirname,'artifacts'),{recursive:true});await p.screenshot({path:path.join(__dirname,'artifacts','manual-reduction-mobile.png'),fullPage:true});await mobile.close();
     });
+    await check('real touch jitter within ten pixels keeps the viewport fixed and reduces once on release',async()=>{
+      const mobile=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});const p=await mobile.newPage();p.on('pageerror',e=>errors.push(e.message));await p.goto(base);
+      await source(p,'(λx.x) 20');await p.locator('#actual-size').tap();await p.locator('#zoom-in').tap();
+      const cdp=await mobile.newCDPSession(p);
+      await p.evaluate(()=>{const v=document.getElementById('diagram-viewport');v.scrollLeft=20;v.scrollTop=20;});
+      const start=await center(hit(p,'x')),position=()=>p.evaluate(()=>{const v=document.getElementById('diagram-viewport');return [v.scrollLeft,v.scrollTop];}),before=await position();
+      await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:start.x,y:start.y,id:1}]});
+      for(const offset of [3,7,10]){await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:start.x-offset,y:start.y,id:1}]});assert.deepEqual(await position(),before);}
+      await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});assert.equal(await p.locator('#step-count').textContent(),'1');assert.equal(await p.locator('[data-redex-hit]').count(),0);await mobile.close();
+    });
     await check('offline single-file build keeps all diagram lines and manual order',async()=>{
       const p=await context.newPage();p.on('pageerror',e=>errors.push(e.message));await p.goto(pathToFileURL(path.resolve(__dirname,'../dist/lambda-lab.html')).href);
       await source(p,'g 900 ((λx.x) y)');await hit(p,'x').click();assert.equal(await p.locator('#diagram-mount line').count(),3611);assert.equal(await p.locator('#step-count').textContent(),'1');await p.close();
