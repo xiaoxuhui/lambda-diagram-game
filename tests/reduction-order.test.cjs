@@ -23,7 +23,7 @@ test('mixed history replays exact paths independently from the current preferenc
 });
 test('legacy snapshots default to normal and invalid strategies are rejected',()=>{
   const s=sample();delete s.view.strategy;assert.equal(S.decode(S.encode(s)).view.strategy,'normal');
-  for(const strategy of ['other',3,{},'']){s.view.strategy=strategy;assert.throws(()=>S.decode(JSON.stringify(s)),/归约顺序/);assert.throws(()=>C.step(C.parse('λx.x'),strategy),/归约顺序/);}
+  for(const strategy of [null,'other',3,{},'']){s.view.strategy=strategy;assert.throws(()=>S.decode(JSON.stringify(s)),/归约顺序/);assert.throws(()=>C.step(C.parse('λx.x'),strategy),/归约顺序/);}
 });
 test('applicative lookup stays iterative through ten thousand binders and keeps path prefix compatibility',()=>{
   let t=C.parse('(λx.x) z');for(let i=0;i<10000;i++)t=C.L('a',t);const path=C.findRedex(t,[],'applicative').path;assert.equal(path.length,10000);

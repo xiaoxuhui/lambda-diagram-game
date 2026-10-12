@@ -42,7 +42,7 @@
     }
     if(typeof s.halt!=='string'||s.halt.length>500)fail('暂停信息不合法。');
     const v=raw.view;if(!object(v)||!Number.isInteger(v.speed)||v.speed<1||v.speed>60000||!Number.isFinite(v.scale)||v.scale<.02||v.scale>16)fail('视图设置不合法。');
-    const strategy=v.strategy??'normal';if(!C.STRATEGIES.includes(strategy))fail('归约顺序不合法。');
+    const strategy=v.strategy===undefined?'normal':v.strategy;if(!C.STRATEGIES.includes(strategy))fail('归约顺序不合法。');
     const panX=v.panX??0,panY=v.panY??0;
     if(!Number.isFinite(panX)||!Number.isFinite(panY)||panX<0||panY<0||panX>5000000||panY>5000000)fail('图示位置不合法。');
     for(const field of ['autoFit','historyOpen','helpOpen','hintOpen'])if(typeof v[field]!=='boolean')fail('视图开关不合法。');

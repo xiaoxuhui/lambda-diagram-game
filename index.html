@@ -19,7 +19,7 @@
     </section>
     <section id="help-panel" class="help-panel" hidden>
       <div><h2>三个积木，就能计算</h2><p><code>x</code> 是变量；<code>λx.x</code> 是函数；<code>f x</code> 把 x 交给 f。<code>(λx.x) y → y</code> 是一次 β 归约。</p></div>
-      <div><h2>怎么写、怎么看</h2><p>用快捷栏插入 λ；也可用 <code>\</code>。<code>λx y.x</code> 等同 <code>λx.λy.x</code>。变量之间用空格：<code>xy</code> 是一个名字。λ 的作用域延伸到右侧，作为参数时需加括号。</p><p>同色竖线连接绑定横线；应用横线连接子式最左变量。粉色标记下一步归约，自由变量以虚线显示。采用左最外正常序，包含函数内部归约。<a href="https://tromp.github.io/cl/diagrams.html" target="_blank" rel="noopener">John Tromp 原始说明 ↗</a></p></div>
+      <div><h2>怎么写、怎么看</h2><p>用快捷栏插入 λ；也可用 <code>\</code>。<code>λx y.x</code> 等同 <code>λx.λy.x</code>。变量之间用空格：<code>xy</code> 是一个名字。λ 的作用域延伸到右侧，作为参数时需加括号。</p><p>同色竖线连接绑定横线；应用横线连接子式最左变量。粉色标记下一步归约，自由变量以虚线显示。可选择正规序（外层优先）或应用序（内部优先），都包含函数内部归约。<a href="https://tromp.github.io/cl/diagrams.html" target="_blank" rel="noopener">John Tromp 原始说明 ↗</a></p></div>
     </section>
     <nav class="mode-row" aria-label="游戏模式"><div class="mode-tabs"><button id="mode-free" class="mode-tab active" aria-pressed="true">自由实验</button><button id="mode-challenge" class="mode-tab" aria-pressed="false">闯关模式 <span>5</span></button></div><span id="progress-text" class="progress-label">探索 · 输入 · 归约</span></nav>
     <section class="save-bar" aria-label="状态与进度存档"><div class="save-info"><strong>状态与进度</strong><span id="storage-status" role="status">自动保存准备中</span><small>包含函数库、归约轨迹与关卡进度</small></div><div class="save-actions"><button id="save-state" class="button primary">保存当前状态</button><button id="restore-state" class="button" disabled>恢复已保存状态</button><button id="export-state" class="button">导出存档 ↓</button><button id="import-state" class="button">导入存档 ↑</button><button id="clear-all" type="button" class="button danger" aria-describedby="clear-note">导出存档并清空</button><input id="import-file" type="file" accept=".json,application/json" hidden></div><p id="clear-note" class="clear-note">清空会删除表达式、函数库、运行记录、关卡进度及保存点，并自动导出备份。</p><p id="save-feedback" class="save-feedback" role="status" hidden></p></section>
@@ -63,6 +63,7 @@
         </div>
         <section class="card execution-card">
           <div class="execution-top"><div class="section-heading"><div><span class="section-number">03</span><h2>运行与归约</h2></div></div><div class="speed-label"><label for="speed">速度</label><select id="speed"><option value="1200">慢速</option><option value="600" selected>正常</option><option value="180">快速</option><option value="10">极速</option><option value="custom">自定义</option></select><label class="sr-only" for="speed-ms">每步间隔，毫秒</label><input id="speed-ms" type="number" min="1" max="60000" step="1" value="600" inputmode="numeric" title="每步间隔 1–60000 毫秒，数字越小运行越快" aria-describedby="speed-error"><span>ms/步</span></div></div>
+          <div class="strategy-control"><label for="reduction-order">归约顺序</label><select id="reduction-order"><option value="normal">正规序（外层优先）</option><option value="applicative">应用序（内部优先）</option></select><small id="strategy-hint">先替换最左侧外层项，再处理内部。</small></div>
           <p id="speed-error" class="error-message" role="alert" hidden></p>
           <div class="run-controls"><button id="run" class="button run-button"><span>▶</span> <span id="run-label">运行</span></button><button id="step" class="button">单步 →</button><button id="back" class="button">← 回退</button><button id="reset" class="button reset-button">↺ 重置</button><span class="step-counter"><b id="step-count">0</b> 步</span></div>
           <p id="run-status" class="run-status" role="status" aria-live="polite">准备好了。点击单步，观察一次函数替换。</p>
@@ -72,7 +73,7 @@
         </section>
       </section>
     </div>
-    <footer class="page-footer"><span><b>λ</b> 只有变量、函数和应用。其余，交给计算。</span><span>正常序 β 归约 · 本地保存</span></footer>
+    <footer class="page-footer"><span><b>λ</b> 只有变量、函数和应用。其余，交给计算。</span><span>β 归约 · 本地保存</span></footer>
   </main>
   <div id="toast" class="toast" role="status" hidden></div>
   <script src="src/core.js"></script><script src="src/diagram.js"></script><script src="src/diagram-view.js"></script><script src="src/presets.js"></script><script src="src/library.js"></script><script src="src/snapshot.js"></script><script src="src/download.js"></script><script src="src/workspace-tools.js"></script><script src="src/viewport.js"></script><script src="src/app.js"></script>

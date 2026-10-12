@@ -38,6 +38,7 @@ jobs:
       - run: node tests/reduction-browser.cjs
       - run: node tests/performance-browser.cjs
       - run: node tests/manual-reduction-browser.cjs
+      - run: node tests/reduction-order-browser.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

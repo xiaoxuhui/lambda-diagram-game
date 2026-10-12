@@ -18,6 +18,7 @@
 .diagram-viewport{touch-action:none;cursor:grab;user-select:none;overflow-anchor:none}.diagram-viewport.dragging{cursor:grabbing}.diagram-hint{font-size:10px;color:#7d94ad;padding:8px 24px 0;margin:0}.zoom-controls #fit[aria-pressed="true"]{color:#64d8bd;background:#64d8bd10}
 .execution-top{flex-wrap:wrap}.speed-label{flex-wrap:wrap}.speed-label input{width:67px;padding:4px 5px;border:1px solid #dfe4dd;border-radius:5px;background:#fafbf8;color:#486c55;font-size:11px;min-width:0}.execution-card #speed-error{margin:10px 0 0}
 .function-actions{flex-wrap:wrap}.function-item-head{flex-wrap:wrap}.function-item-buttons{margin-left:auto}#function-edit-status{color:var(--mint);overflow-wrap:anywhere}
+.strategy-control{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:7px 12px;margin:12px 0;color:#7c8b81;font-size:11px}.strategy-control select{width:100%;max-width:240px}.strategy-control small{grid-column:1/-1;font-size:10px;color:#89978d}
 .diagram-mount line{transition:none}
 .diagram-mount [data-redex-hit]{cursor:pointer}
 .diagram-mount [data-redex-hit]:hover,.diagram-mount [data-redex-hit]:focus-visible{stroke:#ff91b7;stroke-opacity:.25;outline:none}
