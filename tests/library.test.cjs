@@ -1,6 +1,22 @@
 const {test}=require('node:test'),assert=require('node:assert/strict');
 const C=require('../src/core.js'),L=require('../src/library.js');
 const p=C.parse;
+
+test('function source preserves exact aliases, numerals, whitespace and backslash notation',()=>{
+  let f=L.add([],'ID','\\x.x');const source='  λf x.\n ID (f 3)  ';f=L.add(f,'F',source);
+  assert.equal(f[0].source,'\\x.x');assert.equal(f[1].source,source);assert.ok(C.equal(f[1].term,L.expand(p(source),f.slice(0,1))));
+});
+test('unchanged source retains compiled term after dependencies change or disappear',()=>{
+  let f=L.add(L.add([],'ID','λx.x'),'COPY','ID');const before=f[1].term;
+  f=L.update(f,'ID','ID','λx.y');f=L.update(f,'COPY','COPY','ID');assert.equal(f[1].term,before);
+  f=L.remove(f,'ID');f=L.update(f,'COPY','NEW','ID');assert.equal(f[0].term,before);assert.equal(f[0].source,'ID');
+  assert.throws(()=>L.update(f,'NEW','ID','ID'),/自身/);
+});
+test('changed source recompiles and legacy functions gain source on save',()=>{
+  let f=L.add(L.add([],'ID','λx.x'),'COPY','ID');f=L.update(f,'ID','ID','λx.y');f=L.update(f,'COPY','COPY','ID ');
+  assert.ok(C.equal(f[1].term,p('λx.y')));assert.equal(f[1].source,'ID ');
+  const legacy=L.update([{name:'OLD',term:p('λx.x')}],'OLD','OLD','λx.x');assert.equal(legacy[0].source,'λx.x');
+});
 test('fully expanded large function remains editable without truncation',()=>{const f=L.add([],'BIG','1024'),source=C.format(f[0].term);assert.ok(source.length>C.LIMITS.chars);const updated=L.update(f,'BIG','BIG',source+' ');assert.equal(C.churchNumber(updated[0].term),1024);});
 test('editing replaces a function in place without changing the original library',()=>{const f=L.add(L.add([],'ID','λx.x'),'OTHER','λx y.x');const updated=L.update(f,'ID','ID','λx y.y');assert.equal(updated.length,2);assert.deepEqual(updated.map(fn=>fn.name),['ID','OTHER']);assert.ok(C.equal(updated[0].term,p('λx y.y')));assert.ok(C.equal(f[0].term,p('λx.x')));});
 test('editing may rename but rejects collisions and invalid definitions atomically',()=>{const f=L.add(L.add([],'ID','λx.x'),'OTHER','λx y.x');assert.deepEqual(L.update(f,'ID','RENAMED','λz.z').map(fn=>fn.name),['RENAMED','OTHER']);for(const [old,name,source] of [['ID','OTHER','λx.x'],['ID','ID','λx.'],['ID','ID','λx.ID x'],['MISSING','NEW','λx.x']])assert.throws(()=>L.update(f,old,name,source));assert.equal(C.format(f[0].term),'λx.x');});

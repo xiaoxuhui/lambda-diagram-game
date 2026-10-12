@@ -12,6 +12,7 @@
     if(!Array.isArray(functions))throw new C.LambdaError('函数库格式不合法。');
     const seen=new Set();let nodes=0,nameChars=0;
     for(const fn of functions) {
+      if(fn.source!==undefined&&typeof fn.source!=='string')throw new C.LambdaError('函数原始定义需为文本。');
       if(!validName(fn.name))throw new C.LambdaError('函数名需以英文字母开头，最多 32 字符，可含数字、下划线和单引号。');
       if(seen.has(fn.name))throw new C.LambdaError(`函数「${fn.name}」已存在，请换一个名字。`);
       seen.add(fn.name);nodes+=C.inspect(fn.term).nodes;
@@ -37,13 +38,18 @@
     if(functions.some(f=>f.name===name))throw new C.LambdaError(`函数「${name}」已存在，请换一个名字。`);
     const parsed=C.parse(source,maxChars);
     if(C.freeVars(parsed).has(name))throw new C.LambdaError('定义不能直接引用自身。递归请使用显式不动点组合子。');
-    const result=[...functions,{name,term:expand(parsed,functions)}];validate(result);return result;
+    const result=[...functions,{name,source,term:expand(parsed,functions)}];validate(result);return result;
   }
   const remove=(functions,name)=>functions.filter(f=>f.name!==name);
   function update(functions,originalName,name,source) {
-    if(!functions.some(fn=>fn.name===originalName))throw new C.LambdaError('要编辑的函数已不存在。');
+    const original=functions.find(fn=>fn.name===originalName);
+    if(!original)throw new C.LambdaError('要编辑的函数已不存在。');
     const others=remove(functions,originalName);
-    const replacement=add(others,name,source,Infinity).at(-1);
+    let replacement;
+    if(typeof original.source==='string'&&source===original.source){
+      name=name.trim();replacement={name,source,term:original.term};validate([...others,replacement]);
+      if(C.freeVars(C.parse(source,Infinity)).has(name))throw new C.LambdaError('定义不能直接引用自身。递归请使用显式不动点组合子。');
+    }else replacement=add(others,name,source,Infinity).at(-1);
     return functions.map(fn=>fn.name===originalName?replacement:fn);
   }
   const API={LIMITS,validName,validate,expand,add,update,remove};root.LambdaLibrary=API;
