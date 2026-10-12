@@ -1,10 +1,10 @@
 # Lambda 线路实验室
 
-当前版本：**0.3.2**。许可证：[MIT](LICENSE)。
+当前版本：**0.3.3**。许可证：[MIT](LICENSE)。
 
 ## 安卓 APK
 
-在 [GitHub Releases](https://github.com/xiaoxuhui/lambda-diagram-game/releases) 下载 `lambda-lab-android-0.3.2-debug.apk` 安装。
+在 [GitHub Releases](https://github.com/xiaoxuhui/lambda-diagram-game/releases) 下载 `lambda-lab-android-0.3.3-debug.apk` 安装。
 支持 Android 7.0 及以上，完整网页内置，无需联网、不申请权限。首次安装可能需要允许此来源安装应用。
 APK 使用项目固定 debug 签名；后续升级必须保持相同签名并增加 versionCode，网页与 APK 版本同线。
 
@@ -29,7 +29,9 @@ JSON 存档和 SVG 图示通过原生接口保存：Android 10+ 写入系统下�
 
 网页支持手动点选归约：点击可归约项顶部的 λ 绑定横条，执行该项的一次替换，可以选择内部项。手机直接点按；键盘聚焦横条后按 Enter 或空格。拖动平移、双指缩放不会归约。自动运行时点选会先暂停；输入已编辑时需重新转换。普通「单步」「运行」仍采用左最外正常序。
 
-手动归约顺序随状态和完整备份保存，刷新、导入后仍能逐步回退。带手动路径的存档使用格式 v3，当前网页和 v0.3.2 APK 兼容 v1/v2/v3；旧 v0.3.1 APK 不支持手动归约及 v3 存档。
+点按时累计位移不超过 **20 CSS 像素**，图示保持不动且可点击归约；超过 20 像素才启动拖动，启动后连续跟随。阈值按屏幕位置计算，不受图示缩放比例影响。
+
+手动归约顺序随状态和完整备份保存，刷新、导入后仍能逐步回退。带手动路径的存档使用格式 v3，当前网页和 v0.3.3 APK 兼容 v1/v2/v3；旧 v0.3.1 APK 不支持手动归约及 v3 存档。
 
 长表达式归约会复用未变化子树的统计和查找结果，避免反复扫描和复制路径；替换、图示布局及文本遍历使用显式栈。图示按变化更新 SVG 元素，暂停或重复尝试时保留原图。全部线条、变量和历史仍完整保留。可用 `node scripts/benchmark-reduction.cjs` 与 `node scripts/benchmark-browser.cjs` 重现性能基准，参数 `ff715b2` 对比优化前版本。
 

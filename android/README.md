@@ -4,7 +4,7 @@
 
 - 应用名：Lambda 线路实验室
 - 包名：com.xiaoxuhui.lambda
-- 版本：0.3.2；versionCode 3（上一版为 2）
+- 版本：0.3.3；versionCode 4（上一版为 3）
 - minSdk 24 / targetSdk 34 / compileSdk 34
 - 权限：无；不申请网络权限
 - 签名：项目专属固定公开 debug keystore，必须长期保留
@@ -29,7 +29,7 @@ JSON 和 SVG 导出直接调用 LambdaAndroid.saveFile，传入完整文本及�
 「导出存档并清空」调用 LambdaAndroid.saveFileConfirmed，只有原生文件写入成功才清空现场。
 Android 10+ 使用 MediaStore 保存到下载目录，Android 7–9 保存到应用外部文件目录，不请求存储权限。
 JSON 导入通过系统文件选择器。转屏不重建 Activity，处理系统栏和键盘 Insets；返回键先退页面历史。
-可点按可归约项顶部的 λ 横条选择一步归约；拖动平移、双指缩放不归约。手动顺序保存为 v3 存档，兼容读取 v1/v2/v3。
+可点按可归约项顶部的 λ 横条选择一步归约；累计位移 ≤20 CSS 像素不移动图示且仍可点按，>20 才启动拖动。双指缩放不归约。手动顺序保存为 v3 存档，兼容读取 v1/v2/v3。
 
 网页与 APK 存储空间独立，迁移请使用导出和导入。应用卸载可能清除其数据，存档可先导出备份。
 
@@ -43,7 +43,7 @@ JSON 导入通过系统文件选择器。转屏不重建 Activity，处理系统
 2. android/app/debug.keystore 必须保持不变且入库；gradle 明确引用 PKCS12 签名。
 3. 本地和 CI 的构建、同步、单元测试与浏览器测试通过。
 4. APK 内网页逐字节等于本次构建产物；解析二进制 Manifest；APK v2 证书与 keystore 字节比对；apksigner 验证签名。
-5. 发布后下载线上 APK 再核验，记录在 doc/安卓发版核对报告-v0.3.2.md。
+5. 发布后下载线上 APK 再核验，记录在 doc/安卓发版核对报告-v0.3.3.md。
 6. 新旧 APK 签名和 versionCode 必须静态核验；实际覆盖安装与存档保留、离线启动、系统导入导出、转屏和杀进程后恢复需设备验证。
 
 debug 签名便于直接分发安装，本次不是应用商店 release 签名包。
