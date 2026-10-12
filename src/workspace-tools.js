@@ -36,7 +36,7 @@
         insert.addEventListener('mousedown',e=>e.preventDefault());insert.addEventListener('click',()=>api.insertFunction(fn.name));
         const edit=document.createElement('button');edit.textContent='编辑';edit.setAttribute('aria-label',`编辑函数 ${fn.name}`);
         edit.addEventListener('click',()=>{
-          editing=fn.name;$('function-name').value=fn.name;$('function-source').value=C.format(fn.term);
+          editing=fn.name;$('function-name').value=fn.name;$('function-source').value=fn.source??C.format(fn.term);
           $('function-error').hidden=true;renderEditMode();persist();$('function-source').focus();$('function-form').scrollIntoView({block:'nearest'});
         });
         const del=document.createElement('button');del.textContent='删除';del.className='delete-function';del.setAttribute('aria-label',`删除函数 ${fn.name}`);
