@@ -29,3 +29,23 @@ test('Pascal combinations handle edges, symmetry and k greater than n',()=>{
   for(const [n,k,expected] of [[0,0,1],[3,0,1],[3,3,1],[3,4,0],[4,1,4],[4,3,4],[4,2,6]])
     assert.equal(C.churchNumber(result(`(${P.advanced.choose}) ${n} ${k}`)),expected,`C(${n},${k})`);
 });
+test('combinations move to higher mathematics alongside ten new topics',()=>{
+  const group=P.examples.filter(e=>e.category==='高等数学');assert.equal(group.length,11);
+  assert.equal(P.examples[20].category,'高等数学');assert.equal(P.examples[21].name,'斐波那契 · F(5) → 5');
+  for(const name of ['排列数','自然数求和','平方和','立方和','等比求和','系数和','二项式展开','多项式','自动微分','定积分'])assert.ok(group.some(e=>e.name.includes(name)),name);
+});
+test('finite folds handle zero terms and nontrivial inputs',()=>{
+  for(const [formula,args,expected] of [
+    [P.advanced.permutations,'4 0',1],[P.advanced.permutations,'3 4',0],[P.advanced.permutations,'5 2',20],
+    [P.advanced.sumPowers?.(1),'0',0],[P.advanced.sumPowers?.(2),'2',5],[P.advanced.sumPowers?.(3),'2',9],
+    [P.advanced.geometricSum,'2 0',0],[P.advanced.geometricSum,'0 3',1],[P.advanced.geometricSum,'3 3',13],
+    [P.advanced.polynomial,'0',1],[P.advanced.polynomial,'3',28]
+  ]){assert.equal(typeof formula,'string');assert.equal(C.churchNumber(result(`(${formula}) ${args}`)),expected,args);}
+});
+test('binomial expansion, dual-number differentiation and definite integral follow their formulas',()=>{
+  for(const [formula,args,expected] of [
+    [P.advanced.binomial,'2 3 0',1],[P.advanced.binomial,'2 1 2',9],
+    [P.advanced.derivative,'0',3],[P.advanced.derivative,'1',5],[P.advanced.derivative,'3',9],
+    [P.advanced.integral,'0 0',0],[P.advanced.integral,'1 3',8],[P.advanced.integral,'2 2',0]
+  ]){assert.equal(typeof formula,'string');assert.ok(C.equal(result(`(${formula}) ${args}`),C.parse(String(expected))),args);}
+});
