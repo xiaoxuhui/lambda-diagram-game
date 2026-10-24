@@ -12,7 +12,7 @@ const P=require('../src/presets.js');process.env.PORT='0';const server=require('
    const run=async(number)=>{await page.locator('#speed-ms').fill('1');await page.locator('#run').click();await page.waitForFunction(()=>document.getElementById('state-badge').textContent==='已到正规形',null,{timeout:180000});assert.equal(await page.locator('#decoded').textContent(),`Church 数 ${number}`);};
    await check(`${width}px grouped choices all render complete diagrams and descriptions`,async()=>{
     assert.equal(await page.locator('#examples option').count(),P.examples.length+1);assert.equal(await page.locator('#examples optgroup').count(),6);
-    assert.equal(await page.locator('#examples optgroup[label="高等数学"] option').count(),11);
+    assert.equal(await page.locator('#examples optgroup[label="高等数学"] option').count(),13);
     for(const e of P.examples.filter(e=>e.expected!==undefined)){await select(e.name);assert.equal(await page.locator('#expression').inputValue(),e.term);assert.ok(await page.locator('#diagram-mount line').count()>0);assert.ok(await page.locator('#error-message').isHidden());assert.ok((await page.locator('#example-info').textContent()).includes(e.description));}
     assert.equal(await page.locator('#function-count').textContent(),'0 个函数');
    });

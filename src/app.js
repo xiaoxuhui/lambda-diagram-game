@@ -94,7 +94,12 @@
     else if(C.equal(t,TRUE))text='TRUE · 选择第一个';
     else if(number!==null)text=`Church 数 ${number}`;
     else if(C.equal(t,IDENTITY))text='I · 恒等函数';
-    else{const free=C.freeVars(t);text=free.size?`${free.size} 个自由变量`:'闭合表达式';}
+    else{
+      const M=window.LambdaPolynomial,rational=M.readRational(t),polynomial=rational?null:M.readPolynomial(t);
+      if(rational)text=`有理数 ${M.formatRational(rational)}`;
+      else if(polynomial?.length)text=`多项式：${M.formatPolynomial(polynomial)}`;
+      else{const free=C.freeVars(t);text=free.size?`${free.size} 个自由变量`:'闭合表达式';}
+    }
     decodedTerms.set(t,text);return text;
   }
   function code(text) { const el=document.createElement('code'); el.textContent=text; return el; }
@@ -226,7 +231,8 @@
   $('examples').addEventListener('change',()=>{
     const value=$('examples').value;if(value==='')return;const example=P.examples[Number(value)];if(!example)return;
     setSource(example.term);$('examples').value='';
-    $('example-info').textContent=example.description?`${example.description} 预期结果：${decode(C.parse(example.expected))}。`:'';
+    const expected=example.expectedType==='polynomial'?`多项式：${example.expected}`:example.expectedType==='rational'?`有理数 ${example.expected}`:example.expected===undefined?'':decode(C.parse(example.expected));
+    $('example-info').textContent=example.description?`${example.description} 预期结果：${expected}。`:'';
     $('example-info').hidden=!example.description;
   });
   $('convert').addEventListener('click',convert);$('step').addEventListener('click',advance);$('run').addEventListener('click',run);
