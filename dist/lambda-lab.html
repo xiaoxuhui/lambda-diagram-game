@@ -479,8 +479,88 @@
 })(typeof globalThis!=='undefined'?globalThis:window);
 
 </script><script>
+(function(root){
+ 'use strict';
+ const C=root.LambdaCore||require('./core.js');
+ // These are Lambda programs, not JavaScript differentiation/integration.
+ // Lists are descending powers; each coefficient is a Church pair (numerator,denominator).
+ const definitions=[
+  ['t','λx y.x'],['f','λx y.y'],['pair','λa b k.k a b'],['nil','λc n.n'],['cons','λh r c n.c h (r c n)'],
+  ['add','λm n g x.m g (n g x)'],['mul','λm n g.m (n g)'],['succ','λn g x.g (n g x)'],
+  ['pred','λn g x.n (λa b.b (a g)) (λu.x) (λu.u)'],['sub','λm n.n pred m'],['zero','λn.n (λx.f) t'],
+  ['rmul','λa n.zero n (pair 0 1) (pair (mul (a t) n) (a f))'],['rdiv','λa n.pair (a t) (mul (a f) n)'],
+  ['radd','λa b.zero (a t) b (zero (b t) a (pair (add (mul (a t) (b f)) (mul (b t) (a f))) (mul (a f) (b f))))'],
+  ['rsub','λa b.zero (b t) a (pair (sub (mul (a t) (b f)) (mul (b t) (a f))) (mul (a f) (b f)))'],
+  ['diff','λp.(p (λa s.(λi r.pair (succ i) (zero i r (cons (rmul a i) r))) (s t) (s f)) (pair 0 nil)) f'],
+  ['integ','λp.(p (λa s.(λi r.pair (succ i) (cons (rdiv a (succ i)) r)) (s t) (s f)) (pair 0 (cons (pair 0 1) nil))) f'],
+  ['fold','λg z p.p (λa h s.h (g s a)) (λs.s) z'],
+  ['evalpoly','λp x.fold (λr a.radd (rmul r x) a) (pair 0 1) p']
+ ].map(([name,source])=>({name,source,free:C.freeVars(C.parse(source))}));
+ function compile(body){
+  const needed=new Set(C.freeVars(C.parse(body,Infinity)));
+  for(let i=definitions.length-1;i>=0;i--){const d=definitions[i];if(!needed.has(d.name))continue;
+   body=`(λ${d.name}.${body}) (${d.source})`;needed.delete(d.name);for(const name of d.free)needed.add(name);
+  }
+  if(needed.size)throw new Error('Unbound polynomial program: '+[...needed].join(','));
+  return body;
+ }
+ function polynomial(coefficients){
+  if(!Array.isArray(coefficients)||!coefficients.length)throw new Error('多项式系数不能为空。');
+  let body='n';
+  for(const raw of coefficients){const [a,b]=Array.isArray(raw)?raw:[raw,1];
+   if(!Number.isSafeInteger(a)||a<0||!Number.isSafeInteger(b)||b<1)throw new Error('系数必须为非负自然数或正分母有理数。');
+   body=`c (λk.k ${a} ${b}) (${body})`;
+  }
+  return `λc n.${body}`;
+ }
+ const differentiate=coefficients=>compile(`diff (${polynomial(coefficients)})`);
+ const integrate=coefficients=>compile(`integ (${polynomial(coefficients)})`);
+ const derivativeAt=coefficients=>compile(`λx.evalpoly (diff (${polynomial(coefficients)})) x`);
+ const integralFunction=coefficients=>compile(`λa b.(λp.rsub (evalpoly p b) (evalpoly p a)) (integ (${polynomial(coefficients)}))`);
+ function definite(coefficients,a,b){
+  if(!Number.isSafeInteger(a)||!Number.isSafeInteger(b)||a<0||b<a)throw new Error('端点需为自然数且下限不大于上限。');
+  return `(${integralFunction(coefficients)}) ${a} ${b}`;
+ }
+ const variable=(term,name)=>term?.type==='var'&&term.name===name;
+ function natural(term){
+  const value=C.churchNumber(term);if(value!==null)return value;
+  return term?.type==='abs'&&term.body.type==='abs'&&C.equal(term,C.parse('0'))?0:null;
+ }
+ function readRational(term){
+  if(term?.type!=='abs')return null;const body=term.body;
+  if(body.type!=='app'||body.fn.type!=='app'||!variable(body.fn.fn,term.param))return null;
+  const n=natural(body.fn.arg),d=natural(body.arg);return n===null||d===null||d===0?null:[n,d];
+ }
+ function readPolynomial(term){
+  if(term?.type!=='abs'||term.body.type!=='abs'||term.param===term.body.param)return null;
+  const c=term.param,n=term.body.param,coefficients=[];let body=term.body.body;
+  while(!variable(body,n)){
+   if(body?.type!=='app'||body.fn.type!=='app'||!variable(body.fn.fn,c))return null;
+   const value=readRational(body.fn.arg);if(!value)return null;coefficients.push(value);body=body.arg;
+  }
+  return coefficients;
+ }
+ function formatRational(value){
+  if(!value)return null;let [n,d]=value.map(BigInt),a=n,b=d;while(b){const r=a%b;a=b;b=r;}n/=a;d/=a;
+  return d===1n?String(n):`${n}/${d}`;
+ }
+ function formatPolynomial(coefficients){
+  if(!coefficients)return null;const terms=[];
+  for(let i=0;i<coefficients.length;i++){
+   const value=formatRational(coefficients[i]),degree=coefficients.length-1-i;if(value==='0')continue;
+   const exponent=degree===0?'':degree===1?'x':degree===2?'x²':degree===3?'x³':`x^${degree}`;
+   terms.push((degree&&value==='1'?'':value)+exponent);
+  }
+  return terms.join(' + ')||'0';
+ }
+ const API={polynomial,differentiate,integrate,derivativeAt,integralFunction,definite,readRational,readPolynomial,formatRational,formatPolynomial};
+ root.LambdaPolynomial=API;if(typeof module!=='undefined'&&module.exports)module.exports=API;
+})(typeof globalThis!=='undefined'?globalThis:window);
+
+</script><script>
 (function(root) {
   'use strict';
+  const M=root.LambdaPolynomial||require('./polynomial.js');
   const I='λx.x', TRUE='λx.λy.x', FALSE='λx.λy.y';
   const TWO='λf.λx.f (f x)', THREE='λf.λx.f (f (f x))', FIVE='λf.λx.f (f (f (f (f x))))';
   const ADD='λm.λn.λf.λx.m f (n f x)', SUCC='λn.λf.λx.f (n f x)';
@@ -497,11 +577,7 @@
   const GEOMETRIC_SUM=`λb n.(n (λp.(${PAIR}) ((${MULT}) b (p (${TRUE}))) ((${ADD}) (p (${FALSE})) (p (${TRUE})))) ((${PAIR}) 1 0)) (${FALSE})`;
   const BINOMIAL=`λa b n.((${SUCC}) n (λp.(λk.(${PAIR}) ((${SUCC}) k) ((${ADD}) (p (${FALSE})) ((${MULT}) ((${CHOOSE}) n k) ((${MULT}) ((${POW}) a ((${SUB}) n k)) ((${POW}) b k))))) (p (${TRUE}))) ((${PAIR}) 0 0)) (${FALSE})`;
   const POLYNOMIAL=`λx.(${ADD}) ((${MULT}) ((${ADD}) ((${MULT}) 2 x) 3) x) 1`;
-  // Dual numbers carry (value, derivative); multiplication uses u'v + uv'.
-  const DUAL_ADD=`λp q.(${PAIR}) ((${ADD}) (p (${TRUE})) (q (${TRUE}))) ((${ADD}) (p (${FALSE})) (q (${FALSE})))`;
-  const DUAL_MULT=`λp q.(${PAIR}) ((${MULT}) (p (${TRUE})) (q (${TRUE}))) ((${ADD}) ((${MULT}) (p (${FALSE})) (q (${TRUE}))) ((${MULT}) (p (${TRUE})) (q (${FALSE}))))`;
-  const DERIVATIVE=`λx.((λp.(${DUAL_ADD}) ((${DUAL_MULT}) p p) ((${DUAL_MULT}) ((${PAIR}) 3 0) p)) ((${PAIR}) x 1)) (${FALSE})`;
-  const INTEGRAL=`λa b.(${SUB}) ((${POW}) b 2) ((${POW}) a 2)`;
+  const DERIVATIVE=M.derivativeAt([0,3,1]),INTEGRAL=M.integralFunction([0,2]);
   const recursiveHint='使用显式 Y 不动点组合子。建议选择「正规序」「从左到右」运行，先判断终止条件；其他顺序可能无法终止。';
   const examples = [
     { name:'恒等函数 I', term:I },
@@ -534,8 +610,10 @@
     { name:'二项式系数和 · C(3,0) + … + C(3,3) → 8', category:'高等数学', term:`(${BINOMIAL}) 1 1 3`, expected:'8', description:`把二项式展开中的 a、b 都设为 1，实际计算第 3 行系数和 1 + 3 + 3 + 1 = 8。${recursiveHint}` },
     { name:'二项式展开 · (1 + 2)³ → 27', category:'高等数学', term:`(${BINOMIAL}) 1 2 3`, expected:'27', description:`逐项计算 Σ C(n,k) a^(n−k) b^k。这里 a=1、b=2、n=3，四项为 1、6、12、8，总和 27。${recursiveHint}` },
     { name:'多项式 · 2x² + 3x + 1，x=2 → 15', category:'高等数学', term:`(${POLYNOMIAL}) 2`, expected:'15', description:'使用 Horner 形式 (2x + 3)x + 1 计算多项式。把 x=2 代入，得到 (4 + 3) × 2 + 1 = 15。' },
-    { name:'自动微分 · (x² + 3x)′，x=2 → 7', category:'高等数学', term:`(${DERIVATIVE}) 2`, expected:'7', description:'用有序对同时传播数值与导数：x 对应 (x,1)，常量 3 对应 (3,0)。乘法执行 u′v + uv′，最后取出导数 2x + 3 在 x=2 处的值 7。' },
-    { name:'定积分 · ∫₀³ 2x dx → 9', category:'高等数学', term:`(${INTEGRAL}) 0 3`, expected:'9', description:'已知 2x 的原函数 F(x)=x²，按 F(3)−F(0) 计算定积分，得到 9。可修改自然数端点 a≤b；这是指定原函数的演示，不是通用符号积分器。' }
+    { name:'符号求导并求值 · (x² + 3x)′，x=2 → 7', category:'高等数学', term:`(${DERIVATIVE}) 2`, expected:'7', expectedType:'rational', description:'原多项式 x² + 3x 按次数降序以系数 [1,3,0] 编码。Lambda程序先遍历原系数生成导函数 2x + 3，再代入 x=2；结果是有理数 7。可选「生成导函数」单独观察符号转换。' },
+    { name:'定积分 · ∫₀³ 2x dx → 9', category:'高等数学', term:`(${INTEGRAL}) 0 3`, expected:'9', expectedType:'rational', description:'输入的是原多项式 2x（降序系数 [2,0]）。Lambda程序先按次数生成原函数系数，再分别代入上下限并相减，得到 9；没有预先把 x² 当成输入。系数限非负有理数，端点限自然数 a≤b。' },
+    { name:'生成导函数 · x² + 3x → 2x + 3', category:'高等数学', term:M.differentiate([0,3,1]), expected:'2x + 3', expectedType:'polynomial', description:'原式：x² + 3x。输入列表按次数降序存储 [1,3,0]，每项是有理数。Lambda程序按次数乘系数、去掉原常数项，实际生成新多项式；运行后结果区显示导函数 2x + 3。' },
+    { name:'生成原函数 · 2x → x²（C=0）', category:'高等数学', term:M.integrate([0,2]), expected:'x²', expectedType:'polynomial', description:'原式：2x。输入列表只含原系数 [2,0]；Lambda程序按次数+1除系数，并追加积分常数0，实际生成原函数。这里取 C=0；同一算法输入 x 会生成 1/2x²，不是预置答案。' }
   ];
   const levels = [
     { id:1, name:'原样返回', topic:'恒等函数', description:'让恒等函数接收一个函数，看看它如何把输入原样返回。', start:'(λx.x) (λy.y)', target:I, targetLabel:'I · 恒等函数', hint:'λx.x 会把参数直接返回。点击「单步」，观察 x 被整个参数替换。' },
@@ -1016,7 +1094,12 @@
     else if(C.equal(t,TRUE))text='TRUE · 选择第一个';
     else if(number!==null)text=`Church 数 ${number}`;
     else if(C.equal(t,IDENTITY))text='I · 恒等函数';
-    else{const free=C.freeVars(t);text=free.size?`${free.size} 个自由变量`:'闭合表达式';}
+    else{
+      const M=window.LambdaPolynomial,rational=M.readRational(t),polynomial=rational?null:M.readPolynomial(t);
+      if(rational)text=`有理数 ${M.formatRational(rational)}`;
+      else if(polynomial?.length)text=`多项式：${M.formatPolynomial(polynomial)}`;
+      else{const free=C.freeVars(t);text=free.size?`${free.size} 个自由变量`:'闭合表达式';}
+    }
     decodedTerms.set(t,text);return text;
   }
   function code(text) { const el=document.createElement('code'); el.textContent=text; return el; }
@@ -1148,7 +1231,8 @@
   $('examples').addEventListener('change',()=>{
     const value=$('examples').value;if(value==='')return;const example=P.examples[Number(value)];if(!example)return;
     setSource(example.term);$('examples').value='';
-    $('example-info').textContent=example.description?`${example.description} 预期结果：${decode(C.parse(example.expected))}。`:'';
+    const expected=example.expectedType==='polynomial'?`多项式：${example.expected}`:example.expectedType==='rational'?`有理数 ${example.expected}`:example.expected===undefined?'':decode(C.parse(example.expected));
+    $('example-info').textContent=example.description?`${example.description} 预期结果：${expected}。`:'';
     $('example-info').hidden=!example.description;
   });
   $('convert').addEventListener('click',convert);$('step').addEventListener('click',advance);$('run').addEventListener('click',run);
