@@ -27,20 +27,20 @@
     const {nodes,depth,vars,abstractions,applications}=analyze(term);
     return {nodes,depth,vars,abstractions,applications};
   }
-  function tokenize(source, maxChars = LIMITS.chars) {
+  function tokenize(source, maxChars = LIMITS.chars, decimal = false) {
     if (source.length > maxChars) throw new LambdaError(`输入最多 ${maxChars} 个字符。`, maxChars);
     const out = [];
     for (let i = 0; i < source.length;) {
       if (/\s/.test(source[i])) { i++; continue; }
       const start = i, c = source[i];
       if ('λ\\.()'.includes(c)) { out.push({ kind: c === '\\' ? 'λ' : c, pos: i++ }); continue; }
-      if(c==='-' && /[0-9]/.test(source[i+1]||'')) throw new LambdaError('丘奇数只支持非负整数，不能输入负数。',i);
-      const numeric=/^[0-9]+/.exec(source.slice(i));
+      if(!decimal && c==='-' && /[0-9]/.test(source[i+1]||'')) throw new LambdaError('丘奇数只支持非负整数，不能输入负数。',i);
+      const numeric=(decimal?/^-?[0-9]+(?:\.[0-9]+)?/:/^[0-9]+/).exec(source.slice(i));
       if(numeric) {
-        if(source[i+numeric[0].length]==='.') throw new LambdaError('丘奇数只支持非负整数，不能输入小数。',i);
+        if(!decimal && source[i+numeric[0].length]==='.') throw new LambdaError('丘奇数只支持非负整数，不能输入小数。',i);
         const value=Number(numeric[0]);
-        if(!Number.isSafeInteger(value)) throw new LambdaError('数字超出可精确表示的整数范围。',i);
-        out.push({kind:'number',value,pos:i});i+=numeric[0].length;continue;
+        if(!decimal && !Number.isSafeInteger(value)) throw new LambdaError('数字超出可精确表示的整数范围。',i);
+        out.push({kind:'number',value:decimal?numeric[0]:value,pos:i});i+=numeric[0].length;continue;
       }
       const m = /^[a-zA-Z][a-zA-Z0-9_']*/.exec(source.slice(i));
       if (m) { out.push({ kind: 'name', value: m[0], pos: start }); i += m[0].length; continue; }
@@ -48,8 +48,8 @@
     }
     out.push({ kind: 'end', pos: source.length }); return out;
   }
-  function parse(source, maxChars = LIMITS.chars) {
-    const tokens = tokenize(source, maxChars); let at = 0, nesting = 0;
+  function parse(source, maxChars = LIMITS.chars, numberFactory = null) {
+    const tokens = tokenize(source, maxChars,!!numberFactory); let at = 0, nesting = 0;
     const peek = () => tokens[at];
     const fail = message => { throw new LambdaError(message, peek().pos); };
     function expr() {
@@ -72,7 +72,7 @@
     function atom() {
       if (peek().kind === 'name') return V(tokens[at++].value);
       if (peek().kind === 'number') {
-        const n=tokens[at++].value;let body=V('x');
+        const n=tokens[at++].value;if(numberFactory)return numberFactory(n);let body=V('x');
         for(let i=0;i<n;i++)body=A(V('f'),body);
         return L('f',L('x',body));
       }
@@ -238,7 +238,8 @@
     while (body.type === 'app' && body.fn.type === 'var' && body.fn.name === f) { n++; body = body.arg; }
     return body.type === 'var' && body.name === x ? n : null;
   }
-  const API = { LIMITS, STRATEGIES, DIRECTIONS, LambdaError, V, L, A, parse, format, inspect, freeVars, substitute, alphaKey, key, equal, findRedex, step, stepAt, normalize, churchNumber };
+  function parseInput(source,maxChars=LIMITS.chars){if(!root.LambdaDecimal)throw new LambdaError('列表小数模块尚未加载。');return parse(source,maxChars,root.LambdaDecimal.encodeLiteral);}
+  const API = { LIMITS, STRATEGIES, DIRECTIONS, LambdaError, V, L, A, parse, parseInput, format, inspect, freeVars, substitute, alphaKey, key, equal, findRedex, step, stepAt, normalize, churchNumber };
   root.LambdaCore = API;
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
 })(typeof globalThis !== 'undefined' ? globalThis : window);
