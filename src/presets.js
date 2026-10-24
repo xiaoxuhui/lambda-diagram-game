@@ -1,5 +1,6 @@
 (function(root) {
   'use strict';
+  const M=root.LambdaPolynomial||require('./polynomial.js');
   const I='λx.x', TRUE='λx.λy.x', FALSE='λx.λy.y';
   const TWO='λf.λx.f (f x)', THREE='λf.λx.f (f (f x))', FIVE='λf.λx.f (f (f (f (f x))))';
   const ADD='λm.λn.λf.λx.m f (n f x)', SUCC='λn.λf.λx.f (n f x)';
@@ -16,11 +17,7 @@
   const GEOMETRIC_SUM=`λb n.(n (λp.(${PAIR}) ((${MULT}) b (p (${TRUE}))) ((${ADD}) (p (${FALSE})) (p (${TRUE})))) ((${PAIR}) 1 0)) (${FALSE})`;
   const BINOMIAL=`λa b n.((${SUCC}) n (λp.(λk.(${PAIR}) ((${SUCC}) k) ((${ADD}) (p (${FALSE})) ((${MULT}) ((${CHOOSE}) n k) ((${MULT}) ((${POW}) a ((${SUB}) n k)) ((${POW}) b k))))) (p (${TRUE}))) ((${PAIR}) 0 0)) (${FALSE})`;
   const POLYNOMIAL=`λx.(${ADD}) ((${MULT}) ((${ADD}) ((${MULT}) 2 x) 3) x) 1`;
-  // Dual numbers carry (value, derivative); multiplication uses u'v + uv'.
-  const DUAL_ADD=`λp q.(${PAIR}) ((${ADD}) (p (${TRUE})) (q (${TRUE}))) ((${ADD}) (p (${FALSE})) (q (${FALSE})))`;
-  const DUAL_MULT=`λp q.(${PAIR}) ((${MULT}) (p (${TRUE})) (q (${TRUE}))) ((${ADD}) ((${MULT}) (p (${FALSE})) (q (${TRUE}))) ((${MULT}) (p (${TRUE})) (q (${FALSE}))))`;
-  const DERIVATIVE=`λx.((λp.(${DUAL_ADD}) ((${DUAL_MULT}) p p) ((${DUAL_MULT}) ((${PAIR}) 3 0) p)) ((${PAIR}) x 1)) (${FALSE})`;
-  const INTEGRAL=`λa b.(${SUB}) ((${POW}) b 2) ((${POW}) a 2)`;
+  const DERIVATIVE=M.derivativeAt([0,3,1]),INTEGRAL=M.integralFunction([0,2]);
   const recursiveHint='使用显式 Y 不动点组合子。建议选择「正规序」「从左到右」运行，先判断终止条件；其他顺序可能无法终止。';
   const examples = [
     { name:'恒等函数 I', term:I },
@@ -53,8 +50,10 @@
     { name:'二项式系数和 · C(3,0) + … + C(3,3) → 8', category:'高等数学', term:`(${BINOMIAL}) 1 1 3`, expected:'8', description:`把二项式展开中的 a、b 都设为 1，实际计算第 3 行系数和 1 + 3 + 3 + 1 = 8。${recursiveHint}` },
     { name:'二项式展开 · (1 + 2)³ → 27', category:'高等数学', term:`(${BINOMIAL}) 1 2 3`, expected:'27', description:`逐项计算 Σ C(n,k) a^(n−k) b^k。这里 a=1、b=2、n=3，四项为 1、6、12、8，总和 27。${recursiveHint}` },
     { name:'多项式 · 2x² + 3x + 1，x=2 → 15', category:'高等数学', term:`(${POLYNOMIAL}) 2`, expected:'15', description:'使用 Horner 形式 (2x + 3)x + 1 计算多项式。把 x=2 代入，得到 (4 + 3) × 2 + 1 = 15。' },
-    { name:'自动微分 · (x² + 3x)′，x=2 → 7', category:'高等数学', term:`(${DERIVATIVE}) 2`, expected:'7', description:'用有序对同时传播数值与导数：x 对应 (x,1)，常量 3 对应 (3,0)。乘法执行 u′v + uv′，最后取出导数 2x + 3 在 x=2 处的值 7。' },
-    { name:'定积分 · ∫₀³ 2x dx → 9', category:'高等数学', term:`(${INTEGRAL}) 0 3`, expected:'9', description:'已知 2x 的原函数 F(x)=x²，按 F(3)−F(0) 计算定积分，得到 9。可修改自然数端点 a≤b；这是指定原函数的演示，不是通用符号积分器。' }
+    { name:'符号求导并求值 · (x² + 3x)′，x=2 → 7', category:'高等数学', term:`(${DERIVATIVE}) 2`, expected:'7', expectedType:'rational', description:'原多项式 x² + 3x 按次数降序以系数 [1,3,0] 编码。Lambda程序先遍历原系数生成导函数 2x + 3，再代入 x=2；结果是有理数 7。可选「生成导函数」单独观察符号转换。' },
+    { name:'定积分 · ∫₀³ 2x dx → 9', category:'高等数学', term:`(${INTEGRAL}) 0 3`, expected:'9', expectedType:'rational', description:'输入的是原多项式 2x（降序系数 [2,0]）。Lambda程序先按次数生成原函数系数，再分别代入上下限并相减，得到 9；没有预先把 x² 当成输入。系数限非负有理数，端点限自然数 a≤b。' },
+    { name:'生成导函数 · x² + 3x → 2x + 3', category:'高等数学', term:M.differentiate([0,3,1]), expected:'2x + 3', expectedType:'polynomial', description:'原式：x² + 3x。输入列表按次数降序存储 [1,3,0]，每项是有理数。Lambda程序按次数乘系数、去掉原常数项，实际生成新多项式；运行后结果区显示导函数 2x + 3。' },
+    { name:'生成原函数 · 2x → x²（C=0）', category:'高等数学', term:M.integrate([0,2]), expected:'x²', expectedType:'polynomial', description:'原式：2x。输入列表只含原系数 [2,0]；Lambda程序按次数+1除系数，并追加积分常数0，实际生成原函数。这里取 C=0；同一算法输入 x 会生成 1/2x²，不是预置答案。' }
   ];
   const levels = [
     { id:1, name:'原样返回', topic:'恒等函数', description:'让恒等函数接收一个函数，看看它如何把输入原样返回。', start:'(λx.x) (λy.y)', target:I, targetLabel:'I · 恒等函数', hint:'λx.x 会把参数直接返回。点击「单步」，观察 x 被整个参数替换。' },
