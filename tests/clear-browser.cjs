@@ -10,7 +10,7 @@ const artifacts=path.join(__dirname,'artifacts');fs.mkdirSync(artifacts,{recursi
   const page=await context.newPage();page.on('pageerror',error=>errors.push(error.message));
   const base=`http://127.0.0.1:${server.address().port}/`;
   const check=async(name,run)=>{await run();console.log(`PASS C${++count} ${name}`);};
-  const source=async(text)=>{await page.locator('#expression').fill(text);await page.locator('#convert').click();};
+  const source=async(text)=>{await page.locator('#number-encoding').selectOption('church');await page.locator('#expression').fill(text);await page.locator('#convert').click();};
   const empty=async(p)=>{
     assert.equal(await p.locator('#expression').inputValue(),'');assert.equal(await p.locator('.function-item').count(),0);
     assert.equal(await p.locator('#function-name').inputValue(),'');assert.equal(await p.locator('#function-source').inputValue(),'');

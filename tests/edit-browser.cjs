@@ -8,7 +8,7 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
   const check=async(name,fn)=>{await fn();console.log(`PASS E${++count} ${name}`);};
   const add=async(name,source)=>{await page.locator('#function-name').fill(name);await page.locator('#function-source').fill(source);await page.locator('#function-add').click();};
   const edit=async(name)=>page.getByRole('button',{name:`编辑函数 ${name}`,exact:true}).click();
-  const source=async(s)=>{await page.locator('#expression').fill(s);await page.locator('#convert').click();};
+  const source=async(s)=>{await page.locator('#number-encoding').selectOption('church');await page.locator('#expression').fill(s);await page.locator('#convert').click();};
   try {
     await page.goto(`http://127.0.0.1:${server.address().port}/`);await add('ID','λx.x');await add('COPY','ID');
     await check('edit loads full definition and saving changes replaces the original function',async()=>{

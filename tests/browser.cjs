@@ -20,7 +20,7 @@ const C=require('../src/core.js'),P=require('../src/presets.js');
   const page=await context.newPage();let passed=0;const errors=[];
   page.on('pageerror',e=>errors.push(e.message));
   const check=async(name,fn)=>{await fn();passed++;console.log(`PASS I${String(passed).padStart(2,'0')} ${name}`);};
-  const source=async(s)=>{await page.locator('#expression').fill(s);await page.locator('#convert').click();};
+  const source=async(s)=>{await page.locator('#number-encoding').selectOption('church');await page.locator('#expression').fill(s);await page.locator('#convert').click();};
   const normal=async()=>{await page.locator('#speed').selectOption('180');await page.locator('#run').click();await page.waitForFunction(()=>document.getElementById('state-badge').textContent==='已到正规形');};
   try {
     await page.goto(base);

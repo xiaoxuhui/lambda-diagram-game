@@ -7,7 +7,7 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
   const browser=await pw.chromium.launch({headless:true}),context=await browser.newContext({viewport:{width:1280,height:1000},hasTouch:true,acceptDownloads:true});
   const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));let count=0;
   const check=async(name,fn)=>{await fn();console.log(`PASS O${++count} ${name}`);};
-  const source=async(p,text)=>{await p.locator('#expression').fill(text);await p.locator('#convert').click();};
+  const source=async(p,text)=>{await p.locator('#number-encoding').selectOption('church');await p.locator('#expression').fill(text);await p.locator('#convert').click();};
   const current=p=>p.locator('#current-expression').textContent();
   const order=(p,value)=>p.locator('#reduction-order').selectOption(value);
   const nested='(λx.x) ((λy.y) z)',divergent='(λx.y) ((λz.z z) (λz.z z))';

@@ -8,7 +8,7 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
   const context=await browser.newContext({viewport:{width:1440,height:1080},acceptDownloads:true}),page=await context.newPage(),errors=[];
   page.on('pageerror',e=>errors.push(e.message));let count=0;
   const check=async(name,fn)=>{await fn();console.log(`PASS M${++count} ${name}`);};
-  const source=async(p,text)=>{await p.locator('#expression').fill(text);await p.locator('#convert').click();};
+  const source=async(p,text)=>{await p.locator('#number-encoding').selectOption('church');await p.locator('#expression').fill(text);await p.locator('#convert').click();};
   const hit=(p,name)=>p.locator(`[data-redex-hit][aria-label^="点击 λ${name} "]`);
   const current=p=>p.locator('#current-expression').textContent();
   const center=async locator=>{await locator.scrollIntoViewIfNeeded();const b=await locator.boundingBox();return {x:b.x+b.width/2,y:b.y+b.height/2};};

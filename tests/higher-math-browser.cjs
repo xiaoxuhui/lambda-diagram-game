@@ -11,7 +11,7 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
    const runResult=async(text)=>{await page.locator('#speed-ms').fill('1');await page.locator('#run').click();await page.waitForFunction(()=>document.getElementById('state-badge').textContent==='已到正规形',null,{timeout:180000});assert.equal(await page.locator('#decoded').textContent(),text);};
    const run=(number,kind='Church 数')=>runResult(`${kind} ${number}`);
    await check(`${width}px higher mathematics contains combinations and all choices render`,async()=>{
-    assert.equal(await page.locator('#examples optgroup').count(),6);assert.equal(await page.locator('#examples optgroup[label="高等数学"] option').count(),13);
+    assert.equal(await page.locator('#examples optgroup').count(),7);assert.equal(await page.locator('#examples optgroup[label="高等数学"] option').count(),13);
     const combo=page.locator('#examples option').filter({hasText:'组合数'});assert.equal(await combo.evaluate(el=>el.parentElement.label),'高等数学');
     for(const e of P.examples.filter(e=>e.category==='高等数学')){await select(e.name);assert.equal(await page.locator('#expression').inputValue(),e.term);assert.ok(await page.locator('#error-message').isHidden());assert.ok(await page.locator('#diagram-mount line').count()>0);assert.ok((await page.locator('#example-info').textContent()).includes(e.description));}
     assert.equal(await page.locator('#function-count').textContent(),'0 个函数');

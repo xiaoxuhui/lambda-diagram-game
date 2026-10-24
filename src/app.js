@@ -4,7 +4,7 @@
   const $=id=>document.getElementById(id);
   const input=$('expression');
   const state={ term:null, original:null, history:[], paths:null, dirty:false, running:false, timer:null,
-    mode:'free', level:0, completed:new Set(), halt:'', scale:1, autoFit:true, model:null, speed:600, strategy:'normal', direction:'left' };
+    mode:'free', level:0, completed:new Set(), halt:'', scale:1, autoFit:true, model:null, speed:600, strategy:'normal', direction:'left',numberEncoding:'decimal',decimalPlaces:6,fast:false };
   let toastTimer,workspace,viewer,historySource=null,renderedCount=0,diagramTerm=null,diagramRoute=null;
   const decodedTerms=new WeakMap(),TRUE=C.parse(P.TRUE),FALSE=C.parse(P.FALSE),IDENTITY=C.parse(P.I);
   const diagramView=window.LambdaDiagramView.init($('diagram-mount'));
@@ -12,7 +12,7 @@
   function capture() {
     return {draft:input.value,completed:[...state.completed],mode:state.mode,level:state.level,
       session:{original:state.original,steps:Math.max(0,state.history.length-1),dirty:state.dirty,halt:state.halt,...(state.paths?{paths:state.paths}:{} )},
-      view:{speed:state.speed,strategy:state.strategy,direction:state.direction,scale:state.scale,autoFit:state.autoFit,panX:$('diagram-viewport').scrollLeft,panY:$('diagram-viewport').scrollTop,historyOpen:$('history-details').open,helpOpen:!$('help-panel').hidden,hintOpen:!$('hint').hidden},
+      view:{speed:state.speed,strategy:state.strategy,direction:state.direction,numberEncoding:state.numberEncoding,decimalPlaces:state.decimalPlaces,scale:state.scale,autoFit:state.autoFit,panX:$('diagram-viewport').scrollLeft,panY:$('diagram-viewport').scrollTop,historyOpen:$('history-details').open,helpOpen:!$('help-panel').hidden,hintOpen:!$('hint').hidden},
       selection:{start:input.selectionStart,end:input.selectionEnd},error:$('error-message').hidden?'':$('error-message').textContent};
   }
   function applySnapshot(s) {
@@ -20,6 +20,7 @@
     stop();input.value=s.draft;state.completed=new Set(s.completed);state.mode=s.mode;state.level=s.level;
     state.original=s.session.original;state.term=s.term;state.history=s.history;state.paths=s.session.paths??null;state.dirty=s.session.dirty;state.halt=s.session.halt;
     state.scale=s.view.scale;state.autoFit=s.view.autoFit;state.speed=s.view.speed;state.strategy=s.view.strategy??'normal';state.direction=s.view.direction??'left';renderSpeed();
+    state.numberEncoding=s.view.numberEncoding??'decimal';state.decimalPlaces=s.view.decimalPlaces??6;
     $('history-details').open=s.view.historyOpen;$('help-panel').hidden=!s.view.helpOpen;$('help-toggle').setAttribute('aria-expanded',String(s.view.helpOpen));
     $('hint').hidden=!s.view.hintOpen;$('hint-toggle').textContent=s.view.hintOpen?'收起提示':'显示提示';$('hint-toggle').setAttribute('aria-expanded',String(s.view.hintOpen));
     $('challenge-feedback').textContent='';$('next-level').hidden=true;$('error-message').textContent=s.error;$('error-message').hidden=!s.error;
@@ -31,7 +32,7 @@
     clearTimeout(toastTimer); $('toast').textContent=message; $('toast').hidden=false;
     toastTimer=setTimeout(()=>$('toast').hidden=true,2400);
   }
-  function stop() { clearTimeout(state.timer); state.timer=null; state.running=false; }
+  function stop() { clearTimeout(state.timer); state.timer=null; state.running=false;state.fast=false; }
   function changed() {
     $('example-info').hidden=true;
     stop(); state.dirty=true; state.halt=''; $('error-message').hidden=true;
@@ -49,7 +50,9 @@
     stop(); $('error-message').hidden=true; state.halt='';
     $('challenge-feedback').textContent=''; $('next-level').hidden=true;
     try {
-      const term=workspace?workspace.expand(C.parse(input.value)):C.parse(input.value);
+      if(state.numberEncoding==='decimal'&&!$('decimal-places').checkValidity())throw new C.LambdaError('除法小数位数需为非负整数。');
+      const parsed=state.numberEncoding==='decimal'?C.parseInput(input.value):C.parse(input.value),expanded=workspace?workspace.expand(parsed):parsed;
+      const term=state.numberEncoding==='decimal'?window.LambdaDecimal.expand(expanded,state.decimalPlaces):expanded;
       state.term=term; state.original=term; state.history=[{term,change:null}]; state.paths=null;state.dirty=false;
       state.autoFit=true; render(); save(); return true;
     } catch(e) {
@@ -89,6 +92,7 @@
   }
   function decode(t) {
     if(decodedTerms.has(t))return decodedTerms.get(t);
+    const decimal=window.LambdaDecimal.read(t);if(decimal){const text=decimal.error?`错误：${decimal.error}`:`小数 ${window.LambdaDecimal.format(decimal)}`;decodedTerms.set(t,text);return text;}
     const number=C.churchNumber(t);let text;
     if(C.equal(t,FALSE))text='FALSE / Church 数 0';
     else if(C.equal(t,TRUE))text='TRUE · 选择第一个';
@@ -104,6 +108,8 @@
   }
   function code(text) { const el=document.createElement('code'); el.textContent=text; return el; }
   function render() {
+    $('number-encoding').value=state.numberEncoding;$('decimal-places').value=state.decimalPlaces;
+    $('number-note').textContent=state.numberEncoding==='decimal'?`列表小数：支持负数。ADD / SUB / MUL / DIV；除法截断至 ${state.decimalPlaces} 位，未除尽标≈。递归运算请用正规序、从左到右。`:'丘奇兼容模式：只接受自然数，保留旧示例与存档的编码；可切回列表小数。';
     const ready=state.term&&!state.dirty, redex=state.term?C.findRedex(state.term,[],state.strategy,state.direction):null;
     $('reduction-order').value=state.strategy;
     $('reduction-direction').value=state.direction;
@@ -114,6 +120,7 @@
     $('step-count').textContent=count; $('run-label').textContent=state.running?'暂停':'运行';
     $('run').firstElementChild.textContent=state.running?'Ⅱ':'▶';
     $('run').disabled=!ready;
+    $('fast-run').disabled=!ready;$('fast-run').textContent=state.running&&state.fast?'暂停快速运行':'快速运行';
     $('step').disabled=!ready||state.running;
     $('back').disabled=!ready||count===0||state.running;
     $('reset').disabled=!ready||state.running||count===0;
@@ -147,23 +154,26 @@
     renderDiagram(redex);
     save();
   }
-  function advance(path=null) {
+  function advance(path=null,display=true) {
     if(!state.term||state.dirty) return false;
     try {
-      const selected=Array.isArray(path),result=selected?C.stepAt(state.term,path):C.step(state.term,state.strategy,state.direction); if(!result){stop();render();return false;}
+      const selected=Array.isArray(path),result=selected?C.stepAt(state.term,path):C.step(state.term,state.strategy,state.direction); if(!result){stop();if(display)render();return false;}
       const recordPath=selected||state.strategy==='applicative'||state.direction==='right';
       if(recordPath&&!state.paths)state.paths=Array(state.history.length-1).fill(null);
       if(state.paths)state.paths.push(recordPath?result.path:null);
       state.term=result.term;state.history.push({term:result.term,change:result});state.halt='';
       // The preview is only a hint: confirm with an actual attempt before stopping.
       if(state.running&&!C.findRedex(state.term,[],state.strategy,state.direction)&&C.step(state.term,state.strategy,state.direction)===null)stop();
-      render(); return true;
-    } catch(e) {stop();state.halt=e.message;render();return false;}
+      if(display)render(); return true;
+    } catch(e) {stop();state.halt=e.message;if(display)render();return false;}
   }
   function captureTap(target){const selection=diagramView.selection(target);return !state.dirty&&selection?{...selection,term:state.term}:null;}
   function manualStep(selection){if(!selection||state.dirty||selection.term!==state.term)return;stop();advance(selection.path);}
   function schedule() {
-    state.timer=setTimeout(()=>{if(!state.running)return;const more=advance();if(more&&state.running)schedule();},state.speed);
+    state.timer=setTimeout(()=>{if(!state.running)return;
+      if(state.fast){const started=performance.now();do{if(!advance(null,false))break;}while(state.running&&performance.now()-started<8);render();if(state.running)schedule();}
+      else{const more=advance();if(more&&state.running)schedule();}
+    },state.fast?0:state.speed);
   }
   function renderSpeed() {
     $('speed').value=[1200,600,180,10].includes(state.speed)?String(state.speed):'custom';
@@ -201,6 +211,7 @@
     renderLevels();
   }
   function selectLevel(index) {
+    state.numberEncoding='church';
     state.level=index;state.mode='challenge';$('hint').hidden=true;$('hint-toggle').textContent='显示提示';$('hint-toggle').setAttribute('aria-expanded','false');
     renderMode();setSource(P.levels[index].start);save();
   }
@@ -230,12 +241,15 @@
   });
   $('examples').addEventListener('change',()=>{
     const value=$('examples').value;if(value==='')return;const example=P.examples[Number(value)];if(!example)return;
-    setSource(example.term);$('examples').value='';
-    const expected=example.expectedType==='polynomial'?`多项式：${example.expected}`:example.expectedType==='rational'?`有理数 ${example.expected}`:example.expected===undefined?'':decode(C.parse(example.expected));
+    state.numberEncoding=example.encoding||'church';setSource(example.term);$('examples').value='';
+    const expected=example.expectedType==='decimal'?`小数 ${example.expected}`:example.expectedType==='polynomial'?`多项式：${example.expected}`:example.expectedType==='rational'?`有理数 ${example.expected}`:example.expected===undefined?'':decode(C.parse(example.expected));
     $('example-info').textContent=example.description?`${example.description} 预期结果：${expected}。`:'';
     $('example-info').hidden=!example.description;
   });
   $('convert').addEventListener('click',convert);$('step').addEventListener('click',advance);$('run').addEventListener('click',run);
+  $('fast-run').addEventListener('click',()=>{if(state.running){stop();render();return;}if(!state.term||state.dirty)return;state.running=true;state.fast=true;state.halt='';render();schedule();});
+  $('number-encoding').addEventListener('change',()=>{state.numberEncoding=$('number-encoding').value;changed();});
+  $('decimal-places').addEventListener('input',()=>{const n=$('decimal-places').valueAsNumber;if(!Number.isSafeInteger(n)||n<0){$('decimal-places').setCustomValidity('请输入非负整数');return;}$('decimal-places').setCustomValidity('');state.decimalPlaces=n;if(state.numberEncoding==='decimal')changed();else save();});
   $('back').addEventListener('click',()=>{if(state.history.length>1){stop();state.history.pop();state.paths?.pop();state.term=state.history.at(-1).term;state.halt='';$('challenge-feedback').textContent='';$('next-level').hidden=true;render();}});
   $('reset').addEventListener('click',()=>{if(state.original){stop();state.term=state.original;state.history=[{term:state.original,change:null}];state.paths=null;state.halt='';$('challenge-feedback').textContent='';$('next-level').hidden=true;render();}});
   $('speed').addEventListener('change',()=>{if($('speed').value==='custom'){$('speed-ms').focus();$('speed-ms').select();}else setSpeed(Number($('speed').value));});
@@ -265,6 +279,7 @@
   $('history-details').addEventListener('toggle',save);
   $('speed').addEventListener('change',save);
   workspace=window.LambdaWorkspace.init({capture,apply:applySnapshot,toast,
+    getNumberEncoding:()=>state.numberEncoding,getDecimalPlaces:()=>state.decimalPlaces,
     currentExpression:()=>state.term&&!state.dirty?C.format(state.term):input.value,
     insertFunction:name=>{const start=input.selectionStart,end=input.selectionEnd;
       const before=start&&/[A-Za-z0-9_']/.test(input.value[start-1])?' ':'';

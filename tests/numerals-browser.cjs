@@ -5,7 +5,7 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
   if(!server.listening)await new Promise(r=>server.once('listening',r));const browser=await pw.chromium.launch({headless:true});
   const page=await browser.newPage({viewport:{width:1200,height:900}}),errors=[];page.on('pageerror',e=>errors.push(e.message));let passed=0;
   const check=async(name,fn)=>{await fn();passed++;console.log(`PASS N${passed} ${name}`);};
-  const source=async(text)=>{await page.locator('#expression').fill(text);await page.locator('#convert').click();};
+  const source=async(text)=>{await page.locator('#number-encoding').selectOption('church');await page.locator('#expression').fill(text);await page.locator('#convert').click();};
   const add=async(name,text)=>{await page.locator('#function-name').fill(name);await page.locator('#function-source').fill(text);await page.locator('#function-add').click();};
   try{
     await page.goto(`http://127.0.0.1:${server.address().port}/`);

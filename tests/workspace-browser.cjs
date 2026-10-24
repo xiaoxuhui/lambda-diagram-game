@@ -10,7 +10,7 @@ const artifacts=path.join(__dirname,'artifacts');fs.mkdirSync(artifacts,{recursi
   const context=await browser.newContext({viewport:{width:1440,height:1080},hasTouch:true,acceptDownloads:true});
   const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));let pass=0;
   const check=async(name,fn)=>{await fn();pass++;console.log(`PASS W${String(pass).padStart(2,'0')} ${name}`);};
-  const source=async(text)=>{await page.locator('#expression').fill(text);await page.locator('#convert').click();};
+  const source=async(text)=>{await page.locator('#number-encoding').selectOption('church');await page.locator('#expression').fill(text);await page.locator('#convert').click();};
   const add=async(name,text)=>{await page.locator('#function-name').fill(name);await page.locator('#function-source').fill(text);await page.locator('#function-add').click();};
   const row=name=>page.locator('.function-item').filter({has:page.locator('strong',{hasText:new RegExp('^'+name+'$')})});
   const upload=async(text,name='test-save.json')=>{await page.locator('#import-file').setInputFiles({name,mimeType:'application/json',buffer:Buffer.from(text)});await page.waitForFunction(()=>!document.getElementById('save-feedback').hidden);};

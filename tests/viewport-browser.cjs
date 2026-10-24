@@ -7,7 +7,7 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
   const browser=await pw.chromium.launch({headless:true}),context=await browser.newContext({viewport:{width:1440,height:1080}});
   const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));let count=0;
   const check=async(name,fn)=>{await fn();console.log(`PASS V${++count} ${name}`);};
-  const source=async(text)=>{await page.locator('#expression').fill(text);await page.locator('#convert').click();};
+  const source=async(text)=>{await page.locator('#number-encoding').selectOption('church');await page.locator('#expression').fill(text);await page.locator('#convert').click();};
   const world=()=>page.evaluate(()=>{const v=document.getElementById('diagram-viewport'),s=document.querySelector('#diagram-mount svg'),b=v.getBoundingClientRect(),r=s.getBoundingClientRect(),scale=Number(s.getAttribute('width'))/Number(s.getAttribute('viewBox').split(' ')[2]);return {x:(b.left+v.clientWidth/2-r.left)/scale,y:(b.top+v.clientHeight/2-r.top)/scale,scrollX:v.scrollLeft,scrollY:v.scrollTop};});
   const center=async()=>{await page.locator('#diagram-viewport').scrollIntoViewIfNeeded();const b=await page.locator('#diagram-viewport').boundingBox();return {x:b.x+b.width/2,y:b.y+b.height/2};};
   try{

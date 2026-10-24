@@ -1,6 +1,6 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
-const C=require('../src/core.js'),P=require('../src/presets.js'),M=require('../src/polynomial.js');
+const C=require('../src/core.js'),P=require('../src/presets.js'),M=require('../src/polynomial.js'),D=require('../src/decimal.js');
 const result=source=>{
   const r=C.normalize(C.parse(source),30000);
   assert.equal(r.status,'normal',source);
@@ -14,10 +14,13 @@ test('the original eight choices and five challenges retain their identities',()
   assert.equal(P.examples[6].name,'Ω · 无限循环');assert.equal(P.levels.length,5);
 });
 for(const e of P.examples.filter(e=>e.expected!==undefined))test(`example reaches its stated result: ${e.name}`,()=>{
-  assert.equal(C.freeVars(C.parse(e.term)).size,0,e.name);
+  const parsed=e.encoding==='decimal'?D.expand(C.parseInput(e.term)):C.parse(e.term);
+  assert.equal(C.freeVars(parsed).size,0,e.name);
   assert.ok(e.category&&e.description);
-  const value=result(e.term);
-  if(e.expectedType==='polynomial')assert.equal(M.formatPolynomial(M.readPolynomial(value)),e.expected,e.name);
+  let value;if(e.encoding==='decimal'){value=parsed;for(let n=0;n<100000;n++){const r=C.step(value);if(!r)break;value=r.term;}assert.equal(C.findRedex(value),null);}
+  else value=result(e.term);
+  if(e.expectedType==='decimal')assert.equal(D.format(D.read(value)),e.expected,e.name);
+  else if(e.expectedType==='polynomial')assert.equal(M.formatPolynomial(M.readPolynomial(value)),e.expected,e.name);
   else if(e.expectedType==='rational')assert.equal(M.formatRational(M.readRational(value)),e.expected,e.name);
   else assert.ok(C.equal(value,C.parse(e.expected)),e.name);
 });

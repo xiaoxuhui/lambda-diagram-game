@@ -60,7 +60,7 @@
     }
     $('function-form').addEventListener('submit',e=>{
       e.preventDefault();$('function-error').hidden=true;
-      try {const name=$('function-name').value.trim(),source=$('function-source').value;functions=editing===null?L.add(functions,name,source):L.update(functions,editing,name,source);renderLibrary();clearEditor();persist();api.toast(`已保存函数 ${name}`);}
+      try {const name=$('function-name').value.trim(),source=$('function-source').value,encoding=api.getNumberEncoding?.()||'decimal',precision=api.getDecimalPlaces?.()??6;functions=editing===null?L.add(functions,name,source,C.LIMITS.chars,encoding,precision):L.update(functions,editing,name,source,encoding,precision);renderLibrary();clearEditor();persist();api.toast(`已保存函数 ${name}`);}
       catch(error){$('function-error').textContent=error.message;$('function-error').hidden=false;}
     });
     $('function-cancel').addEventListener('click',()=>{clearEditor();persist();});
@@ -85,7 +85,7 @@
       try {
         const backup=S.encodeBackup(captured(),checkpoint);
         const empty=S.decode(S.encode({version:2,draft:'',functions:[],functionDraft:{name:'',source:''},completed:[],mode:'free',level:0,
-          session:{original:null,steps:0,dirty:false,halt:''},view:{speed:600,scale:1,autoFit:true,panX:0,panY:0,historyOpen:false,helpOpen:false,hintOpen:false},
+          session:{original:null,steps:0,dirty:false,halt:''},view:{numberEncoding:'decimal',decimalPlaces:6,speed:600,scale:1,autoFit:true,panX:0,panY:0,historyOpen:false,helpOpen:false,hintOpen:false},
           selection:{start:0,end:0},error:''}));
         const previous=[AUTO,CHECKPOINT,LEGACY].map(key=>[key,localStorage.getItem(key)]);
         const result=root.LambdaDownload.saveBackup(`lambda-lab-backup-${new Date().toISOString().replace(/[:.]/g,'-')}.json`,backup);

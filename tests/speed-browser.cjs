@@ -5,7 +5,7 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');const P=requir
   if(!server.listening)await new Promise(r=>server.once('listening',r));const browser=await pw.chromium.launch({headless:true});
   const page=await browser.newPage({viewport:{width:1200,height:900}}),errors=[];page.on('pageerror',e=>errors.push(e.message));let count=0;
   const check=async(name,fn)=>{await fn();console.log(`PASS S${++count} ${name}`);};
-  const source=async()=>{await page.locator('#expression').fill(P.examples[5].term);await page.locator('#convert').click();};
+  const source=async()=>{await page.locator('#number-encoding').selectOption('church');await page.locator('#expression').fill(P.examples[5].term);await page.locator('#convert').click();};
   try{
     await page.goto(`http://127.0.0.1:${server.address().port}/`);
     await check('custom interval selects custom mode',async()=>{await page.locator('#speed-ms').fill('35');assert.equal(await page.locator('#speed').inputValue(),'custom');});

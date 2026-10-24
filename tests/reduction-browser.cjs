@@ -7,7 +7,7 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
   const browser=await pw.chromium.launch({headless:true}),context=await browser.newContext(),page=await context.newPage(),errors=[];let count=0;
   page.on('pageerror',error=>errors.push(error.message));
   const check=async(name,run)=>{await run();console.log(`PASS R${++count} ${name}`);};
-  const source=async(text)=>{await page.locator('#expression').fill(text);await page.locator('#convert').click();};
+  const source=async(text)=>{await page.locator('#number-encoding').selectOption('church');await page.locator('#expression').fill(text);await page.locator('#convert').click();};
   const probe=async()=>page.evaluate(()=>{window.attempts=[];const step=LambdaCore.step;LambdaCore.step=term=>{const result=step(term);attempts.push(result!==null);return result;};});
   const runToStop=async()=>{await page.locator('#speed').selectOption('10');await page.locator('#run').click();await page.waitForFunction(()=>document.getElementById('run-label').textContent==='运行');};
   try{

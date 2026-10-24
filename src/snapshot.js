@@ -44,6 +44,8 @@
     const v=raw.view;if(!object(v)||!Number.isInteger(v.speed)||v.speed<1||v.speed>60000||!Number.isFinite(v.scale)||v.scale<.02||v.scale>16)fail('视图设置不合法。');
     const strategy=v.strategy===undefined?'normal':v.strategy;if(!C.STRATEGIES.includes(strategy))fail('归约顺序不合法。');
     const direction=v.direction===undefined?'left':v.direction;if(!C.DIRECTIONS.includes(direction))fail('归约方向不合法。');
+    const numberEncoding=v.numberEncoding===undefined?'decimal':v.numberEncoding;if(!['church','decimal'].includes(numberEncoding))fail('数字编码不合法。');
+    const decimalPlaces=v.decimalPlaces===undefined?6:v.decimalPlaces;if(!Number.isSafeInteger(decimalPlaces)||decimalPlaces<0)fail('小数位数不合法。');
     const panX=v.panX??0,panY=v.panY??0;
     if(!Number.isFinite(panX)||!Number.isFinite(panY)||panX<0||panY<0||panX>5000000||panY>5000000)fail('图示位置不合法。');
     for(const field of ['autoFit','historyOpen','helpOpen','hintOpen'])if(typeof v[field]!=='boolean')fail('视图开关不合法。');
@@ -55,7 +57,7 @@
     if(editing!==null&&(!L.validName(editing)||!functions.some(fn=>fn.name===editing)))fail('正在编辑的函数不存在或不合法。');
     return {version:paths===undefined?raw.version:3,savedAt:typeof raw.savedAt==='string'&&Number.isFinite(Date.parse(raw.savedAt))?raw.savedAt:new Date().toISOString(),draft:raw.draft,
       functions,completed:[...new Set(raw.completed)],mode:raw.mode,level:raw.level,
-      session:{original,steps:s.steps,dirty:s.dirty,halt:s.halt,...(paths===undefined?{}:{paths})},view:{speed:v.speed,strategy,direction,scale:v.scale,autoFit:v.autoFit,panX,panY,historyOpen:v.historyOpen,helpOpen:v.helpOpen,hintOpen:v.hintOpen},
+      session:{original,steps:s.steps,dirty:s.dirty,halt:s.halt,...(paths===undefined?{}:{paths})},view:{speed:v.speed,strategy,direction,numberEncoding,decimalPlaces,scale:v.scale,autoFit:v.autoFit,panX,panY,historyOpen:v.historyOpen,helpOpen:v.helpOpen,hintOpen:v.hintOpen},
       selection:{start:selection.start,end:selection.end},error:raw.error,functionDraft:{name:functionDraft.name,source:functionDraft.source,...(editing===null?{}:{editing})}};
   }
   function replay(s) {
@@ -83,7 +85,7 @@
       const draft=typeof raw.draft==='string'&&raw.draft.length<=10000?raw.draft:'(λx.x) (λy.y)';
       const migrated={version:2,savedAt:new Date().toISOString(),draft,functions:[],completed:Array.isArray(raw.completed)?[...new Set(raw.completed.filter(i=>Number.isInteger(i)&&i>0&&i<6))]:[],
         mode:raw.mode==='challenge'?'challenge':'free',level:Number.isInteger(raw.level)&&raw.level>=0&&raw.level<5?raw.level:0,
-        session:{original:null,steps:0,dirty:true,halt:''},view:{speed:600,scale:1,autoFit:true,historyOpen:false,helpOpen:false,hintOpen:false},selection:{start:0,end:0},error:''};
+        session:{original:null,steps:0,dirty:true,halt:''},view:{numberEncoding:'church',speed:600,scale:1,autoFit:true,historyOpen:false,helpOpen:false,hintOpen:false},selection:{start:0,end:0},error:''};
       return {...validate(migrated),history:[],term:null,hasSession:false};
     }
     const snapshot=replay(validate(raw));

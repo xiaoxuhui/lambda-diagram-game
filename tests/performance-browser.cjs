@@ -7,7 +7,7 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
   const browser=await pw.chromium.launch({headless:true}),context=await browser.newContext({viewport:{width:1440,height:1080},hasTouch:true}),page=await context.newPage(),errors=[];let count=0;
   page.on('pageerror',e=>errors.push(e.message));
   const check=async(name,run)=>{await run();console.log(`PASS P${++count} ${name}`);};
-  const source=async(text)=>{await page.locator('#expression').fill(text);await page.locator('#convert').click();};
+  const source=async(text)=>{await page.locator('#number-encoding').selectOption('church');await page.locator('#expression').fill(text);await page.locator('#convert').click();};
   async function assertDiagram(p){
     assert.equal(await p.evaluate(()=>{
       const t=LambdaCore.parse(document.getElementById('current-expression').textContent,Infinity),expected=LambdaDiagram.layout(t,LambdaCore.findRedex(t)?.path??null);

@@ -11,7 +11,7 @@ const factorial=`(${Y}) (λr n.(${ZERO}) n 1 ((${MULT}) n (r ((${PRED}) n)))) 3`
   const browser=await pw.chromium.launch({headless:true}),page=await browser.newPage({viewport:{width:1200,height:900}}),errors=[];
   page.on('pageerror',e=>errors.push(e.message));let passed=0;
   const check=async(name,fn)=>{await fn();console.log(`PASS U${++passed} ${name}`);};
-  const source=async(s)=>{await page.locator('#expression').fill(s);await page.locator('#convert').click();assert.ok(await page.locator('#error-message').isHidden());};
+  const source=async(s)=>{await page.locator('#number-encoding').selectOption('church');await page.locator('#expression').fill(s);await page.locator('#convert').click();assert.ok(await page.locator('#error-message').isHidden());};
   const run=async(answer)=>{await page.locator('#speed-ms').fill('1');await page.locator('#run').click();await page.waitForFunction(()=>document.getElementById('state-badge').textContent==='已到正规形',null,{timeout:180000});assert.equal(await page.locator('#decoded').textContent(),`Church 数 ${answer}`);};
   try {
     await page.goto(`http://127.0.0.1:${server.address().port}/`);

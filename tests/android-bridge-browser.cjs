@@ -17,7 +17,7 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
       const saved=JSON.parse(exported.content);assert.equal(saved.functions[0].name,'IDENTITY');assert.equal(saved.session.steps,1);
     });
     await check('SVG export passes full SVG and correct MIME to native save',async()=>{
-      await page.locator('#expression').fill('1024');await page.locator('#convert').click();await page.locator('#export-svg').click();
+      await page.locator('#number-encoding').selectOption('church');await page.locator('#expression').fill('1024');await page.locator('#convert').click();await page.locator('#export-svg').click();
       const exported=await page.evaluate(()=>nativeExports.at(-1));assert.equal(exported.name,'lambda-diagram.svg');assert.equal(exported.mime,'image/svg+xml');
       assert.match(exported.content,/xmlns="http:\/\/www.w3.org\/2000\/svg"/);assert.equal((exported.content.match(/<line /g)||[]).length,4099);
     });

@@ -21,3 +21,14 @@ test('default editor parser uses decimal lists while the explicit Church parser 
  assert.equal(D.format(D.read(C.parseInput('3'))),'3');assert.equal(C.churchNumber(C.parse('3')),3);
  const term=D.expand(C.parseInput('ADD 0.1 0.2'));assert.equal(C.freeVars(term).size,0);
 });
+test('decimal function definitions and unchanged old definitions keep their correct encoding',()=>{
+ const L=require('../src/library.js');let functions=L.add([],'N','  -0.125\n',1500,'decimal');assert.equal(D.format(D.read(functions[0].term)),'-0.125');
+ functions=L.update(functions,'N','NN','  -0.125\n','church');assert.equal(D.format(D.read(functions[0].term)),'-0.125');assert.equal(functions[0].source,'  -0.125\n');
+ const old=L.add([],'TWO','2');assert.equal(C.churchNumber(L.update(old,'TWO','NEW','2','decimal')[0].term),2);
+});
+test('decimal preferences, AST and old-mode archives round trip without reinterpretation',()=>{
+ const S=require('../src/snapshot.js'),original=D.encodeLiteral('-1.25');const raw={version:2,draft:'-1.25',functions:[],completed:[],mode:'free',level:0,session:{original,steps:0,dirty:false,halt:''},view:{numberEncoding:'decimal',decimalPlaces:4,speed:1,scale:1,autoFit:true,panX:0,panY:0,historyOpen:false,helpOpen:false,hintOpen:false},selection:{start:0,end:0},error:''};
+ const saved=S.decode(S.encode(raw));assert.equal(saved.view.numberEncoding,'decimal');assert.equal(saved.view.decimalPlaces,4);assert.equal(D.format(D.read(saved.term)),'-1.25');
+ delete raw.view.numberEncoding;delete raw.view.decimalPlaces;raw.session.original=C.parse('2');const legacy=S.decode(JSON.stringify(raw));assert.equal(legacy.view.numberEncoding,'decimal');assert.equal(C.churchNumber(legacy.term),2);
+ for(const mode of ['unknown',null]){raw.view.numberEncoding=mode;assert.throws(()=>S.decode(JSON.stringify(raw)));}
+});
