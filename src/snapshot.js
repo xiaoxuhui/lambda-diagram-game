@@ -1,6 +1,7 @@
 (function(root) {
   'use strict';
-  const C=root.LambdaCore||require('./core.js'),L=root.LambdaLibrary||require('./library.js');
+  const C=root.LambdaCore||require('./core.js'),L=root.LambdaLibrary||require('./library.js'),P=root.LambdaPresets||require('./presets.js');
+  const LEVEL_IDS=new Set(P.levels.map(l=>l.id));
   const MAX_BYTES=2*1024*1024;
   const fail=message=>{throw new C.LambdaError(`存档无效：${message}`);};
   const object=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
@@ -26,9 +27,9 @@
       if(f.source!==undefined&&typeof f.source!=='string')fail('函数原始定义需为文本。');
       return {name:f.name,term:ast(f.term),...(f.source===undefined?{}:{source:f.source})};
     });L.validate(functions);
-    if(!Array.isArray(raw.completed)||raw.completed.length>5||raw.completed.some(i=>!Number.isInteger(i)||i<1||i>5))fail('通关进度不合法。');
+    if(!Array.isArray(raw.completed)||raw.completed.length>P.levels.length||raw.completed.some(i=>!LEVEL_IDS.has(i)))fail('通关进度不合法。');
     if(raw.mode!=='free'&&raw.mode!=='challenge')fail('游戏模式不合法。');
-    if(!Number.isInteger(raw.level)||raw.level<0||raw.level>4)fail('关卡编号不合法。');
+    if(!Number.isInteger(raw.level)||raw.level<0||raw.level>=P.levels.length)fail('关卡编号不合法。');
     const s=raw.session;if(!object(s)||!Number.isSafeInteger(s.steps)||s.steps<0||typeof s.dirty!=='boolean')fail('归约状态不合法。');
     const original=s.original===null?null:ast(s.original);if(!original&&s.steps!==0)fail('没有起始表达式，无法恢复归约。');
     let paths;

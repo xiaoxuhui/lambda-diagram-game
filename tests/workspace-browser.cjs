@@ -99,12 +99,12 @@ const artifacts=path.join(__dirname,'artifacts');fs.mkdirSync(artifacts,{recursi
     });
     await check('legacy v1 imports draft and existing progress',async()=>{
       await upload(JSON.stringify({version:1,draft:'λq.q',mode:'challenge',level:1,completed:[1,2]}));await page.waitForFunction(()=>document.getElementById('save-feedback').textContent.includes('存档已导入'));
-      assert.equal(await page.locator('#expression').inputValue(),'λq.q');assert.equal(await page.locator('#progress-text').textContent(),'2 / 5 关已完成');assert.equal(await page.locator('#function-count').textContent(),'0 个函数');
+      assert.equal(await page.locator('#expression').inputValue(),'λq.q');assert.equal(await page.locator('#progress-text').textContent(),'2 / 30 关已完成');assert.equal(await page.locator('#function-count').textContent(),'0 个函数');
     });
     await check('first-load legacy storage migration preserves progress',async()=>{
       const legacyContext=await browser.newContext();await legacyContext.addInitScript(()=>localStorage.setItem('lambda-lab-v1',JSON.stringify({version:1,draft:'λz.z',mode:'challenge',level:2,completed:[1,3,5]})));
       const p=await legacyContext.newPage();p.on('pageerror',e=>errors.push(e.message));await p.goto(base);
-      assert.equal(await p.locator('#progress-text').textContent(),'3 / 5 关已完成');assert.equal(await p.locator('#expression').inputValue(),'λz.z');
+      assert.equal(await p.locator('#progress-text').textContent(),'3 / 30 关已完成');assert.equal(await p.locator('#expression').inputValue(),'λz.z');
       const stored=await p.evaluate(()=>JSON.parse(localStorage.getItem('lambda-lab-v2')));assert.equal(stored.version,2);assert.deepEqual(stored.completed,[1,3,5]);await legacyContext.close();
     });
     await check('storage failure reports clearly and still allows file export',async()=>{

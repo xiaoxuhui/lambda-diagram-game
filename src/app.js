@@ -192,16 +192,26 @@
   }
   function setSource(source) { input.value=source; changed(); convert(); }
   function renderLevels() {
+    const l=P.levels[state.level],stage=P.stages.find(s=>s.levelIds.includes(l.id));
+    const select=$('stage-select');select.replaceChildren();
+    for(const s of P.stages){
+      const option=document.createElement('option'),done=s.levelIds.filter(id=>state.completed.has(id)).length;
+      option.value=String(s.id);option.textContent=`第 ${s.id} 阶段 · ${s.name}（${done}/${s.levelIds.length}）`;select.append(option);
+    }
+    select.value=String(stage.id);
+    $('stage-progress').textContent=`本阶段 ${stage.levelIds.filter(id=>state.completed.has(id)).length} / ${stage.levelIds.length} 关`;
+    $('challenge-count').textContent=String(P.levels.length);
     const list=$('level-list');list.replaceChildren();
     P.levels.forEach((level,index)=>{
+      if(!stage.levelIds.includes(level.id))return;
       const b=document.createElement('button');b.textContent=`${level.id} ${level.name}`;
       b.className=(index===state.level?'active ':'')+(state.completed.has(level.id)?'completed':'');
       b.setAttribute('aria-pressed',String(index===state.level));b.addEventListener('click',()=>selectLevel(index));list.append(b);
     });
-    const l=P.levels[state.level];
     $('level-topic').textContent=`CHALLENGE ${String(l.id).padStart(2,'0')} / ${l.topic}`;
     $('level-title').textContent=l.name; $('level-description').textContent=l.description;
     $('target-label').textContent=l.targetLabel;$('target-expression').textContent=l.target;$('hint').textContent=l.hint;
+    $('target-kind').textContent=l.targetType?'目标结果（归约至正规形）':'目标正规形';
     $('progress-text').textContent=state.mode==='challenge'?`${state.completed.size} / ${P.levels.length} 关已完成`:'探索 · 输入 · 归约';
   }
   function renderMode() {
@@ -211,7 +221,10 @@
     renderLevels();
   }
   function selectLevel(index) {
-    state.numberEncoding='church';
+    const level=P.levels[index];state.numberEncoding=level.encoding??'church';
+    if(level.decimalPlaces!==undefined)state.decimalPlaces=level.decimalPlaces;
+    if(level.strategy)state.strategy=level.strategy;
+    if(level.direction)state.direction=level.direction;
     state.level=index;state.mode='challenge';$('hint').hidden=true;$('hint-toggle').textContent='显示提示';$('hint-toggle').setAttribute('aria-expanded','false');
     renderMode();setSource(P.levels[index].start);save();
   }
@@ -221,10 +234,12 @@
     if(state.running){feedback.textContent='正在运行，等归约完成后再验证。';return;}
     if(C.findRedex(state.term,[],state.strategy,state.direction)){feedback.textContent='还有可归约的部分。先运行到正规形，再验证答案。';return;}
     const l=P.levels[state.level];
-    if(!C.equal(state.term,C.parse(l.target))){feedback.textContent='这还不是目标结果。可以修改表达式，或显示提示再试一次。';return;}
+    if(!window.LambdaChallenges.matches(l,state.term)){feedback.textContent='这还不是目标结果。可以修改表达式，或显示提示再试一次。';return;}
     state.completed.add(l.id);save();renderLevels();
-    feedback.textContent=state.completed.size===P.levels.length?'五关全部完成！现在可以自由实验，组合你自己的函数。':`第 ${l.id} 关完成！结果与目标等价。`;
+    const stage=P.stages.find(s=>s.levelIds.includes(l.id)),stageDone=stage.levelIds.every(id=>state.completed.has(id));
+    feedback.textContent=state.completed.size===P.levels.length?`${P.levels.length} 关全部完成！现在可以自由实验，组合你自己的函数。`:`第 ${l.id} 关完成！${stageDone?`「${stage.name}」阶段全部完成。`:'结果与目标等价。'}`;
     $('next-level').hidden=state.level===P.levels.length-1;
+    $('next-level').textContent=l.id===stage.levelIds.at(-1)?'下一阶段 →':'下一关 →';
     toast(`✓ ${l.name} · 挑战完成`);
   }
   input.addEventListener('input',changed);
@@ -272,6 +287,10 @@
   });
   $('mode-free').addEventListener('click',()=>{stop();state.mode='free';renderMode();render();save();});
   $('mode-challenge').addEventListener('click',()=>selectLevel(state.level));
+  $('stage-select').addEventListener('change',()=>{
+    const stage=P.stages.find(s=>String(s.id)===$('stage-select').value);
+    selectLevel(P.levels.findIndex(l=>l.id===stage.levelIds[0]));
+  });
   $('hint-toggle').addEventListener('click',()=>{const show=$('hint').hidden;$('hint').hidden=!show;$('hint-toggle').textContent=show?'收起提示':'显示提示';$('hint-toggle').setAttribute('aria-expanded',String(show));save();});
   $('check-answer').addEventListener('click',checkAnswer);
   $('next-level').addEventListener('click',()=>selectLevel(Math.min(state.level+1,P.levels.length-1)));

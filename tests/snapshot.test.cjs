@@ -14,6 +14,17 @@ test('legacy functions without source remain compatible and malformed source is 
 });
 test('large function libraries save and restore every definition',()=>{const s=sample();s.functions=Array.from({length:100},(_,i)=>({name:`F${i}`,term:C.parse('λx.x')}));const r=S.decode(S.encode(s));assert.equal(r.functions.length,100);assert.deepEqual(r.functions,s.functions);});
 test('complete snapshot restores current term and full history',()=>{const s=S.decode(S.encode(sample()));assert.equal(C.format(s.term),'λy.y');assert.equal(s.history.length,2);assert.equal(s.history[1].change.param,'x');assert.deepEqual(s.completed,[1,3]);assert.equal(s.functions[0].name,'ID');assert.equal(s.view.scale,1.5);assert.equal(s.hasSession,true);});
+
+test('thirty-level progress and the final selected level survive export and checkpoints',()=>{
+  const s=sample();s.completed=Array.from({length:30},(_,i)=>i+1);s.level=29;
+  const restored=S.decode(S.encodeBackup(s,S.encode(s)));
+  assert.deepEqual(restored.completed,s.completed);assert.equal(restored.level,29);
+  assert.deepEqual(S.decode(restored.checkpointText).completed,s.completed);
+});
+test('old v2 five-level progress retains ids and current selection',()=>{
+  const s=sample();s.completed=[1,2,3,4,5];s.level=4;
+  const restored=S.decode(JSON.stringify(s));assert.deepEqual(restored.completed,s.completed);assert.equal(restored.level,4);
+});
 test('restoration supports expanded AST longer than input budget',()=>{
   const s=sample();let t=C.V('variable'.repeat(50));for(let i=0;i<3;i++)t=C.A(t,t);s.session={original:t,steps:0,dirty:false,halt:''};
   assert.ok(C.format(t).length>1500);assert.deepEqual(S.decode(S.encode(s)).term,t);
@@ -35,7 +46,7 @@ test('impossible replay steps are rejected',()=>{const s=sample();s.session.step
 test('negative, fractional or inexact step counts are rejected',()=>{for(const steps of [-1,Number.MAX_SAFE_INTEGER+1,1.5]){const s=sample();s.session.steps=steps;assert.throws(()=>S.decode(JSON.stringify(s)),/归约状态/);}});
 test('more than 200 actual steps restore without a fixed cutoff',()=>{const s=sample();s.session={original:C.parse('(λx.x x)(λx.x x)'),steps:250,dirty:false,halt:''};assert.equal(S.decode(S.encode(s)).history.length,251);});
 test('invalid progress, mode, selection and view are rejected',()=>{
-  for(const mutate of [s=>s.completed=[6],s=>s.mode='other',s=>s.level=5,s=>s.selection.end=100,s=>s.view.scale=100,s=>s.view.speed=0,s=>s.view.autoFit='yes']){const s=sample();mutate(s);assert.throws(()=>S.decode(JSON.stringify(s)),/存档无效/);}
+  for(const mutate of [s=>s.completed=[31],s=>s.completed=[0],s=>s.completed=['1'],s=>s.mode='other',s=>s.level=30,s=>s.level=-1,s=>s.selection.end=100,s=>s.view.scale=100,s=>s.view.speed=0,s=>s.view.autoFit='yes']){const s=sample();mutate(s);assert.throws(()=>S.decode(JSON.stringify(s)),/存档无效/);}
 });
 test('duplicate function names cannot enter a snapshot',()=>{const s=sample();s.functions.push(s.functions[0]);assert.throws(()=>S.decode(JSON.stringify(s)),/已存在/);});
 test('AST is copied without arbitrary properties',()=>{const s=sample();s.session.original.injected='ignored';const r=S.decode(JSON.stringify(s));assert.ok(!('injected' in r.term));});

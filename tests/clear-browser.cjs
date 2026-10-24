@@ -46,7 +46,7 @@ const artifacts=path.join(__dirname,'artifacts');fs.mkdirSync(artifacts,{recursi
       await page.locator('#import-file').setInputFiles(backup.file);await page.waitForFunction(()=>document.getElementById('save-feedback').textContent.includes('存档已导入'));
       assert.equal(await page.locator('#step-count').textContent(),'1');assert.equal(await page.locator('#current-expression').textContent(),'(λy.y) z');
       assert.equal(await page.locator('#function-name').inputValue(),'RENAMED');assert.equal(await page.locator('#function-source').inputValue(),'λx.');
-      assert.equal(await page.locator('#progress-text').textContent(),'1 / 5 关已完成');assert.ok(await page.locator('#restore-state').isEnabled());
+      assert.equal(await page.locator('#progress-text').textContent(),'1 / 30 关已完成');assert.ok(await page.locator('#restore-state').isEnabled());
       await page.locator('#restore-state').click();assert.equal(await page.locator('#expression').inputValue(),'λq.q');
     });
     await check('clearing during automatic execution stops the timer and stays empty',async()=>{

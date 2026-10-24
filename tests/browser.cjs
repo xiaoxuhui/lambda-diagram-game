@@ -126,7 +126,7 @@ const C=require('../src/core.js'),P=require('../src/presets.js');
         await page.locator('#level-list button').nth(i).click();await normal();await page.locator('#check-answer').click();
         assert.match(await page.locator('#challenge-feedback').textContent(),/完成/);
       }
-      assert.equal(await page.locator('#progress-text').textContent(),'5 / 5 关已完成');
+      assert.equal(await page.locator('#progress-text').textContent(),'5 / 30 关已完成');
     });
     await check('alpha-equivalent user answer is accepted',async()=>{
       await page.locator('#level-list button').first().click();await source('(λz.z) (λq.q)');await page.locator('#step').click();
@@ -137,7 +137,7 @@ const C=require('../src/core.js'),P=require('../src/presets.js');
     });
     await check('draft and progress survive reload',async()=>{
       await source('λa.a');await page.reload();assert.equal(await page.locator('#expression').inputValue(),'λa.a');
-      assert.equal(await page.locator('#progress-text').textContent(),'5 / 5 关已完成');
+      assert.equal(await page.locator('#progress-text').textContent(),'5 / 30 关已完成');
     });
     await check('desktop has no horizontal overflow and controls are visible',async()=>{
       await page.locator('#mode-free').click();await source(P.examples[5].term);await page.locator('#history-details').evaluate(el=>el.open=false);

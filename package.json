@@ -16,7 +16,7 @@
     "build": "node scripts/build.mjs",
     "test:viewport": "node tests/viewport-browser.cjs",
     "serve": "node scripts/serve.cjs",
-    "test:browser": "node tests/browser.cjs && node tests/workspace-browser.cjs && node tests/numerals-browser.cjs && node tests/presets-browser.cjs && node tests/higher-math-browser.cjs && node tests/decimal-browser.cjs"
+    "test:browser": "node tests/browser.cjs && node tests/workspace-browser.cjs && node tests/numerals-browser.cjs && node tests/presets-browser.cjs && node tests/higher-math-browser.cjs && node tests/decimal-browser.cjs && node tests/challenges-browser.cjs"
   },
   "engines": { "node": ">=20" }
 }
