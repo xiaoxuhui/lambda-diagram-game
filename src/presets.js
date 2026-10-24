@@ -54,10 +54,10 @@
     { name:'定积分 · ∫₀³ 2x dx → 9', category:'高等数学', term:`(${INTEGRAL}) 0 3`, expected:'9', expectedType:'rational', description:'输入的是原多项式 2x（降序系数 [2,0]）。Lambda程序先按次数生成原函数系数，再分别代入上下限并相减，得到 9；没有预先把 x² 当成输入。系数限非负有理数，端点限自然数 a≤b。' },
     { name:'生成导函数 · x² + 3x → 2x + 3', category:'高等数学', term:M.differentiate([0,3,1]), expected:'2x + 3', expectedType:'polynomial', description:'原式：x² + 3x。输入列表按次数降序存储 [1,3,0]，每项是有理数。Lambda程序按次数乘系数、去掉原常数项，实际生成新多项式；运行后结果区显示导函数 2x + 3。' },
     { name:'生成原函数 · 2x → x²（C=0）', category:'高等数学', term:M.integrate([0,2]), expected:'x²', expectedType:'polynomial', description:'原式：2x。输入列表只含原系数 [2,0]；Lambda程序按次数+1除系数，并追加积分常数0，实际生成原函数。这里取 C=0；同一算法输入 x 会生成 1/2x²，不是预置答案。' },
-    { name:'列表小数加法 · 0.1 + 0.2 → 0.3', category:'列表小数四则', encoding:'decimal',term:'ADD 0.1 0.2',expected:'0.3',expectedType:'decimal',description:'默认数值编码：符号、十进制数字列表、小数位置。逐位对齐、进位得到精确0.3，不使用浮点数预算答案；可用快速运行保留全部步骤。' },
-    { name:'列表小数减法 · 1 − 2 → −1', category:'列表小数四则', encoding:'decimal',term:'SUB 1 2',expected:'-1',expectedType:'decimal',description:'默认整数也采用列表编码。先比较绝对值，再逐位借位并确定符号，结果为负数−1。' },
-    { name:'列表小数乘法 · 0.2 × 0.3 → 0.06', category:'列表小数四则', encoding:'decimal',term:'MUL 0.2 0.3',expected:'0.06',expectedType:'decimal',description:'逐位竖式相乘，小数位数相加，结果为精确0.06。' },
-    { name:'列表小数除法 · 1 ÷ 8 → 0.125', category:'列表小数四则', encoding:'decimal',term:'DIV 1 8',expected:'0.125',expectedType:'decimal',description:'用十进制长除法生成小数数字。精度至少3位时结果精确为0.125；精度不足会标≈。选择快速运行可保留全部归约步骤。' }
+    { name:'列表小数加法 · 0.1 + 0.2 → 0.3', category:'列表小数四则', encoding:'decimal',term:'DEC_ADD 0.1 0.2',expected:'0.3',expectedType:'decimal',description:'默认数值编码：符号、十进制数字列表、小数位置。逐位对齐、进位得到精确0.3，不使用浮点数预算答案；可用快速运行保留全部步骤。' },
+    { name:'列表小数减法 · 1 − 2 → −1', category:'列表小数四则', encoding:'decimal',term:'DEC_SUB 1 2',expected:'-1',expectedType:'decimal',description:'默认整数也采用列表编码。先比较绝对值，再逐位借位并确定符号，结果为负数−1。' },
+    { name:'列表小数乘法 · 0.2 × 0.3 → 0.06', category:'列表小数四则', encoding:'decimal',term:'DEC_MUL 0.2 0.3',expected:'0.06',expectedType:'decimal',description:'逐位竖式相乘，小数位数相加，结果为精确0.06。' },
+    { name:'列表小数除法 · 1 ÷ 8 → 0.125', category:'列表小数四则', encoding:'decimal',term:'DEC_DIV 1 8',expected:'0.125',expectedType:'decimal',description:'用十进制长除法生成小数数字。精度至少3位时结果精确为0.125；精度不足会标≈。选择快速运行可保留全部归约步骤。' }
   ];
   const levels = [
     { id:1, name:'原样返回', topic:'恒等函数', description:'让恒等函数接收一个函数，看看它如何把输入原样返回。', start:'(λx.x) (λy.y)', target:I, targetLabel:'I · 恒等函数', hint:'λx.x 会把参数直接返回。点击「单步」，观察 x 被整个参数替换。' },

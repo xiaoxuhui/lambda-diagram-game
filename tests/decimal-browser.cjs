@@ -44,6 +44,11 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
    const raw={version:2,draft:'2',functions:[],completed:[],mode:'free',level:0,session:{original:C.parse('2'),steps:0,dirty:false,halt:''},view:{speed:600,scale:1,autoFit:true,panX:0,panY:0,historyOpen:false,helpOpen:false,hintOpen:false},selection:{start:0,end:0},error:''};
    await page.addInitScript(raw=>localStorage.setItem('lambda-lab-v2',JSON.stringify(raw)),raw);await page.goto(base);assert.equal(await page.locator('#decoded').textContent(),'Church 数 2');assert.equal(await page.locator('#number-encoding').inputValue(),'decimal');
    await page.locator('#expression').fill('-0.25');await page.locator('#convert').click();assert.equal(await page.locator('#decoded').textContent(),'小数 -0.25');await context.close();
+  });
+  await check('decimal presets do not accidentally call an old custom ADD function',async()=>{
+   const context=await browser.newContext(),page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));await page.goto(base);
+   await page.locator('#function-name').fill('ADD');await page.locator('#function-source').fill('λa b.a');await page.locator('#function-add').click();
+   await page.locator('#examples').selectOption({label:'列表小数加法 · 0.1 + 0.2 → 0.3'});assert.equal(await page.locator('#expression').inputValue(),'DEC_ADD 0.1 0.2');await page.locator('#fast-run').click();await page.waitForFunction(()=>document.getElementById('state-badge').textContent==='已到正规形',null,{timeout:120000});assert.equal(await page.locator('#decoded').textContent(),'小数 0.3');assert.equal(await page.locator('#function-count').textContent(),'1 个函数');await context.close();
   });assert.deepEqual(errors,[]);console.log(`Decimal browser: ${passed} passed, 0 failed; Chromium ${browser.version()}; page errors 0.`);
  }finally{await browser.close();server.close();}
 })().catch(e=>{console.error(e);server.close();process.exitCode=1;});

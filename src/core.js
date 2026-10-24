@@ -38,7 +38,7 @@
       const numeric=(decimal?/^-?[0-9]+(?:\.[0-9]+)?/:/^[0-9]+/).exec(source.slice(i));
       if(numeric) {
         if(!decimal && source[i+numeric[0].length]==='.') throw new LambdaError('丘奇数只支持非负整数，不能输入小数。',i);
-        const value=Number(numeric[0]);
+        const value=decimal?numeric[0]:Number(numeric[0]);
         if(!decimal && !Number.isSafeInteger(value)) throw new LambdaError('数字超出可精确表示的整数范围。',i);
         out.push({kind:'number',value:decimal?numeric[0]:value,pos:i});i+=numeric[0].length;continue;
       }
