@@ -38,6 +38,7 @@
 @media(max-width:480px){.save-bar{padding:13px;margin-bottom:18px}.save-info{width:100%}.save-actions{width:100%;display:grid;grid-template-columns:1fr 1fr;gap:7px}.save-actions .button{min-width:0;padding:8px 7px;font-size:10px}.function-card{padding:19px 20px}.function-actions .button{font-size:11px;padding:8px 11px}.function-keys button{min-width:31px;height:32px}.function-item button{font-size:10px;padding:5px 8px}}
 .example-row select{min-width:0;max-width:100%}.example-info{font-size:11px;line-height:1.8;color:#5b7664;background:#f2f6ed;border:1px solid #e1e8d9;border-radius:6px;padding:10px 12px;margin:12px 0 0;overflow-wrap:anywhere}
 .number-options{display:grid;grid-template-columns:auto minmax(0,1fr);gap:7px 10px;align-items:center;margin:12px 0;font-size:10px;color:#647b69}.number-options select,.number-options input{min-width:0;width:100%;border:1px solid #dce2d6;border-radius:5px;padding:6px;background:#f9faf6;color:#43604a}.run-controls{flex-wrap:wrap}
+.stage-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}.stage-row label{display:flex;align-items:center;gap:10px;min-width:0;max-width:100%;font-size:12px;color:#5c8253}.stage-row select{min-width:0;max-width:100%;border:1px solid #d8e2d6;border-radius:6px;background:#f6f7f1;color:#365f43;padding:9px;font:inherit}.stage-row>span{font-size:11px;color:#6c8063}.level-list button{min-height:36px}.stage-row select:focus-visible{outline:2px solid var(--mint);outline-offset:2px}
 
 </style>
 </head>
@@ -55,11 +56,12 @@
       <div><h2>三个积木，就能计算</h2><p><code>x</code> 是变量；<code>λx.x</code> 是函数；<code>f x</code> 把 x 交给 f。<code>(λx.x) y → y</code> 是一次 β 归约。</p></div>
       <div><h2>怎么写、怎么看</h2><p>用快捷栏插入 λ；也可用 <code>\</code>。<code>λx y.x</code> 等同 <code>λx.λy.x</code>。变量之间用空格：<code>xy</code> 是一个名字。λ 的作用域延伸到右侧，作为参数时需加括号。</p><p>同色竖线连接绑定横线；应用横线连接子式最左变量。粉色标记下一步归约，自由变量以虚线显示。可选择正规序（外层优先）或应用序（内部优先），都包含函数内部归约。<a href="https://tromp.github.io/cl/diagrams.html" target="_blank" rel="noopener">John Tromp 原始说明 ↗</a></p></div>
     </section>
-    <nav class="mode-row" aria-label="游戏模式"><div class="mode-tabs"><button id="mode-free" class="mode-tab active" aria-pressed="true">自由实验</button><button id="mode-challenge" class="mode-tab" aria-pressed="false">闯关模式 <span>5</span></button></div><span id="progress-text" class="progress-label">探索 · 输入 · 归约</span></nav>
+    <nav class="mode-row" aria-label="游戏模式"><div class="mode-tabs"><button id="mode-free" class="mode-tab active" aria-pressed="true">自由实验</button><button id="mode-challenge" class="mode-tab" aria-pressed="false">闯关模式 <span id="challenge-count">30</span></button></div><span id="progress-text" class="progress-label">探索 · 输入 · 归约</span></nav>
     <section class="save-bar" aria-label="状态与进度存档"><div class="save-info"><strong>状态与进度</strong><span id="storage-status" role="status">自动保存准备中</span><small>包含函数库、归约轨迹与关卡进度</small></div><div class="save-actions"><button id="save-state" class="button primary">保存当前状态</button><button id="restore-state" class="button" disabled>恢复已保存状态</button><button id="export-state" class="button">导出存档 ↓</button><button id="import-state" class="button">导入存档 ↑</button><button id="clear-all" type="button" class="button danger" aria-describedby="clear-note">导出存档并清空</button><input id="import-file" type="file" accept=".json,application/json" hidden></div><p id="clear-note" class="clear-note">清空会删除表达式、函数库、运行记录、关卡进度及保存点，并自动导出备份。</p><p id="save-feedback" class="save-feedback" role="status" hidden></p></section>
     <section id="challenge-panel" class="challenge-panel" hidden>
+      <div class="stage-row"><label for="stage-select">选择阶段 <select id="stage-select" aria-label="选择挑战阶段"></select></label><span id="stage-progress" role="status"></span></div>
       <div class="level-list" id="level-list" aria-label="选择关卡"></div>
-      <div class="challenge-body"><div><p id="level-topic" class="eyebrow"></p><h2 id="level-title"></h2><p id="level-description"></p></div><div class="challenge-target"><span>目标正规形</span><strong id="target-label"></strong><code id="target-expression"></code></div></div>
+      <div class="challenge-body"><div><p id="level-topic" class="eyebrow"></p><h2 id="level-title"></h2><p id="level-description"></p></div><div class="challenge-target"><span id="target-kind">目标正规形</span><strong id="target-label"></strong><code id="target-expression"></code></div></div>
       <div class="challenge-footer"><button id="hint-toggle" class="text-button" aria-expanded="false">显示提示</button><p id="hint" hidden></p><button id="check-answer" class="button primary">验证答案 <span>↗</span></button><button id="next-level" class="button" hidden>下一关 →</button></div>
       <p id="challenge-feedback" class="challenge-feedback" role="status"></p>
     </section>
@@ -712,12 +714,63 @@
     { id:2, name:'选择第一个', topic:'布尔值', description:'两个函数交给 TRUE；归约后应只留下第一个。', start:`(${TRUE}) (${I}) (${TRUE})`, target:I, targetLabel:'I · 恒等函数', hint:'λx.λy.x 接收两个参数，只保留第一个。第二个参数可以是任意式。' },
     { id:3, name:'翻转真假', topic:'函数组合', description:'将 TRUE 交给 NOT，把选择第一个变成选择第二个。', start:`(λb.b (${FALSE}) (${TRUE})) (${TRUE})`, target:FALSE, targetLabel:'FALSE · 选择第二个', hint:'布尔值本身是一个选择器。NOT 把 FALSE 放在第一位，把 TRUE 放在第二位。' },
     { id:4, name:'再走一步', topic:'Church 数', description:'将 2 交给后继函数，让 f 在 x 上连续作用 3 次。', start:`(${SUCC}) (${TWO})`, target:THREE, targetLabel:'Church 数字 3', hint:'数字 n 表示重复 n 次。「加一」会在 n 次作用之外，再套上一层 f。' },
-    { id:5, name:'让函数相加', topic:'Church 加法', description:'不用数字运算，只靠函数，把 2 + 3 归约成 5。', start:`(${ADD}) (${TWO}) (${THREE})`, target:FIVE, targetLabel:'Church 数字 5', hint:'m f (n f x)：先把 f 作用 n 次，再继续作用 m 次。运行到正规形后验证答案。' }
+    { id:5, name:'让函数相加', topic:'Church 加法', description:'不用数字运算，只靠函数，把 2 + 3 归约成 5。', start:`(${ADD}) (${TWO}) (${THREE})`, target:FIVE, targetLabel:'Church 数字 5', hint:'m f (n f x)：先把 f 作用 n 次，再继续作用 m 次。运行到正规形后验证答案。' },
+    { id:6, name:'组合出恒等', topic:'S K K', description:'只用 S 与 K 两个组合子，组合出恒等函数 I。', start:`(λx y z.(x z) (y z)) (${TRUE}) (${TRUE})`, target:I, targetLabel:'I · 恒等函数', hint:'S K K z = K z (K z) = z。即使外层已经是 λ，也要继续归约函数体。' },
+    { id:7, name:'交换参数', topic:'组合子 C', description:'交换 TRUE 的两个输入，从 2 和 3 中选出原来的第二项。', start:`(λf x y.f y x) (${TRUE}) 2 3`, target:'3', targetLabel:'Church 数字 3', hint:'先代入 f=TRUE，再交换两个参数；最终 TRUE 收到的是 3、2。' },
+    { id:8, name:'连续加一', topic:'组合子 B', description:'把两个加一函数串起来，让 1 变成 3。', start:`(λf g x.f (g x)) (${SUCC}) (${SUCC}) 1`, target:'3', targetLabel:'Church 数字 3', hint:'B f g x = f (g x)。先计算里面的加一，再计算外面的加一。' },
+    { id:9, name:'深入函数内部', topic:'λ 内部归约', description:'外层没有参数可接收，函数体里面仍然可以继续归约。', start:'λz.(λx.x) z', target:I, targetLabel:'I · 恒等函数', hint:'点击 λz 内部那一处应用。得到 λz.z，与 λx.x 只是变量名不同。' },
+    { id:10, name:'保护自由变量', topic:'避免变量捕获', description:'把自由变量 y 传入一个含有 λy 的函数，保留它的自由身份。', start:'(λx.λy.x) y', target:'λz.y', targetLabel:'返回自由变量 y', hint:'先把内部绑定的 y 改名，再替换 x。结果可以是 λy1.y；不能变成 λy.y。' },
+    { id:11, name:'两者都为真', topic:'布尔 AND', description:'计算 TRUE 与 FALSE 的逻辑与，结果应为 FALSE。', start:`(λp q.p q p) (${TRUE}) (${FALSE})`, target:FALSE, targetLabel:'FALSE · 假', hint:'p 为真时选择 q；p 为假时保留 p。这里只有一个输入为真。' },
+    { id:12, name:'有一个为真', topic:'布尔 OR', description:'计算 FALSE 与 TRUE 的逻辑或，结果应为 TRUE。', start:`(λp q.p p q) (${FALSE}) (${TRUE})`, target:TRUE, targetLabel:'TRUE · 真', hint:'p 为假时选择 q。因此 FALSE OR TRUE 会返回 TRUE。' },
+    { id:13, name:'把假变真', topic:'布尔 NOT', description:'对 FALSE 取反，得到选择第一个参数的函数。', start:`(λb.b (${FALSE}) (${TRUE})) (${FALSE})`, target:TRUE, targetLabel:'TRUE · 真', hint:'FALSE 会从两个候选项中选择第二个，这里第二个是 TRUE。' },
+    { id:14, name:'取出第一项', topic:'有序对', description:'将 2 和 5 保存在函数里，再取出第一项。', start:`(${PAIR}) 2 5 (${TRUE})`, target:'2', targetLabel:'Church 数字 2', hint:'有序对把两个值交给选择器。TRUE 选择第一项。' },
+    { id:15, name:'取出第二项', topic:'有序对', description:'使用另一个选择器，从同一个有序对中取出 5。', start:`(${PAIR}) 2 5 (${FALSE})`, target:'5', targetLabel:'Church 数字 5', hint:'FALSE 选择第二项。观察有序对如何展开为一次函数调用。' },
+    { id:16, name:'重复中的重复', topic:'Church 乘法', description:'将重复 3 次的操作再重复 2 次，计算 2 × 3。', start:`(${MULT}) 2 3`, target:'6', targetLabel:'Church 数字 6', hint:'乘法 λm n f.m (n f) 把 n 次操作看成一个整体，再重复 m 次。' },
+    { id:17, name:'让数字作用于数字', topic:'Church 乘方', description:'让指数 3 作用在底数 2 上，计算 2³。', start:`(${POW}) 2 3`, target:'8', targetLabel:'Church 数字 8', hint:'Church 乘方可以写成 λb e.e b。归约函数体直到再无可归约项。' },
+    { id:18, name:'向后一步', topic:'Church 前驱', description:'从数字 3 中去掉一次函数作用，得到 2。', start:`(${PRED}) 3`, target:'2', targetLabel:'Church 数字 2', hint:'前驱借助中间状态，让最终的函数作用少执行一次。' },
+    { id:19, name:'连续后退', topic:'Church 减法', description:'对 5 连续取两次前驱，计算自然数减法 5 − 2。', start:`(${SUB}) 5 2`, target:'3', targetLabel:'Church 数字 3', hint:'把前驱函数重复 2 次。此阶段使用 Church 自然数，下阶段再进入负数与小数。' },
+    { id:20, name:'辨认零', topic:'零判断', description:'判断 Church 数字 0 是否为零，生成布尔值 TRUE。', start:`(${ZERO}) 0`, target:TRUE, targetLabel:'TRUE · 真', hint:'零不会执行传入的操作，所以零判断保留初始的 TRUE。' },
+    { id:21, name:'精确的小数加法', topic:'列表小数', encoding:'decimal', description:'用逐位进位计算 0.1 + 0.2，得到精确 0.3。建议点击「快速运行」。', start:'DEC_ADD 0.1 0.2', target:'0.3', targetType:'decimal', targetLabel:'精确小数 0.3', hint:'小数点位置先对齐，再对数字列表逐位相加。快速运行仍保留全部归约步骤。' },
+    { id:22, name:'跨过零', topic:'带符号减法', encoding:'decimal', description:'计算 1 − 2，让结果从自然数走到负数。', start:'DEC_SUB 1 2', target:'-1', targetType:'decimal', targetLabel:'精确小数 −1', hint:'比较两个绝对值，按较大值减较小值，然后确定负号。' },
+    { id:23, name:'小数点往哪里走', topic:'列表乘法', encoding:'decimal', description:'计算 0.2 × 0.3，观察数字乘积与小数位数共同决定结果。', start:'DEC_MUL 0.2 0.3', target:'0.06', targetType:'decimal', targetLabel:'精确小数 0.06', hint:'2 × 3 = 6；两个输入各有一位小数，所以结果共有两位小数。' },
+    { id:24, name:'除到刚刚好', topic:'十进制长除法', encoding:'decimal', decimalPlaces:3, description:'计算 1 ÷ 8。本关预置3位小数，运行后必须得到精确结果。建议快速运行。', start:'DEC_DIV 1 8', target:'0.125', targetType:'decimal', targetLabel:'精确小数 0.125', hint:'长除法逐位生成 1、2、5，余数归零。若自行调低精度，近似结果不能通关。' },
+    { id:25, name:'正负相遇', topic:'带符号加法', encoding:'decimal', description:'计算 −1.2 + 0.5，保留正确符号和小数位置。', start:'DEC_ADD -1.2 0.5', target:'-0.7', targetType:'decimal', targetLabel:'精确小数 −0.7', hint:'符号不同的加法等价于绝对值相减；较大的绝对值来自负数。' },
+    { id:26, name:'从三个里选两个', topic:'组合数', strategy:'normal', direction:'left', description:'用帕斯卡递推计算 C(3,2)，不计选择顺序。本关预设从左到右正规序。', start:`(${CHOOSE}) 3 2`, target:'3', targetLabel:'Church 数字 3', hint:`C(n,0)=1，C(0,k)=0，其余拆成两个较小的组合数。${recursiveHint}` },
+    { id:27, name:'三个数的连乘', topic:'迭代阶乘', description:'用有序对保存当前数字与累积乘积，真正算出 3!。', start:`(${FACTORIAL}) 3`, target:'6', targetLabel:'Church 数字 6', hint:'从 (0,1) 开始，连续更新三次：(1,1)、(2,2)、(3,6)，最后取出乘积。' },
+    { id:28, name:'生成导函数', topic:'符号求导', description:'输入原多项式 x² + 3x 的系数，归约生成导函数，而不是只代入某个点。', start:M.differentiate([0,3,1]), target:'2x + 3', targetType:'polynomial', targetLabel:'导函数 2x + 3', hint:'遍历降序系数 [1,3,0]，按原次数乘系数并去掉常数项，生成新的系数列表。' },
+    { id:29, name:'生成原函数', topic:'符号积分', description:'从原多项式 x 的系数开始，归约生成原函数，积分常数取 0。', start:M.integrate([0,1]), target:'1/2x²', targetType:'polynomial', targetLabel:'原函数 ½x²（C=0）', hint:'按次数加一除系数，并追加积分常数 0。系数 1 除以 2 后保存为有理数。' },
+    { id:30, name:'最后一关：曲线下面积', topic:'定积分', description:'从原多项式 2x 出发，先生成原函数，再计算从 0 到 3 的定积分。', start:M.definite([0,2],0,3), target:'9', targetType:'rational', targetLabel:'有理数 9', hint:'先对原系数 [2,0] 积分得到 x²，再计算上限值减下限值：9 − 0。所有转换都经过 β 归约。' }
   ];
-  const API={ examples, levels, I, TRUE, FALSE, advanced:{factorial:FACTORIAL,recursiveFactorial:RECURSIVE_FACTORIAL,choose:CHOOSE,permutations:PERMUTATIONS,sumPowers,geometricSum:GEOMETRIC_SUM,binomial:BINOMIAL,polynomial:POLYNOMIAL,derivative:DERIVATIVE,integral:INTEGRAL} };
+  const stages=['入门五关','函数与绑定','逻辑与数据','自然数进阶','列表小数','高等数学'].map((name,index)=>({id:index+1,name,levelIds:levels.slice(index*5,index*5+5).map(l=>l.id)}));
+  const API={ examples, levels, stages, I, TRUE, FALSE, advanced:{factorial:FACTORIAL,recursiveFactorial:RECURSIVE_FACTORIAL,choose:CHOOSE,permutations:PERMUTATIONS,sumPowers,geometricSum:GEOMETRIC_SUM,binomial:BINOMIAL,polynomial:POLYNOMIAL,derivative:DERIVATIVE,integral:INTEGRAL} };
   root.LambdaPresets=API;
   if(typeof module !== 'undefined' && module.exports) module.exports=API;
 })(typeof globalThis !== 'undefined' ? globalThis : window);
+
+</script><script>
+(function(root){
+  'use strict';
+  const C=root.LambdaCore||require('./core.js'),D=root.LambdaDecimal||require('./decimal.js'),M=root.LambdaPolynomial||require('./polynomial.js');
+  function compile(level){
+    return level.encoding==='decimal'?D.expand(C.parseInput(level.start),level.decimalPlaces??6):C.parse(level.start);
+  }
+  function matches(level,term){
+    if(!term||C.findRedex(term))return false;
+    if(level.targetType==='decimal'){
+      const value=D.read(term);
+      return !!value&&!value.error&&!value.approximate&&D.format(value)===level.target;
+    }
+    if(level.targetType==='polynomial'){
+      const value=M.readPolynomial(term);return value!==null&&M.formatPolynomial(value)===level.target;
+    }
+    if(level.targetType==='rational'){
+      const value=M.readRational(term);return value!==null&&M.formatRational(value)===level.target;
+    }
+    return C.equal(term,C.parse(level.target));
+  }
+  const API={compile,matches};root.LambdaChallenges=API;
+  if(typeof module!=='undefined'&&module.exports)module.exports=API;
+})(typeof globalThis!=='undefined'?globalThis:window);
 
 </script><script>
 (function(root) {
@@ -783,7 +836,8 @@
 </script><script>
 (function(root) {
   'use strict';
-  const C=root.LambdaCore||require('./core.js'),L=root.LambdaLibrary||require('./library.js');
+  const C=root.LambdaCore||require('./core.js'),L=root.LambdaLibrary||require('./library.js'),P=root.LambdaPresets||require('./presets.js');
+  const LEVEL_IDS=new Set(P.levels.map(l=>l.id));
   const MAX_BYTES=2*1024*1024;
   const fail=message=>{throw new C.LambdaError(`存档无效：${message}`);};
   const object=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
@@ -809,9 +863,9 @@
       if(f.source!==undefined&&typeof f.source!=='string')fail('函数原始定义需为文本。');
       return {name:f.name,term:ast(f.term),...(f.source===undefined?{}:{source:f.source})};
     });L.validate(functions);
-    if(!Array.isArray(raw.completed)||raw.completed.length>5||raw.completed.some(i=>!Number.isInteger(i)||i<1||i>5))fail('通关进度不合法。');
+    if(!Array.isArray(raw.completed)||raw.completed.length>P.levels.length||raw.completed.some(i=>!LEVEL_IDS.has(i)))fail('通关进度不合法。');
     if(raw.mode!=='free'&&raw.mode!=='challenge')fail('游戏模式不合法。');
-    if(!Number.isInteger(raw.level)||raw.level<0||raw.level>4)fail('关卡编号不合法。');
+    if(!Number.isInteger(raw.level)||raw.level<0||raw.level>=P.levels.length)fail('关卡编号不合法。');
     const s=raw.session;if(!object(s)||!Number.isSafeInteger(s.steps)||s.steps<0||typeof s.dirty!=='boolean')fail('归约状态不合法。');
     const original=s.original===null?null:ast(s.original);if(!original&&s.steps!==0)fail('没有起始表达式，无法恢复归约。');
     let paths;
@@ -1288,16 +1342,26 @@
   }
   function setSource(source) { input.value=source; changed(); convert(); }
   function renderLevels() {
+    const l=P.levels[state.level],stage=P.stages.find(s=>s.levelIds.includes(l.id));
+    const select=$('stage-select');select.replaceChildren();
+    for(const s of P.stages){
+      const option=document.createElement('option'),done=s.levelIds.filter(id=>state.completed.has(id)).length;
+      option.value=String(s.id);option.textContent=`第 ${s.id} 阶段 · ${s.name}（${done}/${s.levelIds.length}）`;select.append(option);
+    }
+    select.value=String(stage.id);
+    $('stage-progress').textContent=`本阶段 ${stage.levelIds.filter(id=>state.completed.has(id)).length} / ${stage.levelIds.length} 关`;
+    $('challenge-count').textContent=String(P.levels.length);
     const list=$('level-list');list.replaceChildren();
     P.levels.forEach((level,index)=>{
+      if(!stage.levelIds.includes(level.id))return;
       const b=document.createElement('button');b.textContent=`${level.id} ${level.name}`;
       b.className=(index===state.level?'active ':'')+(state.completed.has(level.id)?'completed':'');
       b.setAttribute('aria-pressed',String(index===state.level));b.addEventListener('click',()=>selectLevel(index));list.append(b);
     });
-    const l=P.levels[state.level];
     $('level-topic').textContent=`CHALLENGE ${String(l.id).padStart(2,'0')} / ${l.topic}`;
     $('level-title').textContent=l.name; $('level-description').textContent=l.description;
     $('target-label').textContent=l.targetLabel;$('target-expression').textContent=l.target;$('hint').textContent=l.hint;
+    $('target-kind').textContent=l.targetType?'目标结果（归约至正规形）':'目标正规形';
     $('progress-text').textContent=state.mode==='challenge'?`${state.completed.size} / ${P.levels.length} 关已完成`:'探索 · 输入 · 归约';
   }
   function renderMode() {
@@ -1307,7 +1371,10 @@
     renderLevels();
   }
   function selectLevel(index) {
-    state.numberEncoding='church';
+    const level=P.levels[index];state.numberEncoding=level.encoding??'church';
+    if(level.decimalPlaces!==undefined)state.decimalPlaces=level.decimalPlaces;
+    if(level.strategy)state.strategy=level.strategy;
+    if(level.direction)state.direction=level.direction;
     state.level=index;state.mode='challenge';$('hint').hidden=true;$('hint-toggle').textContent='显示提示';$('hint-toggle').setAttribute('aria-expanded','false');
     renderMode();setSource(P.levels[index].start);save();
   }
@@ -1317,10 +1384,12 @@
     if(state.running){feedback.textContent='正在运行，等归约完成后再验证。';return;}
     if(C.findRedex(state.term,[],state.strategy,state.direction)){feedback.textContent='还有可归约的部分。先运行到正规形，再验证答案。';return;}
     const l=P.levels[state.level];
-    if(!C.equal(state.term,C.parse(l.target))){feedback.textContent='这还不是目标结果。可以修改表达式，或显示提示再试一次。';return;}
+    if(!window.LambdaChallenges.matches(l,state.term)){feedback.textContent='这还不是目标结果。可以修改表达式，或显示提示再试一次。';return;}
     state.completed.add(l.id);save();renderLevels();
-    feedback.textContent=state.completed.size===P.levels.length?'五关全部完成！现在可以自由实验，组合你自己的函数。':`第 ${l.id} 关完成！结果与目标等价。`;
+    const stage=P.stages.find(s=>s.levelIds.includes(l.id)),stageDone=stage.levelIds.every(id=>state.completed.has(id));
+    feedback.textContent=state.completed.size===P.levels.length?`${P.levels.length} 关全部完成！现在可以自由实验，组合你自己的函数。`:`第 ${l.id} 关完成！${stageDone?`「${stage.name}」阶段全部完成。`:'结果与目标等价。'}`;
     $('next-level').hidden=state.level===P.levels.length-1;
+    $('next-level').textContent=l.id===stage.levelIds.at(-1)?'下一阶段 →':'下一关 →';
     toast(`✓ ${l.name} · 挑战完成`);
   }
   input.addEventListener('input',changed);
@@ -1368,6 +1437,10 @@
   });
   $('mode-free').addEventListener('click',()=>{stop();state.mode='free';renderMode();render();save();});
   $('mode-challenge').addEventListener('click',()=>selectLevel(state.level));
+  $('stage-select').addEventListener('change',()=>{
+    const stage=P.stages.find(s=>String(s.id)===$('stage-select').value);
+    selectLevel(P.levels.findIndex(l=>l.id===stage.levelIds[0]));
+  });
   $('hint-toggle').addEventListener('click',()=>{const show=$('hint').hidden;$('hint').hidden=!show;$('hint-toggle').textContent=show?'收起提示':'显示提示';$('hint-toggle').setAttribute('aria-expanded',String(show));save();});
   $('check-answer').addEventListener('click',checkAnswer);
   $('next-level').addEventListener('click',()=>selectLevel(Math.min(state.level+1,P.levels.length-1)));
