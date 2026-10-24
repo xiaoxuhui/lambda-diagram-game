@@ -11,7 +11,8 @@ test('advanced examples cover combinators, arithmetic, factorial, combinations a
 });
 test('the original eight choices and five challenges retain their identities',()=>{
   assert.equal(P.examples[3].name,'Church 数字 2');assert.equal(P.examples[5].name,'加法 · 2 + 3');
-  assert.equal(P.examples[6].name,'Ω · 无限循环');assert.equal(P.levels.length,5);
+  assert.equal(P.examples[6].name,'Ω · 无限循环');assert.equal(P.levels.length,30);
+  assert.deepEqual(P.levels.slice(0,5).map(l=>[l.id,l.name]),[[1,'原样返回'],[2,'选择第一个'],[3,'翻转真假'],[4,'再走一步'],[5,'让函数相加']]);
 });
 for(const e of P.examples.filter(e=>e.expected!==undefined))test(`example reaches its stated result: ${e.name}`,()=>{
   const parsed=e.encoding==='decimal'?D.expand(C.parseInput(e.term)):C.parse(e.term);

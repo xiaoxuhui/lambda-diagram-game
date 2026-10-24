@@ -64,9 +64,35 @@
     { id:2, name:'选择第一个', topic:'布尔值', description:'两个函数交给 TRUE；归约后应只留下第一个。', start:`(${TRUE}) (${I}) (${TRUE})`, target:I, targetLabel:'I · 恒等函数', hint:'λx.λy.x 接收两个参数，只保留第一个。第二个参数可以是任意式。' },
     { id:3, name:'翻转真假', topic:'函数组合', description:'将 TRUE 交给 NOT，把选择第一个变成选择第二个。', start:`(λb.b (${FALSE}) (${TRUE})) (${TRUE})`, target:FALSE, targetLabel:'FALSE · 选择第二个', hint:'布尔值本身是一个选择器。NOT 把 FALSE 放在第一位，把 TRUE 放在第二位。' },
     { id:4, name:'再走一步', topic:'Church 数', description:'将 2 交给后继函数，让 f 在 x 上连续作用 3 次。', start:`(${SUCC}) (${TWO})`, target:THREE, targetLabel:'Church 数字 3', hint:'数字 n 表示重复 n 次。「加一」会在 n 次作用之外，再套上一层 f。' },
-    { id:5, name:'让函数相加', topic:'Church 加法', description:'不用数字运算，只靠函数，把 2 + 3 归约成 5。', start:`(${ADD}) (${TWO}) (${THREE})`, target:FIVE, targetLabel:'Church 数字 5', hint:'m f (n f x)：先把 f 作用 n 次，再继续作用 m 次。运行到正规形后验证答案。' }
+    { id:5, name:'让函数相加', topic:'Church 加法', description:'不用数字运算，只靠函数，把 2 + 3 归约成 5。', start:`(${ADD}) (${TWO}) (${THREE})`, target:FIVE, targetLabel:'Church 数字 5', hint:'m f (n f x)：先把 f 作用 n 次，再继续作用 m 次。运行到正规形后验证答案。' },
+    { id:6, name:'组合出恒等', topic:'S K K', description:'只用 S 与 K 两个组合子，组合出恒等函数 I。', start:`(λx y z.(x z) (y z)) (${TRUE}) (${TRUE})`, target:I, targetLabel:'I · 恒等函数', hint:'S K K z = K z (K z) = z。即使外层已经是 λ，也要继续归约函数体。' },
+    { id:7, name:'交换参数', topic:'组合子 C', description:'交换 TRUE 的两个输入，从 2 和 3 中选出原来的第二项。', start:`(λf x y.f y x) (${TRUE}) 2 3`, target:'3', targetLabel:'Church 数字 3', hint:'先代入 f=TRUE，再交换两个参数；最终 TRUE 收到的是 3、2。' },
+    { id:8, name:'连续加一', topic:'组合子 B', description:'把两个加一函数串起来，让 1 变成 3。', start:`(λf g x.f (g x)) (${SUCC}) (${SUCC}) 1`, target:'3', targetLabel:'Church 数字 3', hint:'B f g x = f (g x)。先计算里面的加一，再计算外面的加一。' },
+    { id:9, name:'深入函数内部', topic:'λ 内部归约', description:'外层没有参数可接收，函数体里面仍然可以继续归约。', start:'λz.(λx.x) z', target:I, targetLabel:'I · 恒等函数', hint:'点击 λz 内部那一处应用。得到 λz.z，与 λx.x 只是变量名不同。' },
+    { id:10, name:'保护自由变量', topic:'避免变量捕获', description:'把自由变量 y 传入一个含有 λy 的函数，保留它的自由身份。', start:'(λx.λy.x) y', target:'λz.y', targetLabel:'返回自由变量 y', hint:'先把内部绑定的 y 改名，再替换 x。结果可以是 λy1.y；不能变成 λy.y。' },
+    { id:11, name:'两者都为真', topic:'布尔 AND', description:'计算 TRUE 与 FALSE 的逻辑与，结果应为 FALSE。', start:`(λp q.p q p) (${TRUE}) (${FALSE})`, target:FALSE, targetLabel:'FALSE · 假', hint:'p 为真时选择 q；p 为假时保留 p。这里只有一个输入为真。' },
+    { id:12, name:'有一个为真', topic:'布尔 OR', description:'计算 FALSE 与 TRUE 的逻辑或，结果应为 TRUE。', start:`(λp q.p p q) (${FALSE}) (${TRUE})`, target:TRUE, targetLabel:'TRUE · 真', hint:'p 为假时选择 q。因此 FALSE OR TRUE 会返回 TRUE。' },
+    { id:13, name:'把假变真', topic:'布尔 NOT', description:'对 FALSE 取反，得到选择第一个参数的函数。', start:`(λb.b (${FALSE}) (${TRUE})) (${FALSE})`, target:TRUE, targetLabel:'TRUE · 真', hint:'FALSE 会从两个候选项中选择第二个，这里第二个是 TRUE。' },
+    { id:14, name:'取出第一项', topic:'有序对', description:'将 2 和 5 保存在函数里，再取出第一项。', start:`(${PAIR}) 2 5 (${TRUE})`, target:'2', targetLabel:'Church 数字 2', hint:'有序对把两个值交给选择器。TRUE 选择第一项。' },
+    { id:15, name:'取出第二项', topic:'有序对', description:'使用另一个选择器，从同一个有序对中取出 5。', start:`(${PAIR}) 2 5 (${FALSE})`, target:'5', targetLabel:'Church 数字 5', hint:'FALSE 选择第二项。观察有序对如何展开为一次函数调用。' },
+    { id:16, name:'重复中的重复', topic:'Church 乘法', description:'将重复 3 次的操作再重复 2 次，计算 2 × 3。', start:`(${MULT}) 2 3`, target:'6', targetLabel:'Church 数字 6', hint:'乘法 λm n f.m (n f) 把 n 次操作看成一个整体，再重复 m 次。' },
+    { id:17, name:'让数字作用于数字', topic:'Church 乘方', description:'让指数 3 作用在底数 2 上，计算 2³。', start:`(${POW}) 2 3`, target:'8', targetLabel:'Church 数字 8', hint:'Church 乘方可以写成 λb e.e b。归约函数体直到再无可归约项。' },
+    { id:18, name:'向后一步', topic:'Church 前驱', description:'从数字 3 中去掉一次函数作用，得到 2。', start:`(${PRED}) 3`, target:'2', targetLabel:'Church 数字 2', hint:'前驱借助中间状态，让最终的函数作用少执行一次。' },
+    { id:19, name:'连续后退', topic:'Church 减法', description:'对 5 连续取两次前驱，计算自然数减法 5 − 2。', start:`(${SUB}) 5 2`, target:'3', targetLabel:'Church 数字 3', hint:'把前驱函数重复 2 次。此阶段使用 Church 自然数，下阶段再进入负数与小数。' },
+    { id:20, name:'辨认零', topic:'零判断', description:'判断 Church 数字 0 是否为零，生成布尔值 TRUE。', start:`(${ZERO}) 0`, target:TRUE, targetLabel:'TRUE · 真', hint:'零不会执行传入的操作，所以零判断保留初始的 TRUE。' },
+    { id:21, name:'精确的小数加法', topic:'列表小数', encoding:'decimal', description:'用逐位进位计算 0.1 + 0.2，得到精确 0.3。建议点击「快速运行」。', start:'DEC_ADD 0.1 0.2', target:'0.3', targetType:'decimal', targetLabel:'精确小数 0.3', hint:'小数点位置先对齐，再对数字列表逐位相加。快速运行仍保留全部归约步骤。' },
+    { id:22, name:'跨过零', topic:'带符号减法', encoding:'decimal', description:'计算 1 − 2，让结果从自然数走到负数。', start:'DEC_SUB 1 2', target:'-1', targetType:'decimal', targetLabel:'精确小数 −1', hint:'比较两个绝对值，按较大值减较小值，然后确定负号。' },
+    { id:23, name:'小数点往哪里走', topic:'列表乘法', encoding:'decimal', description:'计算 0.2 × 0.3，观察数字乘积与小数位数共同决定结果。', start:'DEC_MUL 0.2 0.3', target:'0.06', targetType:'decimal', targetLabel:'精确小数 0.06', hint:'2 × 3 = 6；两个输入各有一位小数，所以结果共有两位小数。' },
+    { id:24, name:'除到刚刚好', topic:'十进制长除法', encoding:'decimal', decimalPlaces:3, description:'计算 1 ÷ 8。本关预置3位小数，运行后必须得到精确结果。建议快速运行。', start:'DEC_DIV 1 8', target:'0.125', targetType:'decimal', targetLabel:'精确小数 0.125', hint:'长除法逐位生成 1、2、5，余数归零。若自行调低精度，近似结果不能通关。' },
+    { id:25, name:'正负相遇', topic:'带符号加法', encoding:'decimal', description:'计算 −1.2 + 0.5，保留正确符号和小数位置。', start:'DEC_ADD -1.2 0.5', target:'-0.7', targetType:'decimal', targetLabel:'精确小数 −0.7', hint:'符号不同的加法等价于绝对值相减；较大的绝对值来自负数。' },
+    { id:26, name:'从三个里选两个', topic:'组合数', strategy:'normal', direction:'left', description:'用帕斯卡递推计算 C(3,2)，不计选择顺序。本关预设从左到右正规序。', start:`(${CHOOSE}) 3 2`, target:'3', targetLabel:'Church 数字 3', hint:`C(n,0)=1，C(0,k)=0，其余拆成两个较小的组合数。${recursiveHint}` },
+    { id:27, name:'三个数的连乘', topic:'迭代阶乘', description:'用有序对保存当前数字与累积乘积，真正算出 3!。', start:`(${FACTORIAL}) 3`, target:'6', targetLabel:'Church 数字 6', hint:'从 (0,1) 开始，连续更新三次：(1,1)、(2,2)、(3,6)，最后取出乘积。' },
+    { id:28, name:'生成导函数', topic:'符号求导', description:'输入原多项式 x² + 3x 的系数，归约生成导函数，而不是只代入某个点。', start:M.differentiate([0,3,1]), target:'2x + 3', targetType:'polynomial', targetLabel:'导函数 2x + 3', hint:'遍历降序系数 [1,3,0]，按原次数乘系数并去掉常数项，生成新的系数列表。' },
+    { id:29, name:'生成原函数', topic:'符号积分', description:'从原多项式 x 的系数开始，归约生成原函数，积分常数取 0。', start:M.integrate([0,1]), target:'1/2x²', targetType:'polynomial', targetLabel:'原函数 ½x²（C=0）', hint:'按次数加一除系数，并追加积分常数 0。系数 1 除以 2 后保存为有理数。' },
+    { id:30, name:'最后一关：曲线下面积', topic:'定积分', description:'从原多项式 2x 出发，先生成原函数，再计算从 0 到 3 的定积分。', start:M.definite([0,2],0,3), target:'9', targetType:'rational', targetLabel:'有理数 9', hint:'先对原系数 [2,0] 积分得到 x²，再计算上限值减下限值：9 − 0。所有转换都经过 β 归约。' }
   ];
-  const API={ examples, levels, I, TRUE, FALSE, advanced:{factorial:FACTORIAL,recursiveFactorial:RECURSIVE_FACTORIAL,choose:CHOOSE,permutations:PERMUTATIONS,sumPowers,geometricSum:GEOMETRIC_SUM,binomial:BINOMIAL,polynomial:POLYNOMIAL,derivative:DERIVATIVE,integral:INTEGRAL} };
+  const stages=['入门五关','函数与绑定','逻辑与数据','自然数进阶','列表小数','高等数学'].map((name,index)=>({id:index+1,name,levelIds:levels.slice(index*5,index*5+5).map(l=>l.id)}));
+  const API={ examples, levels, stages, I, TRUE, FALSE, advanced:{factorial:FACTORIAL,recursiveFactorial:RECURSIVE_FACTORIAL,choose:CHOOSE,permutations:PERMUTATIONS,sumPowers,geometricSum:GEOMETRIC_SUM,binomial:BINOMIAL,polynomial:POLYNOMIAL,derivative:DERIVATIVE,integral:INTEGRAL} };
   root.LambdaPresets=API;
   if(typeof module !== 'undefined' && module.exports) module.exports=API;
 })(typeof globalThis !== 'undefined' ? globalThis : window);

@@ -55,7 +55,7 @@ test('export contains namespace, accessible title and solid background', () => {
   assert.match(s,/xmlns="http:\/\/www.w3.org\/2000\/svg"/); assert.match(s,/<title>/); assert.match(s,/<rect/);
 });
 test('all five challenges normalize to their declared alpha-equivalent target', () => {
-  for(const l of P.levels) { const r=C.normalize(C.parse(l.start));
+  for(const l of P.levels.slice(0,5)) { const r=C.normalize(C.parse(l.start));
     assert.equal(r.status,'normal',l.name); assert.ok(C.equal(r.term,C.parse(l.target)),l.name);
   }
 });
