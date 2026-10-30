@@ -89,8 +89,9 @@ const C=require('../src/core.js'),P=require('../src/presets.js');
       assert.match(await page.locator('#error-message').textContent(),/第 4 个字符/);
       assert.ok(await page.locator('#run').isDisabled());assert.equal(await page.locator('#diagram-mount svg').count(),0);
     });
-    await check('input size limit is explained',async()=>{
-      await source('x'.repeat(1501));assert.match(await page.locator('#error-message').textContent(),/1500/);
+    await check('long input is accepted without a character quota',async()=>{
+      const text='λx.'+' '.repeat(20000)+'x';await source(text);assert.ok(await page.locator('#error-message').isHidden());assert.equal(await page.locator('#current-expression').textContent(),'λx.x');
+      assert.equal(await page.locator('#char-count').textContent(),`${text.length} 字符`);
     });
     await check('repeated states keep running until manually paused',async()=>{
       await source('(λx.x x)(λx.x x)');await page.locator('#speed').selectOption('180');await page.locator('#run').click();

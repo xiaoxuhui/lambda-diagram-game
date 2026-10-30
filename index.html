@@ -35,13 +35,13 @@
         <section class="card editor-card">
           <div class="section-heading"><div><span class="section-number">01</span><h2>写下表达式</h2></div><span class="mini-label">INPUT</span></div>
           <label class="sr-only" for="expression">Lambda 表达式</label>
-          <div class="number-options"><label for="number-encoding">数字编码</label><select id="number-encoding"><option value="decimal" selected>列表小数（默认）</option><option value="church">丘奇自然数（兼容）</option></select><label for="decimal-places">除法小数位</label><input id="decimal-places" type="number" min="0" step="1" value="6" inputmode="numeric"></div><p id="number-note" class="syntax-note">默认支持负数和小数。ADD / SUB / MUL / DIV 做列表小数四则运算；除不尽按所选位数截断并标≈。</p>
-          <div class="editor-wrap"><textarea id="expression" spellcheck="false" autocapitalize="off" autocomplete="off" aria-describedby="syntax-note error-message">(λx.x) (λy.y)</textarea><div class="editor-bottom"><span>λ / \ 均可输入</span><span id="char-count">12 / 1500</span></div></div>
+          <div class="number-options"><label for="number-encoding">数字编码</label><select id="number-encoding"><option value="decimal" selected>列表小数（默认）</option><option value="church">丘奇自然数（兼容）</option></select><label for="decimal-places">生成除法小数位</label><input id="decimal-places" type="number" min="0" step="1" value="6" inputmode="numeric"></div><p id="number-note" class="syntax-note">默认支持负数和小数。四则示例会填入完整 λ 表达式；除法精度在生成表达式时确定。</p>
+          <div class="editor-wrap"><textarea id="expression" spellcheck="false" autocapitalize="off" autocomplete="off" aria-describedby="syntax-note error-message">(λx.x) (λy.y)</textarea><div class="editor-bottom"><span>λ / \ 均可输入</span><span id="char-count">12 字符</span></div></div>
           <p class="toolbar-caption">快捷输入 <span>插入到光标位置</span></p>
           <div id="symbol-toolbar" class="symbol-toolbar" role="group" aria-label="Lambda 符号快捷栏">
             <button data-insert="λ" class="lambda-key" aria-label="插入 λ">λ</button>
           </div>
-          <p id="syntax-note" class="syntax-note">例如 <code>DEC_ADD 0.1 0.2</code>、<code>DEC_SUB 1 2</code>。可用简名 ADD / SUB / MUL / DIV；同名自定义函数优先。旧丘奇示例会选择兼容编码。</p>
+          <p id="syntax-note" class="syntax-note">在下方选择小数四则示例，直接编辑完整 λ 表达式。输入和函数定义无字数上限；所有函数名均由你自定义。旧丘奇示例会选择兼容编码。</p>
           <div id="error-message" class="error-message" role="alert" hidden></div>
           <button id="convert" class="button primary convert-button">转换成图示 <span>→</span></button>
           <p class="key-hint">Ctrl / ⌘ + Enter 快速转换</p>

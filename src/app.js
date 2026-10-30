@@ -37,7 +37,7 @@
     $('example-info').hidden=true;
     stop(); state.dirty=true; state.halt=''; $('error-message').hidden=true;
     $('challenge-feedback').textContent=''; $('next-level').hidden=true;
-    $('char-count').textContent=`${input.value.length} / ${C.LIMITS.chars}`;
+    $('char-count').textContent=`${input.value.length} 字符`;
     save(); render();
   }
   function insert(text) {
@@ -52,7 +52,7 @@
     try {
       if(state.numberEncoding==='decimal'&&!$('decimal-places').checkValidity())throw new C.LambdaError('除法小数位数需为非负整数。');
       const parsed=state.numberEncoding==='decimal'?C.parseInput(input.value):C.parse(input.value),expanded=workspace?workspace.expand(parsed):parsed;
-      const term=state.numberEncoding==='decimal'?window.LambdaDecimal.expand(expanded,state.decimalPlaces):expanded;
+      const term=expanded;
       state.term=term; state.original=term; state.history=[{term,change:null}]; state.paths=null;state.dirty=false;
       state.autoFit=true; render(); save(); return true;
     } catch(e) {
@@ -109,14 +109,14 @@
   function code(text) { const el=document.createElement('code'); el.textContent=text; return el; }
   function render() {
     $('number-encoding').value=state.numberEncoding;$('decimal-places').value=state.decimalPlaces;
-    $('number-note').textContent=state.numberEncoding==='decimal'?`列表小数：支持负数。ADD / SUB / MUL / DIV；除法截断至 ${state.decimalPlaces} 位，未除尽标≈。递归运算请用正规序、从左到右。`:'丘奇兼容模式：只接受自然数，保留旧示例与存档的编码；可切回列表小数。';
+    $('number-note').textContent=state.numberEncoding==='decimal'?`列表小数：支持负数。四则示例直接填入完整 λ 表达式。除法示例生成 ${state.decimalPlaces} 位小数，未除尽标≈；改位数后请重新选择示例，已有文本保持不变。`:'丘奇兼容模式：只接受自然数，保留旧示例与存档的编码；可切回列表小数。';
     const ready=state.term&&!state.dirty, redex=state.term?C.findRedex(state.term,[],state.strategy,state.direction):null;
     $('reduction-order').value=state.strategy;
     $('reduction-direction').value=state.direction;
     const side=state.direction==='right'?'右':'左';
     $('strategy-hint').textContent=state.strategy==='normal'?`先替换最${side}侧外层项，再处理内部。`:`先归约最${side}侧内部项，再做外层替换。`;
     const count=Math.max(0,state.history.length-1);
-    $('char-count').textContent=`${input.value.length} / ${C.LIMITS.chars}`;
+    $('char-count').textContent=`${input.value.length} 字符`;
     $('step-count').textContent=count; $('run-label').textContent=state.running?'暂停':'运行';
     $('run').firstElementChild.textContent=state.running?'Ⅱ':'▶';
     $('run').disabled=!ready;
@@ -226,7 +226,7 @@
     if(level.strategy)state.strategy=level.strategy;
     if(level.direction)state.direction=level.direction;
     state.level=index;state.mode='challenge';$('hint').hidden=true;$('hint-toggle').textContent='显示提示';$('hint-toggle').setAttribute('aria-expanded','false');
-    renderMode();setSource(P.levels[index].start);save();
+    renderMode();setSource(P.sourceFor(level,state.decimalPlaces));save();
   }
   function checkAnswer() {
     const feedback=$('challenge-feedback');
@@ -256,7 +256,7 @@
   });
   $('examples').addEventListener('change',()=>{
     const value=$('examples').value;if(value==='')return;const example=P.examples[Number(value)];if(!example)return;
-    state.numberEncoding=example.encoding||'church';setSource(example.term);$('examples').value='';
+    state.numberEncoding=example.encoding||'church';setSource(P.sourceFor(example,state.decimalPlaces));$('examples').value='';
     const expected=example.expectedType==='decimal'?`小数 ${example.expected}`:example.expectedType==='polynomial'?`多项式：${example.expected}`:example.expectedType==='rational'?`有理数 ${example.expected}`:example.expected===undefined?'':decode(C.parse(example.expected));
     $('example-info').textContent=example.description?`${example.description} 预期结果：${expected}。`:'';
     $('example-info').hidden=!example.description;
