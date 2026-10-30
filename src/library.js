@@ -38,7 +38,7 @@
     if(functions.some(f=>f.name===name))throw new C.LambdaError(`函数「${name}」已存在，请换一个名字。`);
     const parsed=numberEncoding==='decimal'?C.parseInput(source,maxChars):C.parse(source,maxChars);
     if(C.freeVars(parsed).has(name))throw new C.LambdaError('定义不能直接引用自身。递归请使用显式不动点组合子。');
-    const expanded=expand(parsed,functions),term=numberEncoding==='decimal'?root.LambdaDecimal.expand(expanded,precision):expanded;
+    const term=expand(parsed,functions);
     const result=[...functions,{name,source,term}];validate(result);return result;
   }
   const remove=(functions,name)=>functions.filter(f=>f.name!==name);

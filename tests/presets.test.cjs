@@ -15,7 +15,7 @@ test('the original eight choices and five challenges retain their identities',()
   assert.deepEqual(P.levels.slice(0,5).map(l=>[l.id,l.name]),[[1,'原样返回'],[2,'选择第一个'],[3,'翻转真假'],[4,'再走一步'],[5,'让函数相加']]);
 });
 for(const e of P.examples.filter(e=>e.expected!==undefined))test(`example reaches its stated result: ${e.name}`,()=>{
-  const parsed=e.encoding==='decimal'?D.expand(C.parseInput(e.term)):C.parse(e.term);
+  const parsed=e.encoding==='decimal'?C.parseInput(e.term):C.parse(e.term);
   assert.equal(C.freeVars(parsed).size,0,e.name);
   assert.ok(e.category&&e.description);
   let value;if(e.encoding==='decimal'){value=parsed;for(let n=0;n<100000;n++){const r=C.step(value);if(!r)break;value=r.term;}assert.equal(C.findRedex(value),null);}

@@ -25,6 +25,13 @@ test('old v2 five-level progress retains ids and current selection',()=>{
   const s=sample();s.completed=[1,2,3,4,5];s.level=4;
   const restored=S.decode(JSON.stringify(s));assert.deepEqual(restored.completed,s.completed);assert.equal(restored.level,4);
 });
+
+test('drafts and function sources longer than old character quotas survive save and v1 migration',()=>{
+  const s=sample(),source='λx.'+' '.repeat(20000)+'x';s.draft=source;s.functions=L.add(s.functions,'LONG',source);
+  s.functionDraft={name:'NEXT',source};s.selection={start:source.length,end:source.length};
+  const restored=S.decode(S.encode(s));assert.equal(restored.draft,source);assert.equal(restored.functions[1].source,source);assert.equal(restored.functionDraft.source,source);
+  assert.equal(S.decode(JSON.stringify({version:1,draft:source})).draft,source);
+});
 test('restoration supports expanded AST longer than input budget',()=>{
   const s=sample();let t=C.V('variable'.repeat(50));for(let i=0;i<3;i++)t=C.A(t,t);s.session={original:t,steps:0,dirty:false,halt:''};
   assert.ok(C.format(t).length>1500);assert.deepEqual(S.decode(S.encode(s)).term,t);

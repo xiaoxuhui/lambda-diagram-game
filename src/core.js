@@ -1,6 +1,6 @@
 (function (root) {
   'use strict';
-  const LIMITS = Object.freeze({ chars: 1500, nodes: Infinity, depth: Infinity, steps: Infinity, nameChars:Infinity });
+  const LIMITS = Object.freeze({ chars: Infinity, nodes: Infinity, depth: Infinity, steps: Infinity, nameChars:Infinity });
   const V = name => Object.freeze({ type: 'var', name });
   const L = (param, body) => Object.freeze({ type: 'abs', param, body });
   const A = (fn, arg) => Object.freeze({ type: 'app', fn, arg });

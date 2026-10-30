@@ -20,7 +20,7 @@
   }
   function validate(raw) {
     if(!object(raw)||![2,3].includes(raw.version))fail('不支持这个存档版本。');
-    if(typeof raw.draft!=='string'||raw.draft.length>10000)fail('草稿过长或缺失。');
+    if(typeof raw.draft!=='string')fail('草稿缺失或不是文本。');
     if(!Array.isArray(raw.functions))fail('函数库不合法。');
     const functions=raw.functions.map(f=>{
       if(!object(f))fail('函数定义不完整。');
@@ -83,7 +83,7 @@
     if(typeof text!=='string'||text.length>MAX_BYTES||new TextEncoder().encode(text).length>MAX_BYTES)fail('文件超过 2 MiB 上限。');
     let raw;try{raw=JSON.parse(text);}catch{fail('不是有效的 JSON 文件。');}
     if(object(raw)&&raw.version===1) {
-      const draft=typeof raw.draft==='string'&&raw.draft.length<=10000?raw.draft:'(λx.x) (λy.y)';
+      const draft=typeof raw.draft==='string'?raw.draft:'(λx.x) (λy.y)';
       const migrated={version:2,savedAt:new Date().toISOString(),draft,functions:[],completed:Array.isArray(raw.completed)?[...new Set(raw.completed.filter(i=>Number.isInteger(i)&&i>0&&i<6))]:[],
         mode:raw.mode==='challenge'?'challenge':'free',level:Number.isInteger(raw.level)&&raw.level>=0&&raw.level<5?raw.level:0,
         session:{original:null,steps:0,dirty:true,halt:''},view:{numberEncoding:'church',speed:600,scale:1,autoFit:true,historyOpen:false,helpOpen:false,hintOpen:false},selection:{start:0,end:0},error:''};

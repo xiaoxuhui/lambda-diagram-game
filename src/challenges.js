@@ -1,8 +1,8 @@
 (function(root){
   'use strict';
-  const C=root.LambdaCore||require('./core.js'),D=root.LambdaDecimal||require('./decimal.js'),M=root.LambdaPolynomial||require('./polynomial.js');
+  const C=root.LambdaCore||require('./core.js'),D=root.LambdaDecimal||require('./decimal.js'),M=root.LambdaPolynomial||require('./polynomial.js'),P=root.LambdaPresets||require('./presets.js');
   function compile(level){
-    return level.encoding==='decimal'?D.expand(C.parseInput(level.start),level.decimalPlaces??6):C.parse(level.start);
+    const source=P.sourceFor(level);return level.encoding==='decimal'?C.parseInput(source):C.parse(source);
   }
   function matches(level,term){
     if(!term||C.findRedex(term))return false;

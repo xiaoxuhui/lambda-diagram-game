@@ -20,7 +20,10 @@ test('missing parenthesis is rejected', () => assert.throws(() => p('(λx.x'), /
 test('extra parenthesis is rejected', () => assert.throws(() => p('x)'), /多余/));
 test('illegal token is located', () => assert.throws(() => p('x + y'), e => e.position === 2));
 test('naked lambda argument is rejected with help', () => assert.throws(() => p('f λx.x'), /需要括号/));
-test('character budget rejects before parse', () => assert.throws(() => p('x'.repeat(1501)), /1500/));
+test('default source length is unlimited while explicit caller budgets still work', () => {
+  const source='λx.'+' '.repeat(20000)+'x';assert.ok(C.equal(p(source),p('λx.x')));
+  assert.equal(C.LIMITS.chars,Infinity);assert.throws(()=>p(source,1500),/1500/);
+});
 test('parentheses beyond old depth limit remain valid', () => assert.equal(p('('.repeat(301) + 'x' + ')'.repeat(301)).name,'x'));
 test('application depth no longer imposes a diagram quota', () => assert.equal(C.inspect(p(Array(302).fill('x').join(' '))).depth,302));
 test('identity reduces in one step', () => assert.ok(C.equal(C.step(p('(λx.x)(λy.y)')).term, p('λy.y'))));

@@ -76,8 +76,8 @@
   text=text.replace(/^0+(?=\d)/,'').replace(/(\.\d*?)0+$/,'$1').replace(/\.$/,'');
   return (value.approximate?'≈ ':'')+(value.negative&&!/^0(?:\.0*)?$/.test(text)?'-':'')+text;
  }
- function expand(term,precision=6){
-  for(const name of C.freeVars(term)){const match=/^(?:DEC_)?(ADD|SUB|MUL|DIV)$/.exec(name);if(match)term=C.substitute(term,name,program(match[1],precision));}return term;
+ function expression(operation,args=[],precision=6){
+  return `(${C.format(program(operation,precision))})`+args.map(arg=>` (${arg})`).join('');
  }
- const API={encodeLiteral,read,format,program,expand};root.LambdaDecimal=API;if(typeof module!=='undefined'&&module.exports)module.exports=API;
+ const API={encodeLiteral,read,format,program,expression};root.LambdaDecimal=API;if(typeof module!=='undefined'&&module.exports)module.exports=API;
 })(typeof globalThis!=='undefined'?globalThis:window);

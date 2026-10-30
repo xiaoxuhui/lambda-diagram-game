@@ -5,7 +5,7 @@ const D = require('../src/diagram.js');
 const P = require('../src/presets.js');
 const before=require('./fixtures/diagram-before-performance.cjs');
 const Decimal=require('../src/decimal.js');
-const parseExample=s=>P.examples.some(e=>e.term===s&&e.encoding==='decimal')?Decimal.expand(C.parseInput(s)):C.parse(s);
+const parseExample=s=>P.examples.some(e=>e.term===s&&e.encoding==='decimal')?C.parseInput(s):C.parse(s);
 const model = s => D.layout(parseExample(s));
 test('large numeral emits every line without compression',()=>{const m=D.svg(C.parse('1024'));assert.equal(m.model.leaves.length,1025);assert.equal(m.model.lines.length,4099);assert.equal((m.markup.match(/<line /g)||[]).length,4099);});
 test('long free-variable labels stay complete',()=>assert.ok(D.svg(C.parse('variableName')).markup.includes('>variableName</text>')));

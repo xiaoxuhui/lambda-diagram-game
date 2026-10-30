@@ -19,7 +19,32 @@ test('long division reports exactness, truncation, signs and division by zero',(
 test('default editor parser uses decimal lists while the explicit Church parser stays compatible',()=>{
  assert.equal(typeof C.parseInput,'function');assert.equal(D.format(D.read(C.parseInput('-0.25'))),'-0.25');
  assert.equal(D.format(D.read(C.parseInput('3'))),'3');assert.equal(C.churchNumber(C.parse('3')),3);
- const term=D.expand(C.parseInput('ADD 0.1 0.2'));assert.equal(C.freeVars(term).size,0);
+ const term=C.parseInput(D.expression('ADD',['0.1','0.2']));assert.equal(C.freeVars(term).size,0);
+});
+
+test('all former decimal builtin names are ordinary free variables or custom functions',()=>{
+ const L=require('../src/library.js');assert.equal(D.expand,undefined);
+ for(const name of ['ADD','SUB','MUL','DIV','DEC_ADD','DEC_SUB','DEC_MUL','DEC_DIV','DECADD']){
+  const raw=C.parseInput(`${name} 0.1 0.2`);assert.deepEqual([...C.freeVars(L.expand(raw,[]))],[name]);
+  const f=L.add([],name,'λa b.a',Infinity,'decimal');let term=L.expand(raw,f);
+  while(C.findRedex(term))term=C.step(term).term;assert.equal(D.format(D.read(term)),'0.1');
+  const holder=L.add([],'HOLDER',`λx.${name} x`,Infinity,'decimal');assert.deepEqual([...C.freeVars(holder[0].term)],[name]);
+ }
+});
+test('complete decimal program text parses, stays closed and actually computes all four operations',()=>{
+ for(const [op,a,b,precision,want] of [['ADD','0.1','0.2',6,'0.3'],['SUB','1','2',6,'-1'],['MUL','0.2','0.3',6,'0.06'],['DIV','1','8',3,'0.125']]){
+  const source=D.expression(op,[a,b],precision);assert.ok(source.length>1500);assert.ok(!/\bDEC_/.test(source));
+  let term=C.parseInput(source);assert.equal(C.freeVars(term).size,0);
+  for(let i=0;i<100000;i++){const next=C.step(term);if(!next)break;term=next.term;}
+  assert.equal(C.findRedex(term),null);assert.equal(D.format(D.read(term)),want);
+ }
+});
+test('long explicit definitions save and edit while legacy compiled alias sources retain meaning',()=>{
+ const L=require('../src/library.js'),source=D.expression('ADD',['0.1','0.2'])+' '.repeat(12000);
+ let f=L.add([],'DEC_ADD',source,undefined,'decimal');assert.equal(f[0].source,source);assert.equal(C.freeVars(f[0].term).size,0);
+ f=L.update(f,'DEC_ADD','DECADD',source+' ','decimal');assert.equal(f[0].source,source+' ');
+ const legacy={name:'OLD',source:'ADD 0.1 0.2',term:C.parseInput(D.expression('ADD',['0.1','0.2']))};
+ assert.equal(L.update([legacy],'OLD','OLD',legacy.source,'decimal')[0].term,legacy.term);
 });
 test('decimal function definitions and unchanged old definitions keep their correct encoding',()=>{
  const L=require('../src/library.js');let functions=L.add([],'N','  -0.125\n',1500,'decimal');assert.equal(D.format(D.read(functions[0].term)),'-0.125');
