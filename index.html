@@ -26,8 +26,8 @@
     <section id="challenge-panel" class="challenge-panel" hidden>
       <div class="stage-row"><label for="stage-select">选择阶段 <select id="stage-select" aria-label="选择挑战阶段"></select></label><span id="stage-progress" role="status"></span></div>
       <div class="level-list" id="level-list" aria-label="选择关卡"></div>
-      <div class="challenge-body"><div><p id="level-topic" class="eyebrow"></p><h2 id="level-title"></h2><p id="level-description"></p></div><div class="challenge-target"><span id="target-kind">目标正规形</span><strong id="target-label"></strong><code id="target-expression"></code></div></div>
-      <div class="challenge-footer"><button id="hint-toggle" class="text-button" aria-expanded="false">显示提示</button><p id="hint" hidden></p><button id="check-answer" class="button primary">验证答案 <span>↗</span></button><button id="next-level" class="button" hidden>下一关 →</button></div>
+      <div class="challenge-body"><div><p id="level-topic" class="eyebrow"></p><h2 id="level-title"></h2><p id="level-description"></p></div><div id="challenge-target" class="challenge-target" hidden><span id="target-kind">目标正规形</span><strong id="target-label"></strong><code id="target-expression"></code></div></div>
+      <div class="challenge-footer"><button id="hint-toggle" class="text-button" aria-expanded="false" aria-controls="hint">显示提示</button><p id="hint" hidden></p><button id="answer-toggle" class="text-button" aria-expanded="false" aria-controls="challenge-target">查看答案</button><button id="check-answer" class="button primary">验证答案 <span>↗</span></button><button id="next-level" class="button" hidden>下一关 →</button></div>
       <p id="challenge-feedback" class="challenge-feedback" role="status"></p>
     </section>
     <div class="workspace">

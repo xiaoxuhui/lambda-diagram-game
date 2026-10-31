@@ -119,8 +119,9 @@ const C=require('../src/core.js'),P=require('../src/presets.js');
     await check('challenge requires normal form and hints toggle',async()=>{
       await page.locator('#mode-challenge').click();await page.locator('#check-answer').click();
       assert.match(await page.locator('#challenge-feedback').textContent(),/还有可归约/);
-      await page.locator('#hint-toggle').click();assert.ok(await page.locator('#hint').isVisible());
+      assert.ok(await page.locator('#hint').isVisible());assert.ok(await page.locator('#challenge-target').isHidden());
       await page.locator('#hint-toggle').click();assert.ok(await page.locator('#hint').isHidden());
+      await page.locator('#hint-toggle').click();assert.ok(await page.locator('#hint').isVisible());
     });
     await check('all five challenge flows complete through real clicks',async()=>{
       for(let i=0;i<5;i++) {

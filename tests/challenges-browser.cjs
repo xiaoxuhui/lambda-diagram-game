@@ -15,11 +15,20 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
    assert.equal(await page.locator('#challenge-count').textContent(),'30');assert.equal(await page.locator('#stage-select option').count(),6);assert.equal(await page.locator('#level-list button').count(),5);
    await page.locator('#check-answer').click();assert.match(await page.locator('#challenge-feedback').textContent(),/还有可归约/);
   });
+  await check('answers require an explicit click and reset on close, reload, restore and stage changes',async()=>{
+   assert.ok(await page.locator('#hint').isVisible());assert.ok(await page.locator('#challenge-target').isHidden());assert.equal(await page.locator('#target-expression').textContent(),'');
+   await page.locator('#answer-toggle').click();assert.ok(await page.locator('#challenge-target').isVisible());assert.equal(await page.locator('#answer-toggle').getAttribute('aria-expanded'),'true');assert.equal(await page.locator('#target-expression').textContent(),P.levels[0].target);
+   await page.locator('#answer-toggle').click();assert.ok(await page.locator('#challenge-target').isHidden());assert.equal(await page.locator('#target-expression').textContent(),'');
+   await page.locator('#answer-toggle').click();await page.locator('#save-state').click();await page.reload();assert.ok(await page.locator('#challenge-target').isHidden());assert.equal(await page.locator('#answer-toggle').getAttribute('aria-expanded'),'false');
+   await page.locator('#answer-toggle').click();await page.locator('#restore-state').click();assert.ok(await page.locator('#challenge-target').isHidden());
+   await page.locator('#answer-toggle').click();await page.locator('#stage-select').selectOption('2');assert.ok(await page.locator('#challenge-target').isHidden());assert.equal(await page.locator('#target-label').textContent(),'');await page.locator('#stage-select').selectOption('1');
+  });
   for(const level of P.levels)await check(`desktop level ${level.id} reduces and advances through real controls`,async()=>{
    assert.equal(await page.locator('#level-title').textContent(),level.name);
+   assert.ok(await page.locator('#challenge-target').isHidden());assert.ok(await page.locator('#hint').isVisible());assert.equal(await page.locator('#target-expression').textContent(),'');assert.equal(await page.locator('#target-label').textContent(),'');assert.equal(await page.locator('#hint').textContent(),level.hint);
    assert.equal(await page.locator('#number-encoding').inputValue(),level.encoding??'church');
    if(level.decimalPlaces!==undefined)assert.equal(await page.locator('#decimal-places').inputValue(),String(level.decimalPlaces));
-   await finish(page);assert.equal(await page.locator('#progress-text').textContent(),`${level.id} / 30 关已完成`);
+   await finish(page);assert.ok(await page.locator('#challenge-target').isHidden());assert.equal(await page.locator('#progress-text').textContent(),`${level.id} / 30 关已完成`);
    if(level.id<30){if(level.id%5===0)assert.equal(await page.locator('#next-level').textContent(),'下一阶段 →');await page.locator('#next-level').click();}
   });
   await check('all thirty records and final stage survive refresh and saved-state restore',async()=>{
@@ -30,12 +39,12 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
   });await context.close();
   const mobile=await browser.newContext({viewport:{width:390,height:950},hasTouch:true}),phone=await mobile.newPage();phone.on('pageerror',e=>errors.push(e.message));await phone.goto(base);await phone.locator('#mode-challenge').click();
   await check('mobile selects every stage with five levels and no horizontal overflow',async()=>{
-   for(const stage of P.stages){await phone.locator('#stage-select').selectOption(String(stage.id));assert.equal(await phone.locator('#level-list button').count(),5);assert.match(await phone.locator('#level-list button').first().textContent(),new RegExp(`^${stage.levelIds[0]} `));assert.ok(await phone.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));}
+   for(const stage of P.stages){await phone.locator('#stage-select').selectOption(String(stage.id));assert.equal(await phone.locator('#level-list button').count(),5);assert.match(await phone.locator('#level-list button').first().textContent(),new RegExp(`^${stage.levelIds[0]} `));assert.ok(await phone.locator('#hint').isVisible());assert.ok(await phone.locator('#challenge-target').isHidden());assert.ok(await phone.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));}
   });
   await check('mobile lambda-internal reduction, decimals and symbolic integral can pass',async()=>{
    await phone.locator('#stage-select').selectOption('2');await phone.locator('#level-list button').nth(3).click();await finish(phone);
    await phone.locator('#stage-select').selectOption('5');await finish(phone);assert.equal(await phone.locator('#decoded').textContent(),'小数 0.3');
-   await phone.locator('#stage-select').selectOption('6');await phone.locator('#level-list button').nth(3).click();await finish(phone);assert.equal(await phone.locator('#target-expression').textContent(),'1/2x²');
+   await phone.locator('#stage-select').selectOption('6');await phone.locator('#level-list button').nth(3).click();await finish(phone);assert.ok(await phone.locator('#challenge-target').isHidden());assert.equal(await phone.locator('#target-expression').textContent(),'');await phone.locator('#answer-toggle').click();assert.equal(await phone.locator('#target-expression').textContent(),'1/2x²');await phone.locator('#answer-toggle').click();assert.ok(await phone.locator('#challenge-target').isHidden());
    await phone.locator('#challenge-panel').screenshot({path:path.join(__dirname,'artifacts','challenges-mobile.png')});
   });
   await check('mobile approximate decimal cannot pass exact division target',async()=>{

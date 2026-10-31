@@ -6,6 +6,11 @@ test('six stages cover thirty unique levels in stable order',()=>{
   assert.deepEqual(P.stages.flatMap(s=>s.levelIds),P.levels.map(l=>l.id));
   for(const stage of P.stages)assert.equal(stage.levelIds.length,5);
 });
+test('challenge guidance explains methods without spelling out final results',()=>{
+ for(const [id,spoiler] of [[5,/归约成 5/],[9,/得到 λz.z/],[10,/结果可以是/],[21,/0\.3/],[23,/2 × 3 = 6/],[24,/0\.125|1、2、5/],[27,/\(3,6\)/],[28,/2x \+ 3/],[29,/1\/2|½/],[30,/9 − 0|得到 x²/]]){
+  const level=P.levels.find(l=>l.id===id);assert.doesNotMatch(level.description+' '+level.hint,spoiler,`level ${id} gives away its answer`);
+ }
+});
 for(const level of P.levels)test(`challenge ${level.id} actually reduces to ${level.targetLabel}`,()=>{
   for(const key of ['name','topic','description','hint','target','targetLabel'])assert.ok(level[key],key);
   let term=H.compile(level),steps=0;assert.ok(!H.matches(level,term),'starting term still needs reduction');

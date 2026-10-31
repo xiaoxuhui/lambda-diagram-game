@@ -18,6 +18,7 @@
   function applySnapshot(s) {
     $('example-info').hidden=true;
     stop();input.value=s.draft;state.completed=new Set(s.completed);state.mode=s.mode;state.level=s.level;
+    revealAnswer(false);
     state.original=s.session.original;state.term=s.term;state.history=s.history;state.paths=s.session.paths??null;state.dirty=s.session.dirty;state.halt=s.session.halt;
     state.scale=s.view.scale;state.autoFit=s.view.autoFit;state.speed=s.view.speed;state.strategy=s.view.strategy??'normal';state.direction=s.view.direction??'left';renderSpeed();
     state.numberEncoding=s.view.numberEncoding??'decimal';state.decimalPlaces=s.view.decimalPlaces??6;
@@ -191,6 +192,11 @@
     schedule();
   }
   function setSource(source) { input.value=source; changed(); convert(); }
+  function revealAnswer(show) {
+    const level=P.levels[state.level];$('challenge-target').hidden=!show;
+    $('answer-toggle').textContent=show?'收起答案':'查看答案';$('answer-toggle').setAttribute('aria-expanded',String(show));
+    $('target-label').textContent=show?level.targetLabel:'';$('target-expression').textContent=show?level.target:'';
+  }
   function renderLevels() {
     const l=P.levels[state.level],stage=P.stages.find(s=>s.levelIds.includes(l.id));
     const select=$('stage-select');select.replaceChildren();
@@ -210,7 +216,7 @@
     });
     $('level-topic').textContent=`CHALLENGE ${String(l.id).padStart(2,'0')} / ${l.topic}`;
     $('level-title').textContent=l.name; $('level-description').textContent=l.description;
-    $('target-label').textContent=l.targetLabel;$('target-expression').textContent=l.target;$('hint').textContent=l.hint;
+    revealAnswer(!$('challenge-target').hidden);$('hint').textContent=l.hint;
     $('target-kind').textContent=l.targetType?'目标结果（归约至正规形）':'目标正规形';
     $('progress-text').textContent=state.mode==='challenge'?`${state.completed.size} / ${P.levels.length} 关已完成`:'探索 · 输入 · 归约';
   }
@@ -225,7 +231,7 @@
     if(level.decimalPlaces!==undefined)state.decimalPlaces=level.decimalPlaces;
     if(level.strategy)state.strategy=level.strategy;
     if(level.direction)state.direction=level.direction;
-    state.level=index;state.mode='challenge';$('hint').hidden=true;$('hint-toggle').textContent='显示提示';$('hint-toggle').setAttribute('aria-expanded','false');
+    state.level=index;state.mode='challenge';revealAnswer(false);$('hint').hidden=false;$('hint-toggle').textContent='收起提示';$('hint-toggle').setAttribute('aria-expanded','true');
     renderMode();setSource(P.sourceFor(level,state.decimalPlaces));save();
   }
   function checkAnswer() {
@@ -292,6 +298,7 @@
     selectLevel(P.levels.findIndex(l=>l.id===stage.levelIds[0]));
   });
   $('hint-toggle').addEventListener('click',()=>{const show=$('hint').hidden;$('hint').hidden=!show;$('hint-toggle').textContent=show?'收起提示':'显示提示';$('hint-toggle').setAttribute('aria-expanded',String(show));save();});
+  $('answer-toggle').addEventListener('click',()=>revealAnswer($('challenge-target').hidden));
   $('check-answer').addEventListener('click',checkAnswer);
   $('next-level').addEventListener('click',()=>selectLevel(Math.min(state.level+1,P.levels.length-1)));
   $('help-toggle').addEventListener('click',()=>{const show=$('help-panel').hidden;$('help-panel').hidden=!show;$('help-toggle').setAttribute('aria-expanded',String(show));save();});
