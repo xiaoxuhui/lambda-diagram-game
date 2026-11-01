@@ -9,6 +9,27 @@ const result=source=>{
 test('advanced examples cover combinators, arithmetic, factorial, combinations and recursion',()=>{
   for(const name of ['组合子 B','乘法','乘方','阶乘','组合数','斐波那契'])assert.ok(P.examples.some(e=>e.name.includes(name)),name);
 });
+test('Church list functions handle empty, singleton, custom mappings and ordered folds',()=>{
+  const L=P.churchLists, list=L.encode, nil=`(${L.nil})`;
+  const cases=[
+    [`(${L.head}) ${nil} 7`,'7'],
+    [`(${L.tail}) ${nil}`,L.nil],
+    [`(${L.tail}) (${list([5])})`,L.nil],
+    [`(${L.length}) ${nil}`,'0'],
+    [`(${L.length}) (${list([0,0,0,0])})`,'4'],
+    [`(${L.map}) (λx.x x) ${nil}`,L.nil],
+    [`(${L.map}) (λx.λf z.x f (x f z)) (${list([1,2])})`,list([2,4])],
+    [`(${L.append}) ${nil} (${list([2,1])})`,list([2,1])],
+    [`(${L.append}) (${list([2,1])}) ${nil}`,list([2,1])],
+    [`(${L.reverse}) ${nil}`,L.nil],
+    [`(${L.reverse}) (${list([4])})`,list([4])],
+    [`(${L.filter}) (λx.${P.TRUE}) (${list([1,2])})`,list([1,2])],
+    [`(${L.filter}) (λx.${P.FALSE}) (${list([1,2])})`,L.nil],
+    [`(${L.filter}) (λx.${P.TRUE}) ${nil}`,L.nil],
+    [`(${list([1,2,3])}) (λh r.h) 0`,'1']
+  ];
+  for(const [source,expected] of cases)assert.ok(C.equal(result(source),C.parse(expected)),source);
+});
 test('the original eight choices and five challenges retain their identities',()=>{
   assert.equal(P.examples[3].name,'Church 数字 2');assert.equal(P.examples[5].name,'加法 · 2 + 3');
   assert.equal(P.examples[6].name,'Ω · 无限循环');assert.equal(P.levels.length,30);

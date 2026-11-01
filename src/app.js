@@ -264,7 +264,7 @@
     const value=$('examples').value;if(value==='')return;const example=P.examples[Number(value)];if(!example)return;
     state.numberEncoding=example.encoding||'church';setSource(P.sourceFor(example,state.decimalPlaces));$('examples').value='';
     const expected=example.expectedType==='decimal'?`小数 ${example.expected}`:example.expectedType==='polynomial'?`多项式：${example.expected}`:example.expectedType==='rational'?`有理数 ${example.expected}`:example.expected===undefined?'':decode(C.parse(example.expected));
-    $('example-info').textContent=example.description?`${example.description} 预期结果：${expected}。`:'';
+    $('example-info').textContent=example.description?`${example.description} 预期结果：${example.expectedLabel||expected}。`:'';
     $('example-info').hidden=!example.description;
   });
   $('convert').addEventListener('click',convert);$('step').addEventListener('click',advance);$('run').addEventListener('click',run);

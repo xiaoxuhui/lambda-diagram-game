@@ -669,6 +669,15 @@
   const POLYNOMIAL=`λx.(${ADD}) ((${MULT}) ((${ADD}) ((${MULT}) 2 x) 3) x) 1`;
   const DERIVATIVE=M.derivativeAt([0,3,1]),INTEGRAL=M.integralFunction([0,2]);
   const recursiveHint='使用显式 Y 不动点组合子。建议选择「正规序」「从左到右」运行，先判断终止条件；其他顺序可能无法终止。';
+  const NIL='λc n.n', CONS='λh t c n.c h (t c n)';
+  const churchList=items=>`λc n.${items.reduceRight((tail,head)=>`c (${head}) (${tail})`,'n')}`;
+  const HEAD='λl d.l (λh r.h) d', EMPTY=`λl.l (λh r.(${FALSE})) (${TRUE})`;
+  const LENGTH=`λl.l (λh r.(${SUCC}) r) 0`;
+  const TAIL=`λl.(l (λh p.(${PAIR}) ((${CONS}) h (p (${TRUE}))) (p (${TRUE}))) ((${PAIR}) (${NIL}) (${NIL}))) (${FALSE})`;
+  const MAP='λf l c n.l (λh r.c (f h) r) n', APPEND='λa b c n.a c (b c n)';
+  const REVERSE=`λl.l (λh r a.r ((${CONS}) h a)) (${I}) (${NIL})`;
+  const FILTER='λp l c n.l (λh r.p h (c h r) r) n';
+  const listExample=(name,term,expected,description,expectedLabel)=>({name,category:'丘奇列表',encoding:'church',term,expected,description,expectedLabel});
   const examples = [
     { name:'恒等函数 I', term:I },
     { name:'TRUE · 选择第一个', term:TRUE },
@@ -709,6 +718,22 @@
     { name:'列表小数乘法 · 0.2 × 0.3 → 0.06', category:'列表小数四则', encoding:'decimal',term:D.expression('MUL',["0.2","0.3"]),decimalOperation:'MUL',operands:["0.2","0.3"],expected:'0.06',expectedType:'decimal',description:'逐位竖式相乘，小数位数相加，结果为精确0.06。' },
     { name:'列表小数除法 · 1 ÷ 8 → 0.125', category:'列表小数四则', encoding:'decimal',term:D.expression('DIV',["1","8"]),decimalOperation:'DIV',operands:["1","8"],expected:'0.125',expectedType:'decimal',description:'用十进制长除法生成小数数字。精度至少3位时结果精确为0.125；精度不足会标≈。选择快速运行可保留全部归约步骤。' }
   ];
+  const list123=churchList([1,2,3]);
+  examples.push(
+    listExample('丘奇列表 · 空表 []',NIL,NIL,'空表 λc n.n 直接返回折叠初值 n，不调用组合函数 c。它与 FALSE、Church 数0同形。','丘奇列表 []（与 FALSE / Church 数0同形）'),
+    listExample('丘奇列表 · 头部插入 1 → [1, 2, 3]',`(${CONS}) 1 (${churchList([2,3])})`,list123,'CONS 接收元素和列表：λh t c n.c h (t c n)。此例把1放到 [2,3] 前面。','丘奇列表 [1, 2, 3]'),
+    listExample('丘奇列表 · 首项 HEAD → 1',`(${HEAD}) (${list123}) 0`,'1','HEAD 用 λh r.h 选择首项；第二个参数是空表时返回的默认值，这里为0。'),
+    listExample('丘奇列表 · 尾部 TAIL → [2, 3]',`(${TAIL}) (${list123})`,churchList([2,3]),'TAIL 从右折叠，用有序对记录当前后缀与去掉首项的后缀；空表的尾部仍为空表。','丘奇列表 [2, 3]'),
+    listExample('丘奇列表 · 判空 [] → TRUE',`(${EMPTY}) (${NIL})`,TRUE,'空表不执行组合函数，保留 TRUE；遇到任意元素就返回 FALSE。'),
+    listExample('丘奇列表 · 判空 [1, 2, 3] → FALSE',`(${EMPTY}) (${list123})`,FALSE,'非空表至少调用一次组合函数，所以判空结果为 FALSE。'),
+    listExample('丘奇列表 · 长度 LENGTH → 3',`(${LENGTH}) (${list123})`,'3','从0开始，每遇到一个元素就对累计长度加一；不读取元素本身。'),
+    listExample('丘奇列表 · 映射 MAP 加一 → [2, 3, 4]',`(${MAP}) (${SUCC}) (${list123})`,churchList([2,3,4]),'MAP 接收函数和列表，对每项应用该函数，并保持原顺序。此处传入 Church 后继函数。','丘奇列表 [2, 3, 4]'),
+    listExample('丘奇列表 · 拼接 APPEND → [1, 2, 3]',`(${APPEND}) (${churchList([1,2])}) (${churchList([3])})`,list123,'先折叠第二个列表，再把第一个列表的元素接到前面，得到 [1,2,3]。','丘奇列表 [1, 2, 3]'),
+    listExample('丘奇列表 · 反转 REVERSE → [3, 2, 1]',`(${REVERSE}) (${list123})`,churchList([3,2,1]),'折叠生成接收累积列表的函数，逐项插入头部，让元素次序反转。','丘奇列表 [3, 2, 1]'),
+    listExample('丘奇列表 · 折叠求和 → 6',`(${list123}) (${ADD}) 0`,'6','Church 列表本身就是右折叠：l c n。将 c 换成加法、n 设为0，计算1 + (2 + (3 + 0))。'),
+    listExample('丘奇列表 · 折叠乘积 → 6',`(${list123}) (${MULT}) 1`,'6','将组合函数换成乘法、初值设为1，计算1 × (2 × (3 × 1))；空表乘积为1。'),
+    listExample('丘奇列表 · 过滤 FILTER 去零 → [2, 3]',`(${FILTER}) (λh.(${ZERO}) h (${FALSE}) (${TRUE})) (${churchList([0,2,0,3])})`,churchList([2,3]),'FILTER 接收布尔谓词和列表，只保留谓词返回 TRUE 的元素；此处筛掉0，保持剩余元素顺序。','丘奇列表 [2, 3]')
+  );
   const levels = [
     { id:1, name:'原样返回', topic:'恒等函数', description:'让恒等函数接收一个函数，看看它如何把输入原样返回。', start:'(λx.x) (λy.y)', target:I, targetLabel:'I · 恒等函数', hint:'λx.x 会把参数直接返回。点击「单步」，观察 x 被整个参数替换。' },
     { id:2, name:'选择第一个', topic:'布尔值', description:'两个函数交给 TRUE；归约后应只留下第一个。', start:`(${TRUE}) (${I}) (${TRUE})`, target:I, targetLabel:'I · 恒等函数', hint:'λx.λy.x 接收两个参数，只保留第一个。第二个参数可以是任意式。' },
@@ -743,7 +768,7 @@
   ];
   const stages=['入门五关','函数与绑定','逻辑与数据','自然数进阶','列表小数','高等数学'].map((name,index)=>({id:index+1,name,levelIds:levels.slice(index*5,index*5+5).map(l=>l.id)}));
   function sourceFor(item,precision=item.decimalPlaces??6){return item.decimalOperation?D.expression(item.decimalOperation,item.operands,precision):item.term??item.start;}
-  const API={ examples, levels, stages, sourceFor, I, TRUE, FALSE, advanced:{factorial:FACTORIAL,recursiveFactorial:RECURSIVE_FACTORIAL,choose:CHOOSE,permutations:PERMUTATIONS,sumPowers,geometricSum:GEOMETRIC_SUM,binomial:BINOMIAL,polynomial:POLYNOMIAL,derivative:DERIVATIVE,integral:INTEGRAL} };
+  const API={ examples, levels, stages, sourceFor, I, TRUE, FALSE, churchLists:{encode:churchList,nil:NIL,cons:CONS,head:HEAD,tail:TAIL,isEmpty:EMPTY,length:LENGTH,map:MAP,append:APPEND,reverse:REVERSE,filter:FILTER}, advanced:{factorial:FACTORIAL,recursiveFactorial:RECURSIVE_FACTORIAL,choose:CHOOSE,permutations:PERMUTATIONS,sumPowers,geometricSum:GEOMETRIC_SUM,binomial:BINOMIAL,polynomial:POLYNOMIAL,derivative:DERIVATIVE,integral:INTEGRAL} };
   root.LambdaPresets=API;
   if(typeof module !== 'undefined' && module.exports) module.exports=API;
 })(typeof globalThis !== 'undefined' ? globalThis : window);
@@ -1415,7 +1440,7 @@
     const value=$('examples').value;if(value==='')return;const example=P.examples[Number(value)];if(!example)return;
     state.numberEncoding=example.encoding||'church';setSource(P.sourceFor(example,state.decimalPlaces));$('examples').value='';
     const expected=example.expectedType==='decimal'?`小数 ${example.expected}`:example.expectedType==='polynomial'?`多项式：${example.expected}`:example.expectedType==='rational'?`有理数 ${example.expected}`:example.expected===undefined?'':decode(C.parse(example.expected));
-    $('example-info').textContent=example.description?`${example.description} 预期结果：${expected}。`:'';
+    $('example-info').textContent=example.description?`${example.description} 预期结果：${example.expectedLabel||expected}。`:'';
     $('example-info').hidden=!example.description;
   });
   $('convert').addEventListener('click',convert);$('step').addEventListener('click',advance);$('run').addEventListener('click',run);
