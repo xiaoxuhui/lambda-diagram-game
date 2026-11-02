@@ -14,7 +14,7 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
       const fast=async()=>{await page.locator('#fast-run').click();await page.waitForFunction(()=>document.getElementById('state-badge').textContent==='已到正规形');};
       const result=async expected=>assert.ok(C.equal(C.parse(await page.locator('#current-expression').textContent()),C.parse(expected)),expected);
       const add=async(name,source)=>{
-        if(!await page.locator('#encoding-name').isVisible())await page.locator('#custom-data-panel summary').click();
+        if(!await page.locator('#encoding-name').isVisible())await page.locator('#custom-data-panel > summary').click();
         await page.locator('#encoding-new').click();await page.locator('#encoding-name').fill(name);await page.locator('#encoding-source').fill(source);await page.locator('#encoding-save').click();
         assert.ok(await page.locator('#encoding-error').isHidden());
       };
@@ -27,7 +27,7 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
         await source('-0.5_decimal');assert.equal(await page.locator('#decoded').textContent(),'小数 -0.5');assert.match(await page.locator('#expression-encoding').textContent(),/列表小数/);
       });
       await check(`${width}px lambda button inserts into the converter cursor and replaces a selection`,async()=>{
-        await page.locator('#custom-data-panel summary').click();
+        await page.locator('#custom-data-panel > summary').click();
         await page.locator('#encoding-source').fill('n.n');await page.locator('#encoding-source').evaluate(field=>field.setSelectionRange(0,0));
         await page.locator('#encoding-lambda').click();assert.equal(await page.locator('#encoding-source').inputValue(),'λn.n');
         assert.ok(await page.locator('#encoding-source').evaluate(field=>document.activeElement===field&&field.selectionStart===1));
@@ -38,8 +38,8 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
       await check(`${width}px save and select a named converter without claiming its function name`,async()=>{
         await add('Box','λn.λk.k n');assert.equal(await page.locator('#number-encoding').inputValue(),'custom:Box');
         assert.match(await page.locator('#number-note').textContent(),/3_Box/);assert.equal(await page.locator('#function-count').textContent(),'0 个函数');
-        await source('3_Box');assert.equal(await page.locator('#step-count').textContent(),'0');assert.equal(await page.locator('#state-badge').textContent(),'可以归约');
-        await page.locator('#step').click();await result('λk.k 3');assert.equal(await page.locator('#step-count').textContent(),'1');assert.match(await page.locator('#expression-encoding').textContent(),/Box/);
+        await source('3_Box');assert.equal(await page.locator('#step-count').textContent(),'0');assert.equal(await page.locator('#state-badge').textContent(),'已到正规形');
+        await result('λk.k 3');assert.equal(await page.locator('#decoded').textContent(),'3_Box');assert.match(await page.locator('#expression-encoding').textContent(),/Box/);
         await source('3');await fast();await result('λk.k 3');assert.match(await page.locator('#expression-encoding').textContent(),/Box/);
         await source('3_丘奇数');await result('3');assert.match(await page.locator('#expression-encoding').textContent(),/丘奇数/);
       });
@@ -55,7 +55,7 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
         assert.equal(await page.locator('#encoding-save').textContent(),'保存修改');assert.equal(await page.locator('#encoding-edit-status').textContent(),'正在编辑：Box');
         await page.locator('#encoding-source').fill('λn.λk.k n n');await page.locator('#encoding-save').click();assert.equal(await page.locator('#current-expression').textContent(),old);
         assert.equal(await page.locator('#encoding-list .function-item').count(),count);assert.equal(await page.locator('#encoding-list [data-encoding-name="Box"] code').textContent(),'λn.λk.k n n');
-        await page.locator('#convert').click();await fast();await result('λk.k 3 3');assert.equal(await page.locator('#decoded').textContent(),'自定义数据');
+        await page.locator('#convert').click();await fast();await result('λk.k 3 3');assert.equal(await page.locator('#decoded').textContent(),'3_Box');
       });
       await check(`${width}px functions accept custom literals and retain provenance through names`,async()=>{
         await page.locator('#function-name').fill('VALUE');await page.locator('#function-source').fill('2_Box');await page.locator('#function-add').click();assert.ok(await page.locator('#function-error').isHidden());
@@ -70,7 +70,7 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
         await source('3_Temp');await fast();await result('3');
       });
       await check(`${width}px saved state restores definitions, draft, selected encoding and run history`,async()=>{
-        await page.locator('#number-encoding').selectOption('custom:Box');await source('3_Box');await fast();
+        await page.locator('#number-encoding').selectOption('custom:Box');await source('(λx.x) 3_Box');await fast();
         await page.locator('#encoding-source').fill('λn.λk.k n');await page.locator('#save-state').click();await page.reload();
         assert.equal(await page.locator('#number-encoding').inputValue(),'custom:Box');assert.equal(await page.locator('#encoding-source').inputValue(),'λn.λk.k n');await result('λk.k 3 3');
         assert.match(await page.locator('#expression-encoding').textContent(),/Box/);await page.locator('#back').click();assert.equal(await page.locator('#step-count').textContent(),'0');await page.locator('#step').click();await result('λk.k 3 3');
@@ -100,8 +100,8 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
     }
     await check('offline build includes custom converter editing and execution',async()=>{
       const context=await browser.newContext(),page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));await page.goto(base+'/dist/lambda-lab.html');
-      await page.locator('#custom-data-panel summary').click();await page.locator('#encoding-name').fill('Own');await page.locator('#encoding-source').fill('λn.n');await page.locator('#encoding-save').click();
-      await page.locator('#expression').fill('4_Own');await page.locator('#convert').click();await page.locator('#step').click();assert.ok(C.equal(C.parse(await page.locator('#current-expression').textContent()),C.parse('4')));assert.equal(await page.locator('#decoded').textContent(),'自定义数据');await context.close();
+      await page.locator('#custom-data-panel > summary').click();await page.locator('#encoding-name').fill('Own');await page.locator('#encoding-source').fill('λn.n');await page.locator('#encoding-save').click();
+      await page.locator('#expression').fill('4_Own');await page.locator('#convert').click();assert.ok(C.equal(C.parse(await page.locator('#current-expression').textContent()),C.parse('4')));assert.equal(await page.locator('#decoded').textContent(),'4_Own');await context.close();
     });
     assert.deepEqual(errors,[]);console.log(`Custom data: ${passed} passed, 0 failed; Chromium ${browser.version()}; page errors 0.`);
   }finally{await browser.close();server.close();}

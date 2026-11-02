@@ -2,11 +2,36 @@ const {test}=require('node:test'),assert=require('node:assert/strict');
 const C=require('../src/core.js'),E=require('../src/data-encoding.js'),D=require('../src/decimal.js'),L=require('../src/library.js'),S=require('../src/snapshot.js'),P=require('../src/presets.js');
 const normalize=term=>{for(let n=0;n<50000;n++){const next=C.step(term);if(!next)return term;term=next.term;}assert.fail('test normalization budget');};
 const box=()=>E.define([],'Box','λn.λk.k n');
-test('unmarked numerals are Church and custom conversion remains an actual beta redex',()=>{
+test('raw parser represents a custom conversion as a beta redex before automatic compilation',()=>{
   assert.ok(C.equal(E.parse('3').term,C.parse('3')));
   const parsed=E.parse('3_Box',box());assert.deepEqual(parsed.encodings,['Box']);assert.equal(parsed.term.type,'app');
   assert.ok(C.equal(parsed.term.arg,C.parse('3')));assert.ok(C.findRedex(parsed.term));
   assert.ok(C.equal(normalize(parsed.term),C.parse('λk.k 3')));
+});
+test('numeric compilation normalizes zero and positive custom literals before any surrounding computation',async()=>{
+  const entries=box();
+  for(const number of ['0','3']){
+    const compiled=await E.compile(number,entries,'custom:Box');assert.equal(C.findRedex(compiled.term),null);
+    assert.ok(C.equal(compiled.term,C.parse(`λk.k ${number}`)));assert.equal(compiled.mappings[0].number,number);
+  }
+  const expression=await E.compile('(λx.x) 2_Box',entries);assert.equal(expression.term.type,'app');assert.equal(C.findRedex(expression.term.arg),null);
+  assert.ok(C.findRedex(expression.term));assert.ok(C.equal(C.step(expression.term).term,C.parse('λk.k 2')));
+  const inner=await E.compile('λk.(λz.z) 2_Box',entries);assert.ok(C.findRedex(inner.term));assert.ok(C.equal(C.step(inner.term).term,C.parse('λa.λb.b 2')));
+});
+test('compiled literal cache follows the converter definition and includes repeated inputs',async()=>{
+  const entries=box(),first=await E.compile('2_Box',entries),second=await E.compile('2_Box',entries);
+  assert.ok(first.mappings[0].steps>0);assert.equal(second.mappings[0].steps,0);assert.equal(first.term,second.term);
+  const changed=E.define(entries,'Box','λn.λk.k n n',undefined,'Box'),next=await E.compile('2_Box',changed);
+  assert.ok(next.mappings[0].steps>0);assert.ok(C.equal(next.term,C.parse('λk.k 2 2')));
+});
+test('endless numeral conversions yield and can be canceled without a fixed step cutoff',async()=>{
+  const entries=E.define([],'Loop','λn.(λx.x x) (λx.x x)'),controller=new AbortController();
+  let progressed=false;const pending=E.compile('0_Loop',entries,'church',{signal:controller.signal,onProgress:()=>{progressed=true;controller.abort();}});
+  await assert.rejects(pending,error=>error.name==='AbortError');assert.ok(progressed);
+});
+test('function saving accepts automatically compiled literals without changing source or provenance',async()=>{
+  const entries=box(),compiled=await E.compile('0_Box',entries),functions=L.add([],'ZERO','0_Box',Infinity,'church',6,entries,compiled);
+  assert.equal(C.findRedex(functions[0].term),null);assert.equal(functions[0].source,'0_Box');assert.deepEqual(functions[0].encodings,['Box']);
 });
 test('unmarked numbers use the selected encoding and explicit suffixes override every default',()=>{
   const entries=box();

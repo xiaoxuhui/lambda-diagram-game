@@ -38,6 +38,7 @@
 @media(max-width:480px){.save-bar{padding:13px;margin-bottom:18px}.save-info{width:100%}.save-actions{width:100%;display:grid;grid-template-columns:1fr 1fr;gap:7px}.save-actions .button{min-width:0;padding:8px 7px;font-size:10px}.function-card{padding:19px 20px}.function-actions .button{font-size:11px;padding:8px 11px}.function-keys button{min-width:31px;height:32px}.function-item button{font-size:10px;padding:5px 8px}}
 .example-row select{min-width:0;max-width:100%}.example-info{font-size:11px;line-height:1.8;color:#5b7664;background:#f2f6ed;border:1px solid #e1e8d9;border-radius:6px;padding:10px 12px;margin:12px 0 0;overflow-wrap:anywhere}
 .number-options{display:grid;grid-template-columns:auto minmax(0,1fr);gap:7px 10px;align-items:center;margin:12px 0;font-size:10px;color:#647b69}.number-options select,.number-options input{min-width:0;width:100%;border:1px solid #dce2d6;border-radius:5px;padding:6px;background:#f9faf6;color:#43604a}.run-controls{flex-wrap:wrap}
+.encoding-table>summary{font-size:11px;cursor:pointer;color:#436b51;overflow-wrap:anywhere}.encoding-table .encoding-table-scroll{max-height:220px;overflow:auto}
 .encoding-table{margin:15px 0;padding-top:12px;border-top:1px solid #dce5d6;min-width:0}.encoding-table h3{font-size:12px;color:#436b51;overflow-wrap:anywhere}.encoding-table-scroll{max-width:100%;overflow:auto}.encoding-table table{width:100%;table-layout:fixed;border-collapse:collapse;font-size:10px;color:#43604a}.encoding-table th,.encoding-table td{border-bottom:1px solid #dce5d6;padding:6px 3px;text-align:left;vertical-align:top;overflow-wrap:anywhere}.encoding-table th:first-child{width:26%}.encoding-table th:last-child{width:23%}.encoding-table td code{font-size:10px;display:block;max-height:100px;overflow:auto;white-space:normal;overflow-wrap:anywhere}.encoding-table td button{display:block;border:1px solid #dce5d6;background:white;border-radius:4px;padding:3px 5px;margin:0 0 4px;color:#436b51;font-size:10px}
 .custom-data-panel{margin:12px 0;padding:12px;border:1px solid #dce5d6;border-radius:7px;background:#f6f8f2;min-width:0}.custom-data-panel summary{font-size:12px;color:#436b51;cursor:pointer}.custom-data-panel label{display:block;font-size:11px;color:#647b69;margin:9px 0 5px}.custom-data-panel input,.custom-data-panel textarea{box-sizing:border-box;width:100%;min-width:0;border:1px solid #dce2d6;border-radius:5px;background:#fff;padding:8px;color:#43604a;font-family:var(--mono)}.custom-data-panel textarea{min-height:80px;font-size:14px}.encoding-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}.encoding-actions .button{padding:7px 9px;font-size:11px}.expression-encoding{font-size:10px;color:#507b61;margin:0 0 8px;overflow-wrap:anywhere}
 .stage-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}.stage-row label{display:flex;align-items:center;gap:10px;min-width:0;max-width:100%;font-size:12px;color:#5c8253}.stage-row select{min-width:0;max-width:100%;border:1px solid #d8e2d6;border-radius:6px;background:#f6f7f1;color:#365f43;padding:9px;font:inherit}.stage-row>span{font-size:11px;color:#6c8063}.level-list button{min-height:36px}.stage-row select:focus-visible{outline:2px solid var(--mint);outline-offset:2px}
@@ -460,6 +461,7 @@
   'use strict';
   const C=root.LambdaCore||require('./core.js');
   const builtins=new Map([['church','church'],['丘奇数','church'],['decimal','decimal'],['列表小数','decimal']]);
+  const literalCache=new WeakMap();
   const validName=name=>typeof name==='string'&&/^[\p{L}][\p{L}\p{N}_']*$/u.test(name)&&!builtins.has(name);
   function validate(entries){
     if(!Array.isArray(entries))throw new C.LambdaError('自定义数据编码列表不合法。');
@@ -491,7 +493,7 @@
     return editing===null?[...entries,entry]:entries.map(old=>old.name===editing?entry:old);
   }
   function parse(source,entries=[],maxChars=Infinity,defaultEncoding='church'){
-    validate(entries);const registry=new Map(entries.map(entry=>[entry.name,entry.term])),encodings=new Set();
+    validate(entries);const registry=new Map(entries.map(entry=>[entry.name,entry.term])),encodings=new Set(),literals=[];
     const selected=defaultEncoding.startsWith('custom:')?defaultEncoding.slice(7):builtins.get(defaultEncoding)||defaultEncoding;
     const term=C.parse(source,maxChars,(value,suffix,position)=>{
       const encoding=suffix===null?selected:builtins.get(suffix)||suffix;
@@ -503,11 +505,40 @@
         const church=C.parse(value);
         if(encoding==='church'){encodings.add('church');return church;}
         if(!registry.has(encoding))throw new C.LambdaError(`未定义数据编码「${encoding}」。请先保存对应转换函数。`);
-        encodings.add(encoding);return C.A(registry.get(encoding),church);
+        encodings.add(encoding);const definition=registry.get(encoding),term=C.A(definition,church);
+        literals.push({name:encoding,number:naturalNumber(value),definition,term});return term;
       }catch(error){if(error.position===null||error.position===undefined)error.position=position;throw error;}
     },{suffixes:true});
-    return {term,encodings:[...encodings]};
+    return {term,encodings:[...encodings],literals};
   }
+  async function compile(source,entries=[],defaultEncoding='church',options={}){
+    const parsed=parse(source,entries,options.maxChars??Infinity,defaultEncoding),replacements=new WeakMap(),mappings=[];
+    const canceled=()=>{if(options.signal?.aborted){const error=new C.LambdaError('数字编码已取消。');error.name='AbortError';throw error;}};
+    for(const literal of parsed.literals){
+      canceled();let cache=literalCache.get(literal.definition);if(!cache){cache=new Map();literalCache.set(literal.definition,cache);}
+      let term=cache.get(literal.number),steps=0;
+      if(!term){
+        term=literal.term;let started=performance.now();
+        while(true){
+          canceled();const next=C.step(term);if(!next)break;term=next.term;steps++;
+          if(performance.now()-started>=8){options.onProgress?.({...literal,steps});await new Promise(resolve=>setTimeout(resolve,0));started=performance.now();}
+        }
+        canceled();cache.set(literal.number,term);
+      }
+      replacements.set(literal.term,term);mappings.push({...literal,term,steps});
+    }
+    canceled();const rebuilt=new WeakMap(),stack=[[parsed.term,false]];
+    while(stack.length){
+      const [node,done]=stack.pop();if(rebuilt.has(node))continue;
+      if(replacements.has(node)){rebuilt.set(node,replacements.get(node));continue;}
+      if(node.type==='var'){rebuilt.set(node,node);continue;}
+      if(!done){stack.push([node,true]);if(node.type==='abs')stack.push([node.body,false]);else stack.push([node.arg,false],[node.fn,false]);continue;}
+      if(node.type==='abs'){const body=rebuilt.get(node.body);rebuilt.set(node,body===node.body?node:C.L(node.param,body));}
+      else{const fn=rebuilt.get(node.fn),arg=rebuilt.get(node.arg);rebuilt.set(node,fn===node.fn&&arg===node.arg?node:C.A(fn,arg));}
+    }
+    return {...parsed,term:rebuilt.get(parsed.term),mappings};
+  }
+  const isLiteral=source=>/^-?[0-9]+(?:\.[0-9]+)?(?:_[\p{L}][\p{L}\p{N}_']*)?$/u.test(source.trim());
   const label=name=>name==='church'?'丘奇数':name==='decimal'?'列表小数':`${name}（自定义）`;
   function naturalNumber(value){
     if(typeof value!=='string'||!(/^[0-9]+$/.test(value.trim())))throw new C.LambdaError('对照表数字需要是非负整数。');
@@ -528,7 +559,7 @@
     for(const entry of entries)if(selected.has(entry.name))for(const row of entry.table??[])if(C.equal(term,row.term))matches.push({name:entry.name,number:row.number});
     return matches;
   }
-  const API={validName,validate,define,parse,label,naturalNumber,putMapping,removeMapping,lookup};root.LambdaDataEncoding=API;
+  const API={validName,validate,define,parse,compile,isLiteral,label,naturalNumber,putMapping,removeMapping,lookup};root.LambdaDataEncoding=API;
   if(typeof module!=='undefined'&&module.exports)module.exports=API;
 })(typeof globalThis!=='undefined'?globalThis:window);
 
@@ -921,18 +952,18 @@
     for(const [placeholder,definition] of replacements)result=C.substitute(result,placeholder,definition);
     C.inspect(result);return result;
   }
-  function add(functions,name,source,maxChars=C.LIMITS.chars,numberEncoding='church',precision=6,dataEncodings=null) {
+  function add(functions,name,source,maxChars=C.LIMITS.chars,numberEncoding='church',precision=6,dataEncodings=null,prepared=null) {
     name=name.trim();
     if(!validName(name))throw new C.LambdaError('函数名需以英文字母开头，最多 32 字符，可含数字、下划线和单引号。');
     if(functions.some(f=>f.name===name))throw new C.LambdaError(`函数「${name}」已存在，请换一个名字。`);
-    const compiled=dataEncodings!==null?(root.LambdaDataEncoding||require('./data-encoding.js')).parse(source,dataEncodings,maxChars,numberEncoding):null;
+    const compiled=prepared??(dataEncodings!==null?(root.LambdaDataEncoding||require('./data-encoding.js')).parse(source,dataEncodings,maxChars,numberEncoding):null);
     const parsed=compiled?compiled.term:numberEncoding==='decimal'?C.parseInput(source,maxChars):C.parse(source,maxChars);
     if(C.freeVars(parsed).has(name))throw new C.LambdaError('定义不能直接引用自身。递归请使用显式不动点组合子。');
     const term=expand(parsed,functions);
     const result=[...functions,{name,source,term,...(compiled?{encodings:[...new Set([...compiled.encodings,...encodingsFor(parsed,functions)])]}:{})}];validate(result);return result;
   }
   const remove=(functions,name)=>functions.filter(f=>f.name!==name);
-  function update(functions,originalName,name,source,numberEncoding='church',precision=6,dataEncodings=null) {
+  function update(functions,originalName,name,source,numberEncoding='church',precision=6,dataEncodings=null,prepared=null) {
     const original=functions.find(fn=>fn.name===originalName);
     if(!original)throw new C.LambdaError('要编辑的函数已不存在。');
     const others=remove(functions,originalName);
@@ -941,7 +972,7 @@
       name=name.trim();replacement={...original,name,source,term:original.term};validate([...others,replacement]);
       const parsed=C.parse(source,Infinity,()=>C.parse('0'),{suffixes:true});
       if(C.freeVars(parsed).has(name))throw new C.LambdaError('定义不能直接引用自身。递归请使用显式不动点组合子。');
-    }else replacement=add(others,name,source,Infinity,numberEncoding,precision,dataEncodings).at(-1);
+    }else replacement=add(others,name,source,Infinity,numberEncoding,precision,dataEncodings,prepared).at(-1);
     return functions.map(fn=>fn.name===originalName?replacement:fn);
   }
   function encodingsFor(term,functions){const names=C.freeVars(term);return [...new Set(functions.filter(fn=>names.has(fn.name)).flatMap(fn=>fn.encodings??[]))];}
@@ -1095,15 +1126,17 @@
   function init(api) {
     const cancel=document.createElement('button');cancel.id='function-cancel';cancel.type='button';cancel.className='button';cancel.textContent='取消编辑';cancel.hidden=true;
     $('function-add').before(cancel);
-    let functions=[],checkpoint=null,saveTimer=null,restoring=false,editing=null;
+    let functions=[],checkpoint=null,saveTimer=null,restoring=false,editing=null,functionController=null;
+    function abortFunctionCompile(){functionController?.abort();functionController=null;}
     const feedback=(message,error=false)=>{$('save-feedback').hidden=false;$('save-feedback').textContent=message;$('save-feedback').classList.toggle('error',error);};
     function captured() {return {...api.capture(),version:2,savedAt:new Date().toISOString(),functions,functionDraft:{name:$('function-name').value,source:$('function-source').value,...(editing===null?{}:{editing})}};}
     function renderEditMode() {
-      $('function-add').textContent=editing===null?'新增函数 +':'保存修改 ✓';
-      $('function-cancel').hidden=editing===null;$('function-edit-status').hidden=editing===null;
+      $('function-add').textContent=functionController?'正在编码…':editing===null?'新增函数 +':'保存修改 ✓';$('function-add').disabled=!!functionController;
+      $('function-cancel').hidden=editing===null&&!functionController;$('function-cancel').textContent=functionController?'取消编码':'取消编辑';$('function-edit-status').hidden=editing===null;
       $('function-edit-status').textContent=editing===null?'':`正在编辑：${editing}`;
     }
     function clearEditor() {
+      abortFunctionCompile();
       editing=null;$('function-name').value='';$('function-source').value='';$('function-error').hidden=true;renderEditMode();
     }
     function storageStatus(ok) {
@@ -1125,6 +1158,7 @@
         insert.addEventListener('mousedown',e=>e.preventDefault());insert.addEventListener('click',()=>api.insertFunction(fn.name));
         const edit=document.createElement('button');edit.textContent='编辑';edit.setAttribute('aria-label',`编辑函数 ${fn.name}`);
         edit.addEventListener('click',()=>{
+          abortFunctionCompile();
           editing=fn.name;$('function-name').value=fn.name;$('function-source').value=fn.source??C.format(fn.term);
           $('function-error').hidden=true;renderEditMode();persist();$('function-source').focus();$('function-form').scrollIntoView({block:'nearest'});
         });
@@ -1134,6 +1168,7 @@
       });
     }
     function apply(snapshot) {
+      abortFunctionCompile();
       restoring=true;
       try {functions=snapshot.functions;renderLibrary();api.apply(snapshot);$('function-name').value=snapshot.functionDraft.name;$('function-source').value=snapshot.functionDraft.source;editing=snapshot.functionDraft.editing??null;renderEditMode();$('function-error').hidden=true;}
       finally{restoring=false;}
@@ -1147,16 +1182,24 @@
       try{const text=localStorage.getItem(CHECKPOINT);if(text){S.decode(text);checkpoint=text;}}catch{/* Keep a corrupt checkpoint untouched. */}
       $('restore-state').disabled=!checkpoint;renderLibrary();return restored;
     }
-    $('function-form').addEventListener('submit',e=>{
+    $('function-form').addEventListener('submit',async e=>{
       e.preventDefault();$('function-error').hidden=true;
-      try {const name=$('function-name').value.trim(),source=$('function-source').value,encoding=api.getNumberEncoding?.()||'decimal',precision=api.getDecimalPlaces?.()??6,entries=api.getDataEncodings?.()??null;functions=editing===null?L.add(functions,name,source,C.LIMITS.chars,encoding,precision,entries):L.update(functions,editing,name,source,encoding,precision,entries);renderLibrary();clearEditor();persist();api.toast(`已保存函数 ${name}`);}
-      catch(error){$('function-error').textContent=error.message;$('function-error').hidden=false;}
+      abortFunctionCompile();const controller=new AbortController();functionController=controller;renderEditMode();
+      try {
+        const name=$('function-name').value.trim(),source=$('function-source').value,encoding=api.getNumberEncoding?.()||'decimal',precision=api.getDecimalPlaces?.()??6,entries=api.getDataEncodings?.()??null,target=editing;
+        const original=functions.find(fn=>fn.name===target),prepared=api.compileSource&&source!==original?.source?await api.compileSource(source,controller.signal):null;
+        if(controller.signal.aborted||functionController!==controller)return;
+        functions=target===null?L.add(functions,name,source,C.LIMITS.chars,encoding,precision,entries,prepared):L.update(functions,target,name,source,encoding,precision,entries,prepared);
+        renderLibrary();clearEditor();persist();api.toast(`已保存函数 ${name}`);
+      }
+      catch(error){if(!controller.signal.aborted){$('function-error').textContent=error.message;$('function-error').hidden=false;}}
+      finally{if(functionController===controller){functionController=null;renderEditMode();}}
     });
-    $('function-cancel').addEventListener('click',()=>{clearEditor();persist();});
+    $('function-cancel').addEventListener('click',()=>{if(functionController){abortFunctionCompile();renderEditMode();return;}clearEditor();persist();});
     renderEditMode();
-    $('function-use-current').addEventListener('click',()=>{$('function-source').value=api.currentExpression();$('function-error').hidden=true;$('function-name').focus();queueSave();});
-    $('function-name').addEventListener('input',queueSave);$('function-source').addEventListener('input',queueSave);
-    document.querySelectorAll('[data-function-insert]').forEach(b=>{b.addEventListener('mousedown',e=>e.preventDefault());b.addEventListener('click',()=>{const field=$('function-source');field.setRangeText(b.dataset.functionInsert,field.selectionStart,field.selectionEnd,'end');field.focus();queueSave();});});
+    $('function-use-current').addEventListener('click',()=>{abortFunctionCompile();renderEditMode();$('function-source').value=api.currentExpression();$('function-error').hidden=true;$('function-name').focus();queueSave();});
+    for(const id of ['function-name','function-source'])$(id).addEventListener('input',()=>{abortFunctionCompile();renderEditMode();queueSave();});
+    document.querySelectorAll('[data-function-insert]').forEach(b=>{b.addEventListener('mousedown',e=>e.preventDefault());b.addEventListener('click',()=>{abortFunctionCompile();renderEditMode();const field=$('function-source');field.setRangeText(b.dataset.functionInsert,field.selectionStart,field.selectionEnd,'end');field.focus();queueSave();});});
     $('save-state').addEventListener('click',()=>{
       try{const text=S.encode(captured());localStorage.setItem(CHECKPOINT,text);checkpoint=text;$('restore-state').disabled=false;persist();feedback('当前状态和关卡进度已保存。可随时恢复到这个位置。');api.toast('当前状态已保存');}
       catch(e){feedback(`未能保存到浏览器：${e.message}。请使用「导出存档」备份当前状态。`,true);}
@@ -1281,20 +1324,21 @@
   'use strict';
   const C=root.LambdaCore,E=root.LambdaDataEncoding;
   function init(api){
-    const panel=document.createElement('section');panel.className='encoding-table';panel.id='encoding-table';
+    const panel=document.createElement('details');panel.className='encoding-table';panel.id='encoding-table';
     panel.innerHTML='<h3 id="encoding-table-title">数字 ↔ 表达式对照表</h3><p class="syntax-note">填写数字，生成对应表达式；也可登记当前已归约结果。匹配表中表达式时，结果区会显示数字及编码名称。</p><label for="encoding-table-number">数字</label><input id="encoding-table-number" inputmode="numeric" value="0" autocomplete="off"><div class="encoding-actions"><button type="button" id="encoding-table-generate" class="button">生成并加入</button><button type="button" id="encoding-table-current" class="button">使用当前结果</button><button type="button" id="encoding-table-cancel" class="button" hidden>取消生成</button></div><p id="encoding-table-status" class="syntax-note" role="status"></p><div class="encoding-table-scroll"><table><thead><tr><th>数字</th><th>对应表达式</th><th>操作</th></tr></thead><tbody id="encoding-table-body"></tbody></table></div><p id="encoding-table-empty" class="syntax-note">对照表为空，先生成一个数字。</p>';
+    const heading=panel.querySelector('h3'),summary=document.createElement('summary');summary.id=heading.id;summary.textContent=heading.textContent;heading.replaceWith(summary);
     api.host.after(panel);const $=id=>panel.querySelector(`#${id}`);
-    let generation=null,timer=null;
+    let generation=null,timer=null,autoTimer=null;
     const status=(text,error=false)=>{$('encoding-table-status').textContent=text;$('encoding-table-status').classList.toggle('error-message',error);};
     function cancel(){
-      const active=!!generation;clearTimeout(timer);timer=null;generation=null;
+      const active=!!generation;clearTimeout(timer);clearTimeout(autoTimer);autoTimer=null;timer=null;generation=null;
       $('encoding-table-generate').disabled=false;$('encoding-table-cancel').hidden=true;
       status(active?'生成已取消，原有对照表保留。':'');
     }
     function render(){
       const entry=api.getEntry();panel.hidden=!entry;
       const body=$('encoding-table-body');body.replaceChildren();if(!entry)return;
-      $('encoding-table-title').textContent=`${entry.name} · 数字 ↔ 表达式对照表`;
+      $('encoding-table-title').textContent=`数字 ↔ 表达式对照表 · ${entry.table?.length??0} 项`;
       for(const row of entry.table??[]){
         const tr=document.createElement('tr');tr.dataset.number=row.number;
         const number=document.createElement('td');number.textContent=`${row.number}_${entry.name}`;
@@ -1343,6 +1387,7 @@
       }catch(error){cancel();status(error.message,true);}
     });
     $('encoding-table-cancel').addEventListener('click',cancel);
+    $('encoding-table-number').addEventListener('input',()=>{cancel();if(/^[0-9]+$/.test($('encoding-table-number').value.trim()))autoTimer=setTimeout(()=>$('encoding-table-generate').click(),180);});
     return {render,cancel};
   }
   root.LambdaEncodingTable={init};
@@ -1424,6 +1469,10 @@
     options();
     return {
       entries:()=>entries,select,
+      remember(mappings){
+        for(const mapping of mappings)if(entries.some(entry=>entry.name===mapping.name&&entry.term===mapping.definition))entries=E.putMapping(entries,mapping.name,mapping.number,mapping.term);
+        tableView.render();
+      },
       capture:()=>({dataEncodings:entries,encodingDraft:{name:$('encoding-name').value,source:$('encoding-source').value,...(editing===null?{}:{editing})}}),
       restore(snapshot){tableView.cancel();entries=snapshot.dataEncodings??[];const draft=snapshot.encodingDraft??{name:'',source:''};editing=draft.editing??null;$('encoding-name').value=draft.name;$('encoding-source').value=draft.source;options();error('');$('custom-data-panel').open=entries.length>0||!!draft.source;}
     };
@@ -1438,10 +1487,15 @@
   const $=id=>document.getElementById(id);
   const input=$('expression');
   const state={ term:null, original:null, history:[], paths:null, dirty:false, running:false, timer:null,
-    mode:'free', level:0, completed:new Set(), halt:'', scale:1, autoFit:true, model:null, speed:600, strategy:'normal', direction:'left',numberEncoding:'church',decimalPlaces:6,fast:false,encodings:null };
-  let toastTimer,workspace,viewer,dataEditor,historySource=null,renderedCount=0,diagramTerm=null,diagramRoute=null;
+    mode:'free', level:0, completed:new Set(), halt:'', scale:1, autoFit:true, model:null, speed:600, strategy:'normal', direction:'left',numberEncoding:'church',decimalPlaces:6,fast:false,encodings:null,encodingBusy:false };
+  let toastTimer,workspace,viewer,dataEditor,conversionController=null,compilingDefinitions=null,autoConvertTimer=null,historySource=null,renderedCount=0,diagramTerm=null,diagramRoute=null;
   const decodedTerms=new WeakMap(),TRUE=C.parse(P.TRUE),FALSE=C.parse(P.FALSE),IDENTITY=C.parse(P.I);
   const diagramView=window.LambdaDiagramView.init($('diagram-mount'));
+  const encodingProgress=document.createElement('p');encodingProgress.className='syntax-note';encodingProgress.id='encoding-progress';encodingProgress.setAttribute('role','status');encodingProgress.hidden=true;
+  const cancelEncoding=document.createElement('button');cancelEncoding.type='button';cancelEncoding.id='cancel-encoding';cancelEncoding.className='button';cancelEncoding.textContent='取消数字编码';cancelEncoding.hidden=true;$('convert').after(encodingProgress,cancelEncoding);
+  function cancelConversion(){clearTimeout(autoConvertTimer);autoConvertTimer=null;conversionController?.abort();conversionController=null;compilingDefinitions=null;state.encodingBusy=false;encodingProgress.hidden=true;cancelEncoding.hidden=true;}
+  function queueLiteralConversion(){clearTimeout(autoConvertTimer);if(E.isLiteral(input.value))autoConvertTimer=setTimeout(convert,180);}
+  cancelEncoding.addEventListener('click',()=>{cancelConversion();render();});
   function save() { workspace?.queueSave(); }
   function capture() {
     return {...dataEditor.capture(),draft:input.value,completed:[...state.completed],mode:state.mode,level:state.level,
@@ -1450,6 +1504,7 @@
       selection:{start:input.selectionStart,end:input.selectionEnd},error:$('error-message').hidden?'':$('error-message').textContent};
   }
   function applySnapshot(s) {
+    cancelConversion();
     $('example-info').hidden=true;
     stop();input.value=s.draft;state.completed=new Set(s.completed);state.mode=s.mode;state.level=s.level;
     revealAnswer(false);
@@ -1463,6 +1518,7 @@
     renderMode();if(s.hasSession)render();else convert();input.setSelectionRange(s.selection.start,s.selection.end);
     if(!state.term){$('zoom-label').textContent=`${Math.round(state.scale*100)}%`;$('fit').setAttribute('aria-pressed',String(state.autoFit));}
     $('diagram-viewport').scrollLeft=s.view.panX;$('diagram-viewport').scrollTop=s.view.panY;
+    if(state.dirty||(s.session.steps===0&&state.term&&C.findRedex(state.term)))queueLiteralConversion();
   }
   function toast(message) {
     clearTimeout(toastTimer); $('toast').textContent=message; $('toast').hidden=false;
@@ -1470,6 +1526,7 @@
   }
   function stop() { clearTimeout(state.timer); state.timer=null; state.running=false;state.fast=false; }
   function changed() {
+    cancelConversion();
     $('example-info').hidden=true;
     stop(); state.dirty=true; state.halt=''; $('error-message').hidden=true;
     $('challenge-feedback').textContent=''; $('next-level').hidden=true;
@@ -1482,21 +1539,30 @@
     input.focus();
     changed();
   }
-  function convert() {
-    stop(); $('error-message').hidden=true; state.halt='';
+  async function convert() {
+    cancelConversion();const controller=new AbortController();conversionController=controller;let showedProgress=false;
+    compilingDefinitions=new Map(dataEditor.entries().map(entry=>[entry.name,entry.term]));
+    stop(); $('error-message').hidden=true; state.halt='';state.dirty=true;
     $('challenge-feedback').textContent=''; $('next-level').hidden=true;
     try {
       if(state.numberEncoding==='decimal'&&!$('decimal-places').checkValidity())throw new C.LambdaError('除法小数位数需为非负整数。');
-      const compiled=E.parse(input.value,dataEditor.entries(),Infinity,state.numberEncoding),parsed=compiled.term,expanded=workspace?workspace.expand(parsed):parsed;
+      const compiled=await E.compile(input.value,dataEditor.entries(),state.numberEncoding,{signal:controller.signal,onProgress:literal=>{if(!showedProgress){state.encodingBusy=true;render();showedProgress=true;}encodingProgress.hidden=false;cancelEncoding.hidden=false;encodingProgress.textContent=`正在自动编码 ${literal.number}_${literal.name} · ${literal.steps} 步`;}});
+      if(controller.signal.aborted||conversionController!==controller)return false;
+      if(compiled.mappings.some(mapping=>!dataEditor.entries().some(entry=>entry.name===mapping.name&&entry.term===mapping.definition)))return false;
+      const parsed=compiled.term,expanded=workspace?workspace.expand(parsed):parsed;
+      dataEditor.remember(compiled.mappings);
       const term=expanded;
-      state.term=term; state.original=term; state.history=[{term,change:null}]; state.paths=null;state.dirty=false;state.encodings=[...new Set([...compiled.encodings,...(workspace?.encodingsFor(parsed)??[])])];
+      state.term=term; state.original=term; state.history=[{term,change:null}]; state.paths=null;state.dirty=false;state.encodingBusy=false;state.encodings=[...new Set([...compiled.encodings,...(workspace?.encodingsFor(parsed)??[])])];
       state.autoFit=true; render(); save(); return true;
     } catch(e) {
-      state.term=null; state.original=null; state.history=[];state.paths=null; state.dirty=true;state.encodings=null;
+      if(e.name==='AbortError'||controller.signal.aborted)return false;
+      state.term=null; state.original=null; state.history=[];state.paths=null; state.dirty=true;state.encodings=null;state.encodingBusy=false;
       $('error-message').textContent=(e.position!==null&&e.position!==undefined?`第 ${e.position+1} 个字符：`:'')+e.message;
       $('error-message').hidden=false; render(); input.focus();
       if(e.position!==null&&e.position!==undefined) input.setSelectionRange(e.position,e.position+1);
       return false;
+    } finally {
+      if(conversionController===controller){conversionController=null;compilingDefinitions=null;state.encodingBusy=false;encodingProgress.hidden=true;cancelEncoding.hidden=true;if(showedProgress&&state.dirty)render();}
     }
   }
   function renderDiagram(redex) {
@@ -1562,13 +1628,14 @@
     $('reset').disabled=!ready||state.running||count===0;
     $('export-svg').disabled=!ready; $('zoom-in').disabled=!state.term; $('zoom-out').disabled=!state.term; $('fit').disabled=!state.term;$('actual-size').disabled=!state.term;
     const badge=$('state-badge'); badge.className='state-badge';
-    if(!state.term) { badge.textContent='等待输入'; badge.classList.add('dirty'); }
+    if(state.encodingBusy)badge.textContent='数字编码中';
+    else if(!state.term) { badge.textContent='等待输入'; badge.classList.add('dirty'); }
     else if(state.dirty) { badge.textContent='已编辑 · 请转换'; badge.classList.add('dirty'); }
     else if(state.running) badge.textContent='正在归约';
     else if(state.halt) { badge.textContent='已暂停'; badge.classList.add('error'); }
     else if(!redex) badge.textContent='已到正规形';
     else badge.textContent='可以归约';
-    $('run-status').textContent=!state.term?'输入有效表达式后，就能开始运行。':state.dirty?'输入已改变。重新转换后开始新的归约。':
+    $('run-status').textContent=state.encodingBusy?'正在自动归约数字编码，完成后显示图示。':!state.term?'输入有效表达式后，就能开始运行。':state.dirty?'输入已改变。重新转换后开始新的归约。':
       state.halt|| (state.running?'自动运行中；粉色线路标记下一次函数替换。':!redex?'已到 β 正规形；可点击单步或运行再次尝试，不能归约时保持当前式。':count?'可以继续单步，或回退查看上一帧。':'准备好了。点击单步，观察一次函数替换。');
     $('current-expression').textContent=state.term?C.format(state.term):'—';
     $('expression-encoding').textContent=!state.term?'':state.encodings===null?'编码：旧存档保留原表达式':state.encodings.length?`数字来源编码：${state.encodings.map(E.label).join('、')}`:'编码：纯 λ 表达式（无数字字面量）';
@@ -1688,7 +1755,7 @@
     $('next-level').textContent=l.id===stage.levelIds.at(-1)?'下一阶段 →':'下一关 →';
     toast(`✓ ${l.name} · 挑战完成`);
   }
-  input.addEventListener('input',changed);
+  input.addEventListener('input',event=>{changed();if(!event.isComposing)queueLiteralConversion();});
   input.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();convert();}});
   document.querySelectorAll('[data-insert]').forEach(b=>{
     b.addEventListener('mousedown',e=>e.preventDefault());
@@ -1709,7 +1776,7 @@
   });
   $('convert').addEventListener('click',convert);$('step').addEventListener('click',advance);$('run').addEventListener('click',run);
   $('fast-run').addEventListener('click',()=>{if(state.running){stop();render();return;}if(!state.term||state.dirty)return;state.running=true;state.fast=true;state.halt='';render();schedule();});
-  $('number-encoding').addEventListener('change',()=>{const previous=state.numberEncoding;state.numberEncoding=$('number-encoding').value;dataEditor.select(state.numberEncoding);if(previous!==state.numberEncoding)changed();else{render();save();}});
+  $('number-encoding').addEventListener('change',()=>{const previous=state.numberEncoding;state.numberEncoding=$('number-encoding').value;dataEditor.select(state.numberEncoding);if(previous!==state.numberEncoding){changed();queueLiteralConversion();}else{render();save();}});
   $('decimal-places').addEventListener('input',()=>{const n=$('decimal-places').valueAsNumber;if(!Number.isSafeInteger(n)||n<0){$('decimal-places').setCustomValidity('请输入非负整数');return;}$('decimal-places').setCustomValidity('');state.decimalPlaces=n;if(state.numberEncoding==='decimal')changed();else save();});
   $('back').addEventListener('click',()=>{if(state.history.length>1){stop();state.history.pop();state.paths?.pop();state.term=state.history.at(-1).term;state.halt='';$('challenge-feedback').textContent='';$('next-level').hidden=true;render();}});
   $('reset').addEventListener('click',()=>{if(state.original){stop();state.term=state.original;state.history=[{term:state.original,change:null}];state.paths=null;state.halt='';$('challenge-feedback').textContent='';$('next-level').hidden=true;render();}});
@@ -1744,9 +1811,10 @@
   $('help-toggle').addEventListener('click',()=>{const show=$('help-panel').hidden;$('help-panel').hidden=!show;$('help-toggle').setAttribute('aria-expanded',String(show));save();});
   $('history-details').addEventListener('toggle',save);
   $('speed').addEventListener('change',save);
-  dataEditor=window.LambdaDataEncodingEditor.init({getSelection:()=>state.numberEncoding,setSelection:value=>{state.numberEncoding=value;},expand:term=>workspace?workspace.expand(term):term,queueSave:save,onChange:()=>{render();save();},currentTerm:()=>state.term&&!state.dirty?state.term:null,loadTerm:(term,name)=>{state.numberEncoding=`custom:${name}`;setSource(C.format(term));},toast});
+  dataEditor=window.LambdaDataEncodingEditor.init({getSelection:()=>state.numberEncoding,setSelection:value=>{state.numberEncoding=value;},expand:term=>workspace?workspace.expand(term):term,queueSave:save,onChange:()=>{if(compilingDefinitions&&(compilingDefinitions.size!==dataEditor.entries().length||dataEditor.entries().some(entry=>compilingDefinitions.get(entry.name)!==entry.term))){changed();queueLiteralConversion();}else{render();save();}},currentTerm:()=>state.term&&!state.dirty?state.term:null,loadTerm:(term,name)=>{state.numberEncoding=`custom:${name}`;setSource(C.format(term));},toast});
   workspace=window.LambdaWorkspace.init({capture,apply:applySnapshot,toast,
     getNumberEncoding:()=>state.numberEncoding,getDecimalPlaces:()=>state.decimalPlaces,getDataEncodings:()=>dataEditor.entries(),
+    compileSource:async(source,signal)=>{const compiled=await E.compile(source,dataEditor.entries(),state.numberEncoding,{signal});dataEditor.remember(compiled.mappings);return compiled;},
     currentExpression:()=>state.term&&!state.dirty?C.format(state.term):input.value,
     insertFunction:name=>{const start=input.selectionStart,end=input.selectionEnd;
       const before=start&&/[A-Za-z0-9_']/.test(input.value[start-1])?' ':'';

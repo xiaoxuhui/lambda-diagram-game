@@ -9,10 +9,11 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
     for(const width of [1280,390]){
       const context=await browser.newContext({viewport:{width,height:950},hasTouch:true,acceptDownloads:true}),page=await context.newPage();page.on('pageerror',error=>errors.push(error.message));await page.goto(base);
       const define=async(name,source)=>{
-        if(!await page.locator('#encoding-name').isVisible())await page.locator('#custom-data-panel summary').click();
+        if(!await page.locator('#encoding-name').isVisible())await page.locator('#custom-data-panel > summary').click();
         await page.locator('#encoding-new').click();await page.locator('#encoding-name').fill(name);await page.locator('#encoding-source').fill(source);await page.locator('#encoding-save').click();assert.ok(await page.locator('#encoding-error').isHidden());
       };
       const generate=async number=>{
+        if(!await page.locator('#encoding-table').evaluate(panel=>panel.open))await page.locator('#encoding-table-title').click();
         await page.locator('#encoding-table-number').fill(number);await page.locator('#encoding-table-generate').click();
         await page.waitForFunction(()=>document.getElementById('encoding-table-status').textContent.startsWith('已加入'));
         assert.equal(await page.locator(`#encoding-table-body tr[data-number="${number}"]`).count(),1);
@@ -42,6 +43,7 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
         assert.equal(await page.locator('#encoding-table-body tr').count(),0);
         await page.locator('#import-file').setInputFiles({name:'table-backup.json',mimeType:'application/json',buffer:Buffer.from(backup)});
         await page.waitForFunction(()=>document.getElementById('encoding-table-body').rows.length===3);assert.equal(await page.locator('#decoded').textContent(),'3_Box');
+        if(!await page.locator('#encoding-table').evaluate(panel=>panel.open))await page.locator('#encoding-table-title').click();
         await page.getByRole('button',{name:'删除对照项 0',exact:true}).click();assert.equal(await page.locator('#encoding-table-body tr').count(),2);
       });
       await check(`${width}px editing source clears stale mappings and renaming preserves them`,async()=>{
@@ -53,18 +55,18 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
       });
       await check(`${width}px ambiguous encodings list every matching numeral`,async()=>{
         await define('Constant','λn.λx y.x');await generate('0');await generate('1');await source('7_Constant');await fast();
-        assert.equal(await page.locator('#decoded').textContent(),'0_Constant / 1_Constant（多项匹配）');
+        assert.equal(await page.locator('#decoded').textContent(),'0_Constant / 1_Constant / 7_Constant（多项匹配）');
       });
       await check(`${width}px endless generators remain cancelable`,async()=>{
-        await define('Loop','λn.(λx.x x) (λx.x x)');await page.locator('#encoding-table-number').fill('0');await page.locator('#encoding-table-generate').click();
+        await define('Loop','λn.(λx.x x) (λx.x x)');if(!await page.locator('#encoding-table').evaluate(panel=>panel.open))await page.locator('#encoding-table-title').click();await page.locator('#encoding-table-number').fill('0');await page.locator('#encoding-table-generate').click();
         await page.waitForFunction(()=>document.getElementById('encoding-table-status').textContent.startsWith('正在归约'));
         await page.locator('#encoding-table-cancel').click();assert.match(await page.locator('#encoding-table-status').textContent(),/取消/);assert.equal(await page.locator('#encoding-table-body tr').count(),0);assert.ok(await page.locator('#encoding-table-generate').isEnabled());
       });await context.close();
     }
     await check('offline HTML generates a table and recognizes a converted numeral',async()=>{
       const context=await browser.newContext(),page=await context.newPage();page.on('pageerror',error=>errors.push(error.message));await page.goto(base+'/dist/lambda-lab.html');
-      await page.locator('#custom-data-panel summary').click();await page.locator('#encoding-name').fill('Offline');await page.locator('#encoding-source').fill('λn.λk.k n');await page.locator('#encoding-save').click();
-      await page.locator('#encoding-table-number').fill('4');await page.locator('#encoding-table-generate').click();await page.waitForFunction(()=>document.getElementById('encoding-table-body').rows.length===1);
+      await page.locator('#custom-data-panel > summary').click();await page.locator('#encoding-name').fill('Offline');await page.locator('#encoding-source').fill('λn.λk.k n');await page.locator('#encoding-save').click();
+      await page.locator('#encoding-table-title').click();await page.locator('#encoding-table-number').fill('4');await page.locator('#encoding-table-generate').click();await page.waitForFunction(()=>document.getElementById('encoding-table-body').rows.length===1);
       await page.locator('#expression').fill('4');await page.locator('#convert').click();await page.locator('#step').click();assert.equal(await page.locator('#decoded').textContent(),'4_Offline');await context.close();
     });
     assert.deepEqual(errors,[]);console.log(`Encoding tables: ${passed} passed, 0 failed; Chromium ${browser.version()}; page errors 0.`);

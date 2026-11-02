@@ -6,15 +6,17 @@
   function init(api) {
     const cancel=document.createElement('button');cancel.id='function-cancel';cancel.type='button';cancel.className='button';cancel.textContent='取消编辑';cancel.hidden=true;
     $('function-add').before(cancel);
-    let functions=[],checkpoint=null,saveTimer=null,restoring=false,editing=null;
+    let functions=[],checkpoint=null,saveTimer=null,restoring=false,editing=null,functionController=null;
+    function abortFunctionCompile(){functionController?.abort();functionController=null;}
     const feedback=(message,error=false)=>{$('save-feedback').hidden=false;$('save-feedback').textContent=message;$('save-feedback').classList.toggle('error',error);};
     function captured() {return {...api.capture(),version:2,savedAt:new Date().toISOString(),functions,functionDraft:{name:$('function-name').value,source:$('function-source').value,...(editing===null?{}:{editing})}};}
     function renderEditMode() {
-      $('function-add').textContent=editing===null?'新增函数 +':'保存修改 ✓';
-      $('function-cancel').hidden=editing===null;$('function-edit-status').hidden=editing===null;
+      $('function-add').textContent=functionController?'正在编码…':editing===null?'新增函数 +':'保存修改 ✓';$('function-add').disabled=!!functionController;
+      $('function-cancel').hidden=editing===null&&!functionController;$('function-cancel').textContent=functionController?'取消编码':'取消编辑';$('function-edit-status').hidden=editing===null;
       $('function-edit-status').textContent=editing===null?'':`正在编辑：${editing}`;
     }
     function clearEditor() {
+      abortFunctionCompile();
       editing=null;$('function-name').value='';$('function-source').value='';$('function-error').hidden=true;renderEditMode();
     }
     function storageStatus(ok) {
@@ -36,6 +38,7 @@
         insert.addEventListener('mousedown',e=>e.preventDefault());insert.addEventListener('click',()=>api.insertFunction(fn.name));
         const edit=document.createElement('button');edit.textContent='编辑';edit.setAttribute('aria-label',`编辑函数 ${fn.name}`);
         edit.addEventListener('click',()=>{
+          abortFunctionCompile();
           editing=fn.name;$('function-name').value=fn.name;$('function-source').value=fn.source??C.format(fn.term);
           $('function-error').hidden=true;renderEditMode();persist();$('function-source').focus();$('function-form').scrollIntoView({block:'nearest'});
         });
@@ -45,6 +48,7 @@
       });
     }
     function apply(snapshot) {
+      abortFunctionCompile();
       restoring=true;
       try {functions=snapshot.functions;renderLibrary();api.apply(snapshot);$('function-name').value=snapshot.functionDraft.name;$('function-source').value=snapshot.functionDraft.source;editing=snapshot.functionDraft.editing??null;renderEditMode();$('function-error').hidden=true;}
       finally{restoring=false;}
@@ -58,16 +62,24 @@
       try{const text=localStorage.getItem(CHECKPOINT);if(text){S.decode(text);checkpoint=text;}}catch{/* Keep a corrupt checkpoint untouched. */}
       $('restore-state').disabled=!checkpoint;renderLibrary();return restored;
     }
-    $('function-form').addEventListener('submit',e=>{
+    $('function-form').addEventListener('submit',async e=>{
       e.preventDefault();$('function-error').hidden=true;
-      try {const name=$('function-name').value.trim(),source=$('function-source').value,encoding=api.getNumberEncoding?.()||'decimal',precision=api.getDecimalPlaces?.()??6,entries=api.getDataEncodings?.()??null;functions=editing===null?L.add(functions,name,source,C.LIMITS.chars,encoding,precision,entries):L.update(functions,editing,name,source,encoding,precision,entries);renderLibrary();clearEditor();persist();api.toast(`已保存函数 ${name}`);}
-      catch(error){$('function-error').textContent=error.message;$('function-error').hidden=false;}
+      abortFunctionCompile();const controller=new AbortController();functionController=controller;renderEditMode();
+      try {
+        const name=$('function-name').value.trim(),source=$('function-source').value,encoding=api.getNumberEncoding?.()||'decimal',precision=api.getDecimalPlaces?.()??6,entries=api.getDataEncodings?.()??null,target=editing;
+        const original=functions.find(fn=>fn.name===target),prepared=api.compileSource&&source!==original?.source?await api.compileSource(source,controller.signal):null;
+        if(controller.signal.aborted||functionController!==controller)return;
+        functions=target===null?L.add(functions,name,source,C.LIMITS.chars,encoding,precision,entries,prepared):L.update(functions,target,name,source,encoding,precision,entries,prepared);
+        renderLibrary();clearEditor();persist();api.toast(`已保存函数 ${name}`);
+      }
+      catch(error){if(!controller.signal.aborted){$('function-error').textContent=error.message;$('function-error').hidden=false;}}
+      finally{if(functionController===controller){functionController=null;renderEditMode();}}
     });
-    $('function-cancel').addEventListener('click',()=>{clearEditor();persist();});
+    $('function-cancel').addEventListener('click',()=>{if(functionController){abortFunctionCompile();renderEditMode();return;}clearEditor();persist();});
     renderEditMode();
-    $('function-use-current').addEventListener('click',()=>{$('function-source').value=api.currentExpression();$('function-error').hidden=true;$('function-name').focus();queueSave();});
-    $('function-name').addEventListener('input',queueSave);$('function-source').addEventListener('input',queueSave);
-    document.querySelectorAll('[data-function-insert]').forEach(b=>{b.addEventListener('mousedown',e=>e.preventDefault());b.addEventListener('click',()=>{const field=$('function-source');field.setRangeText(b.dataset.functionInsert,field.selectionStart,field.selectionEnd,'end');field.focus();queueSave();});});
+    $('function-use-current').addEventListener('click',()=>{abortFunctionCompile();renderEditMode();$('function-source').value=api.currentExpression();$('function-error').hidden=true;$('function-name').focus();queueSave();});
+    for(const id of ['function-name','function-source'])$(id).addEventListener('input',()=>{abortFunctionCompile();renderEditMode();queueSave();});
+    document.querySelectorAll('[data-function-insert]').forEach(b=>{b.addEventListener('mousedown',e=>e.preventDefault());b.addEventListener('click',()=>{abortFunctionCompile();renderEditMode();const field=$('function-source');field.setRangeText(b.dataset.functionInsert,field.selectionStart,field.selectionEnd,'end');field.focus();queueSave();});});
     $('save-state').addEventListener('click',()=>{
       try{const text=S.encode(captured());localStorage.setItem(CHECKPOINT,text);checkpoint=text;$('restore-state').disabled=false;persist();feedback('当前状态和关卡进度已保存。可随时恢复到这个位置。');api.toast('当前状态已保存');}
       catch(e){feedback(`未能保存到浏览器：${e.message}。请使用「导出存档」备份当前状态。`,true);}

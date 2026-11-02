@@ -73,6 +73,10 @@
     options();
     return {
       entries:()=>entries,select,
+      remember(mappings){
+        for(const mapping of mappings)if(entries.some(entry=>entry.name===mapping.name&&entry.term===mapping.definition))entries=E.putMapping(entries,mapping.name,mapping.number,mapping.term);
+        tableView.render();
+      },
       capture:()=>({dataEncodings:entries,encodingDraft:{name:$('encoding-name').value,source:$('encoding-source').value,...(editing===null?{}:{editing})}}),
       restore(snapshot){tableView.cancel();entries=snapshot.dataEncodings??[];const draft=snapshot.encodingDraft??{name:'',source:''};editing=draft.editing??null;$('encoding-name').value=draft.name;$('encoding-source').value=draft.source;options();error('');$('custom-data-panel').open=entries.length>0||!!draft.source;}
     };

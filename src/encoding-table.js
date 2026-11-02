@@ -2,20 +2,21 @@
   'use strict';
   const C=root.LambdaCore,E=root.LambdaDataEncoding;
   function init(api){
-    const panel=document.createElement('section');panel.className='encoding-table';panel.id='encoding-table';
+    const panel=document.createElement('details');panel.className='encoding-table';panel.id='encoding-table';
     panel.innerHTML='<h3 id="encoding-table-title">数字 ↔ 表达式对照表</h3><p class="syntax-note">填写数字，生成对应表达式；也可登记当前已归约结果。匹配表中表达式时，结果区会显示数字及编码名称。</p><label for="encoding-table-number">数字</label><input id="encoding-table-number" inputmode="numeric" value="0" autocomplete="off"><div class="encoding-actions"><button type="button" id="encoding-table-generate" class="button">生成并加入</button><button type="button" id="encoding-table-current" class="button">使用当前结果</button><button type="button" id="encoding-table-cancel" class="button" hidden>取消生成</button></div><p id="encoding-table-status" class="syntax-note" role="status"></p><div class="encoding-table-scroll"><table><thead><tr><th>数字</th><th>对应表达式</th><th>操作</th></tr></thead><tbody id="encoding-table-body"></tbody></table></div><p id="encoding-table-empty" class="syntax-note">对照表为空，先生成一个数字。</p>';
+    const heading=panel.querySelector('h3'),summary=document.createElement('summary');summary.id=heading.id;summary.textContent=heading.textContent;heading.replaceWith(summary);
     api.host.after(panel);const $=id=>panel.querySelector(`#${id}`);
-    let generation=null,timer=null;
+    let generation=null,timer=null,autoTimer=null;
     const status=(text,error=false)=>{$('encoding-table-status').textContent=text;$('encoding-table-status').classList.toggle('error-message',error);};
     function cancel(){
-      const active=!!generation;clearTimeout(timer);timer=null;generation=null;
+      const active=!!generation;clearTimeout(timer);clearTimeout(autoTimer);autoTimer=null;timer=null;generation=null;
       $('encoding-table-generate').disabled=false;$('encoding-table-cancel').hidden=true;
       status(active?'生成已取消，原有对照表保留。':'');
     }
     function render(){
       const entry=api.getEntry();panel.hidden=!entry;
       const body=$('encoding-table-body');body.replaceChildren();if(!entry)return;
-      $('encoding-table-title').textContent=`${entry.name} · 数字 ↔ 表达式对照表`;
+      $('encoding-table-title').textContent=`数字 ↔ 表达式对照表 · ${entry.table?.length??0} 项`;
       for(const row of entry.table??[]){
         const tr=document.createElement('tr');tr.dataset.number=row.number;
         const number=document.createElement('td');number.textContent=`${row.number}_${entry.name}`;
@@ -64,6 +65,7 @@
       }catch(error){cancel();status(error.message,true);}
     });
     $('encoding-table-cancel').addEventListener('click',cancel);
+    $('encoding-table-number').addEventListener('input',()=>{cancel();if(/^[0-9]+$/.test($('encoding-table-number').value.trim()))autoTimer=setTimeout(()=>$('encoding-table-generate').click(),180);});
     return {render,cancel};
   }
   root.LambdaEncodingTable={init};

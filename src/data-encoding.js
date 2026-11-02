@@ -2,6 +2,7 @@
   'use strict';
   const C=root.LambdaCore||require('./core.js');
   const builtins=new Map([['church','church'],['丘奇数','church'],['decimal','decimal'],['列表小数','decimal']]);
+  const literalCache=new WeakMap();
   const validName=name=>typeof name==='string'&&/^[\p{L}][\p{L}\p{N}_']*$/u.test(name)&&!builtins.has(name);
   function validate(entries){
     if(!Array.isArray(entries))throw new C.LambdaError('自定义数据编码列表不合法。');
@@ -33,7 +34,7 @@
     return editing===null?[...entries,entry]:entries.map(old=>old.name===editing?entry:old);
   }
   function parse(source,entries=[],maxChars=Infinity,defaultEncoding='church'){
-    validate(entries);const registry=new Map(entries.map(entry=>[entry.name,entry.term])),encodings=new Set();
+    validate(entries);const registry=new Map(entries.map(entry=>[entry.name,entry.term])),encodings=new Set(),literals=[];
     const selected=defaultEncoding.startsWith('custom:')?defaultEncoding.slice(7):builtins.get(defaultEncoding)||defaultEncoding;
     const term=C.parse(source,maxChars,(value,suffix,position)=>{
       const encoding=suffix===null?selected:builtins.get(suffix)||suffix;
@@ -45,11 +46,40 @@
         const church=C.parse(value);
         if(encoding==='church'){encodings.add('church');return church;}
         if(!registry.has(encoding))throw new C.LambdaError(`未定义数据编码「${encoding}」。请先保存对应转换函数。`);
-        encodings.add(encoding);return C.A(registry.get(encoding),church);
+        encodings.add(encoding);const definition=registry.get(encoding),term=C.A(definition,church);
+        literals.push({name:encoding,number:naturalNumber(value),definition,term});return term;
       }catch(error){if(error.position===null||error.position===undefined)error.position=position;throw error;}
     },{suffixes:true});
-    return {term,encodings:[...encodings]};
+    return {term,encodings:[...encodings],literals};
   }
+  async function compile(source,entries=[],defaultEncoding='church',options={}){
+    const parsed=parse(source,entries,options.maxChars??Infinity,defaultEncoding),replacements=new WeakMap(),mappings=[];
+    const canceled=()=>{if(options.signal?.aborted){const error=new C.LambdaError('数字编码已取消。');error.name='AbortError';throw error;}};
+    for(const literal of parsed.literals){
+      canceled();let cache=literalCache.get(literal.definition);if(!cache){cache=new Map();literalCache.set(literal.definition,cache);}
+      let term=cache.get(literal.number),steps=0;
+      if(!term){
+        term=literal.term;let started=performance.now();
+        while(true){
+          canceled();const next=C.step(term);if(!next)break;term=next.term;steps++;
+          if(performance.now()-started>=8){options.onProgress?.({...literal,steps});await new Promise(resolve=>setTimeout(resolve,0));started=performance.now();}
+        }
+        canceled();cache.set(literal.number,term);
+      }
+      replacements.set(literal.term,term);mappings.push({...literal,term,steps});
+    }
+    canceled();const rebuilt=new WeakMap(),stack=[[parsed.term,false]];
+    while(stack.length){
+      const [node,done]=stack.pop();if(rebuilt.has(node))continue;
+      if(replacements.has(node)){rebuilt.set(node,replacements.get(node));continue;}
+      if(node.type==='var'){rebuilt.set(node,node);continue;}
+      if(!done){stack.push([node,true]);if(node.type==='abs')stack.push([node.body,false]);else stack.push([node.arg,false],[node.fn,false]);continue;}
+      if(node.type==='abs'){const body=rebuilt.get(node.body);rebuilt.set(node,body===node.body?node:C.L(node.param,body));}
+      else{const fn=rebuilt.get(node.fn),arg=rebuilt.get(node.arg);rebuilt.set(node,fn===node.fn&&arg===node.arg?node:C.A(fn,arg));}
+    }
+    return {...parsed,term:rebuilt.get(parsed.term),mappings};
+  }
+  const isLiteral=source=>/^-?[0-9]+(?:\.[0-9]+)?(?:_[\p{L}][\p{L}\p{N}_']*)?$/u.test(source.trim());
   const label=name=>name==='church'?'丘奇数':name==='decimal'?'列表小数':`${name}（自定义）`;
   function naturalNumber(value){
     if(typeof value!=='string'||!(/^[0-9]+$/.test(value.trim())))throw new C.LambdaError('对照表数字需要是非负整数。');
@@ -70,6 +100,6 @@
     for(const entry of entries)if(selected.has(entry.name))for(const row of entry.table??[])if(C.equal(term,row.term))matches.push({name:entry.name,number:row.number});
     return matches;
   }
-  const API={validName,validate,define,parse,label,naturalNumber,putMapping,removeMapping,lookup};root.LambdaDataEncoding=API;
+  const API={validName,validate,define,parse,compile,isLiteral,label,naturalNumber,putMapping,removeMapping,lookup};root.LambdaDataEncoding=API;
   if(typeof module!=='undefined'&&module.exports)module.exports=API;
 })(typeof globalThis!=='undefined'?globalThis:window);

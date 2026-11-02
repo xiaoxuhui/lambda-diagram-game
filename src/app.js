@@ -4,10 +4,15 @@
   const $=id=>document.getElementById(id);
   const input=$('expression');
   const state={ term:null, original:null, history:[], paths:null, dirty:false, running:false, timer:null,
-    mode:'free', level:0, completed:new Set(), halt:'', scale:1, autoFit:true, model:null, speed:600, strategy:'normal', direction:'left',numberEncoding:'church',decimalPlaces:6,fast:false,encodings:null };
-  let toastTimer,workspace,viewer,dataEditor,historySource=null,renderedCount=0,diagramTerm=null,diagramRoute=null;
+    mode:'free', level:0, completed:new Set(), halt:'', scale:1, autoFit:true, model:null, speed:600, strategy:'normal', direction:'left',numberEncoding:'church',decimalPlaces:6,fast:false,encodings:null,encodingBusy:false };
+  let toastTimer,workspace,viewer,dataEditor,conversionController=null,compilingDefinitions=null,autoConvertTimer=null,historySource=null,renderedCount=0,diagramTerm=null,diagramRoute=null;
   const decodedTerms=new WeakMap(),TRUE=C.parse(P.TRUE),FALSE=C.parse(P.FALSE),IDENTITY=C.parse(P.I);
   const diagramView=window.LambdaDiagramView.init($('diagram-mount'));
+  const encodingProgress=document.createElement('p');encodingProgress.className='syntax-note';encodingProgress.id='encoding-progress';encodingProgress.setAttribute('role','status');encodingProgress.hidden=true;
+  const cancelEncoding=document.createElement('button');cancelEncoding.type='button';cancelEncoding.id='cancel-encoding';cancelEncoding.className='button';cancelEncoding.textContent='取消数字编码';cancelEncoding.hidden=true;$('convert').after(encodingProgress,cancelEncoding);
+  function cancelConversion(){clearTimeout(autoConvertTimer);autoConvertTimer=null;conversionController?.abort();conversionController=null;compilingDefinitions=null;state.encodingBusy=false;encodingProgress.hidden=true;cancelEncoding.hidden=true;}
+  function queueLiteralConversion(){clearTimeout(autoConvertTimer);if(E.isLiteral(input.value))autoConvertTimer=setTimeout(convert,180);}
+  cancelEncoding.addEventListener('click',()=>{cancelConversion();render();});
   function save() { workspace?.queueSave(); }
   function capture() {
     return {...dataEditor.capture(),draft:input.value,completed:[...state.completed],mode:state.mode,level:state.level,
@@ -16,6 +21,7 @@
       selection:{start:input.selectionStart,end:input.selectionEnd},error:$('error-message').hidden?'':$('error-message').textContent};
   }
   function applySnapshot(s) {
+    cancelConversion();
     $('example-info').hidden=true;
     stop();input.value=s.draft;state.completed=new Set(s.completed);state.mode=s.mode;state.level=s.level;
     revealAnswer(false);
@@ -29,6 +35,7 @@
     renderMode();if(s.hasSession)render();else convert();input.setSelectionRange(s.selection.start,s.selection.end);
     if(!state.term){$('zoom-label').textContent=`${Math.round(state.scale*100)}%`;$('fit').setAttribute('aria-pressed',String(state.autoFit));}
     $('diagram-viewport').scrollLeft=s.view.panX;$('diagram-viewport').scrollTop=s.view.panY;
+    if(state.dirty||(s.session.steps===0&&state.term&&C.findRedex(state.term)))queueLiteralConversion();
   }
   function toast(message) {
     clearTimeout(toastTimer); $('toast').textContent=message; $('toast').hidden=false;
@@ -36,6 +43,7 @@
   }
   function stop() { clearTimeout(state.timer); state.timer=null; state.running=false;state.fast=false; }
   function changed() {
+    cancelConversion();
     $('example-info').hidden=true;
     stop(); state.dirty=true; state.halt=''; $('error-message').hidden=true;
     $('challenge-feedback').textContent=''; $('next-level').hidden=true;
@@ -48,21 +56,30 @@
     input.focus();
     changed();
   }
-  function convert() {
-    stop(); $('error-message').hidden=true; state.halt='';
+  async function convert() {
+    cancelConversion();const controller=new AbortController();conversionController=controller;let showedProgress=false;
+    compilingDefinitions=new Map(dataEditor.entries().map(entry=>[entry.name,entry.term]));
+    stop(); $('error-message').hidden=true; state.halt='';state.dirty=true;
     $('challenge-feedback').textContent=''; $('next-level').hidden=true;
     try {
       if(state.numberEncoding==='decimal'&&!$('decimal-places').checkValidity())throw new C.LambdaError('除法小数位数需为非负整数。');
-      const compiled=E.parse(input.value,dataEditor.entries(),Infinity,state.numberEncoding),parsed=compiled.term,expanded=workspace?workspace.expand(parsed):parsed;
+      const compiled=await E.compile(input.value,dataEditor.entries(),state.numberEncoding,{signal:controller.signal,onProgress:literal=>{if(!showedProgress){state.encodingBusy=true;render();showedProgress=true;}encodingProgress.hidden=false;cancelEncoding.hidden=false;encodingProgress.textContent=`正在自动编码 ${literal.number}_${literal.name} · ${literal.steps} 步`;}});
+      if(controller.signal.aborted||conversionController!==controller)return false;
+      if(compiled.mappings.some(mapping=>!dataEditor.entries().some(entry=>entry.name===mapping.name&&entry.term===mapping.definition)))return false;
+      const parsed=compiled.term,expanded=workspace?workspace.expand(parsed):parsed;
+      dataEditor.remember(compiled.mappings);
       const term=expanded;
-      state.term=term; state.original=term; state.history=[{term,change:null}]; state.paths=null;state.dirty=false;state.encodings=[...new Set([...compiled.encodings,...(workspace?.encodingsFor(parsed)??[])])];
+      state.term=term; state.original=term; state.history=[{term,change:null}]; state.paths=null;state.dirty=false;state.encodingBusy=false;state.encodings=[...new Set([...compiled.encodings,...(workspace?.encodingsFor(parsed)??[])])];
       state.autoFit=true; render(); save(); return true;
     } catch(e) {
-      state.term=null; state.original=null; state.history=[];state.paths=null; state.dirty=true;state.encodings=null;
+      if(e.name==='AbortError'||controller.signal.aborted)return false;
+      state.term=null; state.original=null; state.history=[];state.paths=null; state.dirty=true;state.encodings=null;state.encodingBusy=false;
       $('error-message').textContent=(e.position!==null&&e.position!==undefined?`第 ${e.position+1} 个字符：`:'')+e.message;
       $('error-message').hidden=false; render(); input.focus();
       if(e.position!==null&&e.position!==undefined) input.setSelectionRange(e.position,e.position+1);
       return false;
+    } finally {
+      if(conversionController===controller){conversionController=null;compilingDefinitions=null;state.encodingBusy=false;encodingProgress.hidden=true;cancelEncoding.hidden=true;if(showedProgress&&state.dirty)render();}
     }
   }
   function renderDiagram(redex) {
@@ -128,13 +145,14 @@
     $('reset').disabled=!ready||state.running||count===0;
     $('export-svg').disabled=!ready; $('zoom-in').disabled=!state.term; $('zoom-out').disabled=!state.term; $('fit').disabled=!state.term;$('actual-size').disabled=!state.term;
     const badge=$('state-badge'); badge.className='state-badge';
-    if(!state.term) { badge.textContent='等待输入'; badge.classList.add('dirty'); }
+    if(state.encodingBusy)badge.textContent='数字编码中';
+    else if(!state.term) { badge.textContent='等待输入'; badge.classList.add('dirty'); }
     else if(state.dirty) { badge.textContent='已编辑 · 请转换'; badge.classList.add('dirty'); }
     else if(state.running) badge.textContent='正在归约';
     else if(state.halt) { badge.textContent='已暂停'; badge.classList.add('error'); }
     else if(!redex) badge.textContent='已到正规形';
     else badge.textContent='可以归约';
-    $('run-status').textContent=!state.term?'输入有效表达式后，就能开始运行。':state.dirty?'输入已改变。重新转换后开始新的归约。':
+    $('run-status').textContent=state.encodingBusy?'正在自动归约数字编码，完成后显示图示。':!state.term?'输入有效表达式后，就能开始运行。':state.dirty?'输入已改变。重新转换后开始新的归约。':
       state.halt|| (state.running?'自动运行中；粉色线路标记下一次函数替换。':!redex?'已到 β 正规形；可点击单步或运行再次尝试，不能归约时保持当前式。':count?'可以继续单步，或回退查看上一帧。':'准备好了。点击单步，观察一次函数替换。');
     $('current-expression').textContent=state.term?C.format(state.term):'—';
     $('expression-encoding').textContent=!state.term?'':state.encodings===null?'编码：旧存档保留原表达式':state.encodings.length?`数字来源编码：${state.encodings.map(E.label).join('、')}`:'编码：纯 λ 表达式（无数字字面量）';
@@ -254,7 +272,7 @@
     $('next-level').textContent=l.id===stage.levelIds.at(-1)?'下一阶段 →':'下一关 →';
     toast(`✓ ${l.name} · 挑战完成`);
   }
-  input.addEventListener('input',changed);
+  input.addEventListener('input',event=>{changed();if(!event.isComposing)queueLiteralConversion();});
   input.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();convert();}});
   document.querySelectorAll('[data-insert]').forEach(b=>{
     b.addEventListener('mousedown',e=>e.preventDefault());
@@ -275,7 +293,7 @@
   });
   $('convert').addEventListener('click',convert);$('step').addEventListener('click',advance);$('run').addEventListener('click',run);
   $('fast-run').addEventListener('click',()=>{if(state.running){stop();render();return;}if(!state.term||state.dirty)return;state.running=true;state.fast=true;state.halt='';render();schedule();});
-  $('number-encoding').addEventListener('change',()=>{const previous=state.numberEncoding;state.numberEncoding=$('number-encoding').value;dataEditor.select(state.numberEncoding);if(previous!==state.numberEncoding)changed();else{render();save();}});
+  $('number-encoding').addEventListener('change',()=>{const previous=state.numberEncoding;state.numberEncoding=$('number-encoding').value;dataEditor.select(state.numberEncoding);if(previous!==state.numberEncoding){changed();queueLiteralConversion();}else{render();save();}});
   $('decimal-places').addEventListener('input',()=>{const n=$('decimal-places').valueAsNumber;if(!Number.isSafeInteger(n)||n<0){$('decimal-places').setCustomValidity('请输入非负整数');return;}$('decimal-places').setCustomValidity('');state.decimalPlaces=n;if(state.numberEncoding==='decimal')changed();else save();});
   $('back').addEventListener('click',()=>{if(state.history.length>1){stop();state.history.pop();state.paths?.pop();state.term=state.history.at(-1).term;state.halt='';$('challenge-feedback').textContent='';$('next-level').hidden=true;render();}});
   $('reset').addEventListener('click',()=>{if(state.original){stop();state.term=state.original;state.history=[{term:state.original,change:null}];state.paths=null;state.halt='';$('challenge-feedback').textContent='';$('next-level').hidden=true;render();}});
@@ -310,9 +328,10 @@
   $('help-toggle').addEventListener('click',()=>{const show=$('help-panel').hidden;$('help-panel').hidden=!show;$('help-toggle').setAttribute('aria-expanded',String(show));save();});
   $('history-details').addEventListener('toggle',save);
   $('speed').addEventListener('change',save);
-  dataEditor=window.LambdaDataEncodingEditor.init({getSelection:()=>state.numberEncoding,setSelection:value=>{state.numberEncoding=value;},expand:term=>workspace?workspace.expand(term):term,queueSave:save,onChange:()=>{render();save();},currentTerm:()=>state.term&&!state.dirty?state.term:null,loadTerm:(term,name)=>{state.numberEncoding=`custom:${name}`;setSource(C.format(term));},toast});
+  dataEditor=window.LambdaDataEncodingEditor.init({getSelection:()=>state.numberEncoding,setSelection:value=>{state.numberEncoding=value;},expand:term=>workspace?workspace.expand(term):term,queueSave:save,onChange:()=>{if(compilingDefinitions&&(compilingDefinitions.size!==dataEditor.entries().length||dataEditor.entries().some(entry=>compilingDefinitions.get(entry.name)!==entry.term))){changed();queueLiteralConversion();}else{render();save();}},currentTerm:()=>state.term&&!state.dirty?state.term:null,loadTerm:(term,name)=>{state.numberEncoding=`custom:${name}`;setSource(C.format(term));},toast});
   workspace=window.LambdaWorkspace.init({capture,apply:applySnapshot,toast,
     getNumberEncoding:()=>state.numberEncoding,getDecimalPlaces:()=>state.decimalPlaces,getDataEncodings:()=>dataEditor.entries(),
+    compileSource:async(source,signal)=>{const compiled=await E.compile(source,dataEditor.entries(),state.numberEncoding,{signal});dataEditor.remember(compiled.mappings);return compiled;},
     currentExpression:()=>state.term&&!state.dirty?C.format(state.term):input.value,
     insertFunction:name=>{const start=input.selectionStart,end=input.selectionEnd;
       const before=start&&/[A-Za-z0-9_']/.test(input.value[start-1])?' ':'';
