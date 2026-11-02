@@ -24,6 +24,15 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
         assert.match(await page.locator('#expression-encoding').textContent(),/丘奇数/);
         await source('-0.5_decimal');assert.equal(await page.locator('#decoded').textContent(),'小数 -0.5');assert.match(await page.locator('#expression-encoding').textContent(),/列表小数/);
       });
+      await check(`${width}px lambda button inserts into the converter cursor and replaces a selection`,async()=>{
+        await page.locator('#custom-data-panel summary').click();
+        await page.locator('#encoding-source').fill('n.n');await page.locator('#encoding-source').evaluate(field=>field.setSelectionRange(0,0));
+        await page.locator('#encoding-lambda').click();assert.equal(await page.locator('#encoding-source').inputValue(),'λn.n');
+        assert.ok(await page.locator('#encoding-source').evaluate(field=>document.activeElement===field&&field.selectionStart===1));
+        await page.locator('#encoding-source').evaluate(field=>field.setSelectionRange(0,2));await page.locator('#encoding-lambda').click();
+        assert.equal(await page.locator('#encoding-source').inputValue(),'λ.n');
+        await page.locator('#save-state').click();await page.reload();assert.equal(await page.locator('#encoding-source').inputValue(),'λ.n');
+      });
       await check(`${width}px save and select a named converter without claiming its function name`,async()=>{
         await add('Box','λn.λk.k n');assert.equal(await page.locator('#number-encoding').inputValue(),'custom:Box');
         assert.match(await page.locator('#number-note').textContent(),/3_Box/);assert.equal(await page.locator('#function-count').textContent(),'0 个函数');
@@ -37,8 +46,11 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
       });
       await check(`${width}px editing converter keeps the already compiled term until reconversion`,async()=>{
         await source('3_Box');await fast();const old=await page.locator('#current-expression').textContent();
-        await page.locator('#number-encoding').selectOption('custom:Box');assert.equal(await page.locator('#encoding-source').inputValue(),'λn.λk.k n');
+        const count=await page.locator('#encoding-list .function-item').count();
+        await page.getByRole('button',{name:'编辑数据编码 Box',exact:true}).click();assert.equal(await page.locator('#encoding-source').inputValue(),'λn.λk.k n');
+        assert.equal(await page.locator('#encoding-save').textContent(),'保存修改');assert.equal(await page.locator('#encoding-edit-status').textContent(),'正在编辑：Box');
         await page.locator('#encoding-source').fill('λn.λk.k n n');await page.locator('#encoding-save').click();assert.equal(await page.locator('#current-expression').textContent(),old);
+        assert.equal(await page.locator('#encoding-list .function-item').count(),count);assert.equal(await page.locator('#encoding-list [data-encoding-name="Box"] code').textContent(),'λn.λk.k n n');
         await page.locator('#convert').click();await fast();await result('λk.k 3 3');assert.equal(await page.locator('#decoded').textContent(),'自定义数据');
       });
       await check(`${width}px functions accept custom literals and retain provenance through names`,async()=>{
@@ -60,7 +72,7 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
         assert.match(await page.locator('#expression-encoding').textContent(),/Box/);await page.locator('#back').click();assert.equal(await page.locator('#step-count').textContent(),'0');await page.locator('#step').click();await result('λk.k 3 3');
       });
       await check(`${width}px deletion preserves compiled functions and restore recovers encoding`,async()=>{
-        await page.locator('#encoding-delete').click();assert.equal(await page.locator('#number-encoding option[value="custom:Box"]').count(),0);await result('λk.k 3 3');
+        await page.getByRole('button',{name:'删除数据编码 Box',exact:true}).click();assert.equal(await page.locator('#number-encoding option[value="custom:Box"]').count(),0);await result('λk.k 3 3');
         await source('VALUE');await fast();await result('λk.k 2 2');assert.match(await page.locator('#expression-encoding').textContent(),/Box/);
         await page.getByRole('button',{name:'编辑函数 VALUE',exact:true}).click();await page.locator('#function-name').fill('RENAMED');await page.locator('#function-add').click();assert.ok(await page.locator('#function-error').isHidden());
         await page.locator('#restore-state').click();assert.equal(await page.locator('#number-encoding option[value="custom:Box"]').count(),1);await result('λk.k 3 3');
