@@ -8,6 +8,24 @@ test('unmarked numerals are Church and custom conversion remains an actual beta 
   assert.ok(C.equal(parsed.term.arg,C.parse('3')));assert.ok(C.findRedex(parsed.term));
   assert.ok(C.equal(normalize(parsed.term),C.parse('λk.k 3')));
 });
+test('unmarked numbers use the selected encoding and explicit suffixes override every default',()=>{
+  const entries=box();
+  for(const selected of ['church','decimal','custom:Box']){
+    assert.ok(C.equal(E.parse('3_church',entries,Infinity,selected).term,C.parse('3')));
+    assert.ok(C.equal(E.parse('3_丘奇数',entries,Infinity,selected).term,C.parse('3')));
+    assert.equal(D.format(D.read(E.parse('-0.5_decimal',entries,Infinity,selected).term)),'-0.5');
+    assert.ok(C.equal(normalize(E.parse('3_Box',entries,Infinity,selected).term),C.parse('λk.k 3')));
+  }
+  const decimal=E.parse('-0.5',entries,Infinity,'decimal');assert.equal(D.format(D.read(decimal.term)),'-0.5');assert.deepEqual(decimal.encodings,['decimal']);
+  const custom=E.parse('3',entries,Infinity,'custom:Box');assert.ok(C.equal(normalize(custom.term),C.parse('λk.k 3')));assert.deepEqual(custom.encodings,['Box']);
+  assert.throws(()=>E.parse('0.5',entries,Infinity,'custom:Box'),/非负整数/);
+});
+test('function definitions use the current encoding and converter definitions still receive Church numerals',()=>{
+  const entries=box(),fn=L.add([],'THREE','3',Infinity,'custom:Box',6,entries).at(-1);
+  assert.ok(C.equal(normalize(fn.term),C.parse('λk.k 3')));assert.deepEqual(fn.encodings,['Box']);
+  assert.equal(D.format(D.read(L.add([],'HALF','0.5',Infinity,'decimal',6,entries).at(-1).term)),'0.5');
+  const converter=E.define([],'Constant','λn.3_丘奇数');assert.ok(C.equal(normalize(E.parse('9_Constant',converter).term),C.parse('3')));
+});
 test('custom encodings support Chinese names, multiple definitions, zero, and hygiene',()=>{
   const entries=E.define(box(),'我的数据','λn.λx.n');
   assert.ok(C.equal(normalize(E.parse('0_我的数据',entries).term),C.parse('λx.0')));
@@ -64,5 +82,31 @@ test('decimal examples explicitly annotate operands for the new editor parser',(
   for(const example of P.examples.filter(e=>e.decimalOperation)){
     const parsed=E.parse(P.inputSourceFor(example));assert.deepEqual(parsed.encodings,['decimal']);
     assert.equal(D.format(D.read(normalize(parsed.term))),example.expected);
+  }
+});
+test('mapping tables match alpha-equivalent normal forms and replace one numeral immutably',()=>{
+  const entries=E.putMapping(box(),'Box','003',C.parse('λk.k 3'));
+  assert.deepEqual(E.lookup(C.parse('λrenamed.renamed 3'),entries,['Box']),[{name:'Box',number:'3'}]);
+  assert.deepEqual(E.lookup(C.parse('λk.k 2'),entries,['Box']),[]);
+  assert.deepEqual(E.lookup(C.parse('λk.k 3'),entries,['Other']),[]);
+  const updated=E.putMapping(entries,'Box','3',C.parse('λk.k 2'));
+  assert.equal(updated[0].table.length,1);assert.ok(C.equal(entries[0].table[0].term,C.parse('λk.k 3')));
+  assert.equal(E.removeMapping(updated,'Box','3')[0].table.length,0);
+  assert.throws(()=>E.putMapping(entries,'Box','-1',C.parse('0')),/非负整数/);
+  assert.throws(()=>E.putMapping(entries,'Box','2',C.parse('(λx.x) 2')),/正规形/);
+  assert.throws(()=>E.putMapping(entries,'Box','2',C.parse('free')),/闭合/);
+});
+test('mapping ambiguity is retained and changing a converter invalidates its old table',()=>{
+  let entries=E.putMapping(box(),'Box','0',C.parse('λk.k 0'));entries=E.putMapping(entries,'Box','1',C.parse('λk.k 0'));
+  assert.equal(E.lookup(C.parse('λx.x 0'),entries,['Box']).length,2);
+  const renamed=E.define(entries,'NewBox',entries[0].source,undefined,'Box');assert.equal(renamed[0].table.length,2);
+  const changed=E.define(entries,'Box','λn.n',undefined,'Box');assert.equal(changed[0].table.length,0);
+});
+test('mapping tables survive archives and malformed or reducible records are rejected',()=>{
+  const raw=sample();raw.dataEncodings=E.putMapping(raw.dataEncodings,'Box','3',C.parse('λk.k 3'));
+  const restored=S.decode(S.encodeBackup(raw,S.encode(raw)));
+  assert.deepEqual(restored.dataEncodings,raw.dataEncodings);assert.deepEqual(S.decode(restored.checkpointText).dataEncodings,raw.dataEncodings);
+  for(const table of [[{number:'3',term:C.V('free')}],[{number:'3',term:C.parse('(λx.x) 3')}],[{number:'3',term:C.parse('3')},{number:'3',term:C.parse('3')}],{}]){
+    raw.dataEncodings[0].table=table;assert.throws(()=>S.decode(JSON.stringify(raw)));
   }
 });

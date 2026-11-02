@@ -18,10 +18,12 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
         await page.locator('#encoding-new').click();await page.locator('#encoding-name').fill(name);await page.locator('#encoding-source').fill(source);await page.locator('#encoding-save').click();
         assert.ok(await page.locator('#encoding-error').isHidden());
       };
-      await check(`${width}px unsuffixed numbers stay Church regardless of selected menu`,async()=>{
+      await check(`${width}px unsuffixed numbers follow the menu and Church suffix overrides it`,async()=>{
         assert.equal(await page.locator('#number-encoding').inputValue(),'church');
-        await source('3');await result('3');await page.locator('#number-encoding').selectOption('decimal');await source('3');await result('3');
+        await source('3');await result('3');await page.locator('#number-encoding').selectOption('decimal');await source('3');assert.equal(await page.locator('#decoded').textContent(),'小数 3');
+        await source('3_church');await result('3');await source('3_丘奇数');await result('3');
         assert.match(await page.locator('#expression-encoding').textContent(),/丘奇数/);
+        await source('-0.5');assert.equal(await page.locator('#decoded').textContent(),'小数 -0.5');
         await source('-0.5_decimal');assert.equal(await page.locator('#decoded').textContent(),'小数 -0.5');assert.match(await page.locator('#expression-encoding').textContent(),/列表小数/);
       });
       await check(`${width}px lambda button inserts into the converter cursor and replaces a selection`,async()=>{
@@ -38,10 +40,12 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
         assert.match(await page.locator('#number-note').textContent(),/3_Box/);assert.equal(await page.locator('#function-count').textContent(),'0 个函数');
         await source('3_Box');assert.equal(await page.locator('#step-count').textContent(),'0');assert.equal(await page.locator('#state-badge').textContent(),'可以归约');
         await page.locator('#step').click();await result('λk.k 3');assert.equal(await page.locator('#step-count').textContent(),'1');assert.match(await page.locator('#expression-encoding').textContent(),/Box/);
+        await source('3');await fast();await result('λk.k 3');assert.match(await page.locator('#expression-encoding').textContent(),/Box/);
+        await source('3_丘奇数');await result('3');assert.match(await page.locator('#expression-encoding').textContent(),/丘奇数/);
       });
       await check(`${width}px multiple and Chinese encodings can mix with builtins`,async()=>{
         await add('后继','λn.λf x.f (n f x)');await source('2_后继');await fast();await result('3');
-        await source('λf.f 2 3_Box 0.5_decimal');await fast();const label=await page.locator('#expression-encoding').textContent();
+        await source('λf.f 2_church 3_Box 0.5_decimal');await fast();const label=await page.locator('#expression-encoding').textContent();
         assert.match(label,/丘奇数/);assert.match(label,/Box/);assert.match(label,/列表小数/);
       });
       await check(`${width}px editing converter keeps the already compiled term until reconversion`,async()=>{
@@ -60,7 +64,7 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
       });
       await check(`${width}px invalid converter and suffixes show errors without losing saved encodings`,async()=>{
         await add('Temp','λn.n');await page.locator('#encoding-source').fill('λn.missing');await page.locator('#encoding-save').click();assert.match(await page.locator('#encoding-error').textContent(),/自由变量/);
-        for(const text of ['3_Unknown','3_','-1_Box','0.5_Box','0.1']){
+        for(const text of ['3_Unknown','3_','-1_Box','0.5_Box','0.1_church']){
           await page.locator('#expression').fill(text);await page.locator('#convert').click();assert.ok(await page.locator('#error-message').isVisible(),text);
         }
         await source('3_Temp');await fast();await result('3');

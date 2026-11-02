@@ -30,7 +30,9 @@
     if(raw.dataEncodings!==undefined&&!Array.isArray(raw.dataEncodings))fail('数据编码列表不合法。');
     const dataEncodings=(raw.dataEncodings??[]).map(entry=>{
       if(!object(entry))fail('数据转换函数不完整。');
-      return {name:entry.name,source:entry.source,term:ast(entry.term)};
+      if(entry.table!==undefined&&!Array.isArray(entry.table))fail('数字表达式对照表不合法。');
+      const table=entry.table?.map(row=>{if(!object(row))fail('对照项不完整。');return {number:row.number,term:ast(row.term)};});
+      return {name:entry.name,source:entry.source,term:ast(entry.term),...(table===undefined?{}:{table})};
     });E.validate(dataEncodings);
     const encodingDraft=raw.encodingDraft??{name:'',source:''};
     if(!object(encodingDraft)||typeof encodingDraft.name!=='string'||typeof encodingDraft.source!=='string')fail('数据编码草稿不合法。');

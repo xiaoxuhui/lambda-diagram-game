@@ -2,7 +2,7 @@
   'use strict';
   const E=root.LambdaDataEncoding,$=id=>document.getElementById(id);
   function init(api){
-    let entries=[],editing=null;
+    let entries=[],editing=null,tableView;
     const editStatus=document.createElement('p');editStatus.id='encoding-edit-status';editStatus.className='function-note';$('encoding-form').prepend(editStatus);
     const heading=document.createElement('p');heading.className='function-note';
     const list=document.createElement('div');list.id='encoding-list';list.className='function-list';$('encoding-form').after(heading,list);
@@ -11,6 +11,7 @@
       $('encoding-save').textContent=editing===null?'保存新编码':'保存修改';
       $('encoding-delete').disabled=editing===null;
       editStatus.hidden=editing===null;editStatus.textContent=editing===null?'':`正在编辑：${editing}`;
+      tableView?.render();
     }
     function renderList(){
       heading.textContent=`已保存的数据编码 · ${entries.length} 个`;list.replaceChildren();
@@ -32,7 +33,7 @@
       if(!['church','decimal',...entries.map(entry=>`custom:${entry.name}`)].includes(api.getSelection()))api.setSelection('church');
       $('number-encoding').value=api.getSelection();buttons();renderList();
     }
-    function fresh(){editing=null;$('encoding-name').value='';$('encoding-source').value='';error('');buttons();api.queueSave();}
+    function fresh(){tableView?.cancel();editing=null;$('encoding-name').value='';$('encoding-source').value='';error('');buttons();api.queueSave();}
     function remove(name){
       entries=entries.filter(entry=>entry.name!==name);
       if(editing===name)fresh();options();api.onChange();api.toast(`已删除编码 ${name}`);
@@ -40,6 +41,7 @@
     function select(value){
       if(!value.startsWith('custom:'))return;
       const entry=entries.find(entry=>`custom:${entry.name}`===value);if(!entry)return;
+      if(editing!==entry.name)tableView?.cancel();
       editing=entry.name;$('encoding-name').value=entry.name;$('encoding-source').value=entry.source;
       $('custom-data-panel').open=true;error('');buttons();
     }
@@ -50,6 +52,7 @@
         const original=entries.find(entry=>entry.name===editing),source=$('encoding-source').value;
         // Unchanged definitions retain their compiled dependencies even after library changes.
         if(original&&name===editing&&source===original.source){api.toast(`编码 ${name} 已保存`);return;}
+        tableView?.cancel();
         entries=E.define(entries,name,source,api.expand,editing);editing=name;
         api.setSelection(`custom:${name}`);options();error('');api.onChange();api.toast(`已保存编码 ${name}`);
       }catch(e){error(e.message);}
@@ -66,11 +69,12 @@
       remove(editing);
     });
     for(const id of ['encoding-name','encoding-source'])$(id).addEventListener('input',()=>{error('');api.queueSave();});
+    tableView=root.LambdaEncodingTable.init({host:$('encoding-form'),getEntry:()=>entries.find(entry=>entry.name===editing),getEntries:()=>entries,setEntries:value=>{entries=value;renderList();},onChange:api.onChange,currentTerm:api.currentTerm,loadTerm:api.loadTerm});
     options();
     return {
       entries:()=>entries,select,
       capture:()=>({dataEncodings:entries,encodingDraft:{name:$('encoding-name').value,source:$('encoding-source').value,...(editing===null?{}:{editing})}}),
-      restore(snapshot){entries=snapshot.dataEncodings??[];const draft=snapshot.encodingDraft??{name:'',source:''};editing=draft.editing??null;$('encoding-name').value=draft.name;$('encoding-source').value=draft.source;options();error('');$('custom-data-panel').open=entries.length>0||!!draft.source;}
+      restore(snapshot){tableView.cancel();entries=snapshot.dataEncodings??[];const draft=snapshot.encodingDraft??{name:'',source:''};editing=draft.editing??null;$('encoding-name').value=draft.name;$('encoding-source').value=draft.source;options();error('');$('custom-data-panel').open=entries.length>0||!!draft.source;}
     };
   }
   root.LambdaDataEncodingEditor={init};
