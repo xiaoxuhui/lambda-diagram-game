@@ -14,6 +14,7 @@
     for(const fn of functions) {
       if(fn.source!==undefined&&typeof fn.source!=='string')throw new C.LambdaError('函数原始定义需为文本。');
       if(fn.encodings!==undefined&&(!Array.isArray(fn.encodings)||fn.encodings.some(name=>typeof name!=='string'||!/^[\p{L}][\p{L}\p{N}_']*$/u.test(name))))throw new C.LambdaError('函数编码标记不合法。');
+      if(fn.sourceFree!==undefined&&(!Array.isArray(fn.sourceFree)||fn.sourceFree.some(name=>typeof name!=='string'||!/^[A-Za-z][A-Za-z0-9_']*$/.test(name))))throw new C.LambdaError('函数原文变量标记不合法。');
       if(!validName(fn.name))throw new C.LambdaError('函数名需以英文字母开头，最多 32 字符，可含数字、下划线和单引号。');
       if(seen.has(fn.name))throw new C.LambdaError(`函数「${fn.name}」已存在，请换一个名字。`);
       seen.add(fn.name);nodes+=C.inspect(fn.term).nodes;
@@ -41,7 +42,7 @@
     const parsed=compiled?compiled.term:numberEncoding==='decimal'?C.parseInput(source,maxChars):C.parse(source,maxChars);
     if(C.freeVars(parsed).has(name))throw new C.LambdaError('定义不能直接引用自身。递归请使用显式不动点组合子。');
     const term=expand(parsed,functions);
-    const result=[...functions,{name,source,term,...(compiled?{encodings:[...new Set([...compiled.encodings,...encodingsFor(parsed,functions)])]}:{})}];validate(result);return result;
+    const result=[...functions,{name,source,term,...(compiled?{encodings:[...new Set([...compiled.encodings,...encodingsFor(parsed,functions)])],sourceFree:[...C.freeVars(parsed)]}:{})}];validate(result);return result;
   }
   const remove=(functions,name)=>functions.filter(f=>f.name!==name);
   function update(functions,originalName,name,source,numberEncoding='church',precision=6,dataEncodings=null,prepared=null) {
@@ -51,8 +52,8 @@
     let replacement;
     if(typeof original.source==='string'&&source===original.source){
       name=name.trim();replacement={...original,name,source,term:original.term};validate([...others,replacement]);
-      const parsed=C.parse(source,Infinity,()=>C.parse('0'),{suffixes:true});
-      if(C.freeVars(parsed).has(name))throw new C.LambdaError('定义不能直接引用自身。递归请使用显式不动点组合子。');
+      const sourceNames=original.sourceFree??[...C.freeVars(C.parse(source,Infinity,()=>C.parse('0'),{suffixes:true}))];
+      if(sourceNames.includes(name))throw new C.LambdaError('定义不能直接引用自身。递归请使用显式不动点组合子。');
     }else replacement=add(others,name,source,Infinity,numberEncoding,precision,dataEncodings,prepared).at(-1);
     return functions.map(fn=>fn.name===originalName?replacement:fn);
   }

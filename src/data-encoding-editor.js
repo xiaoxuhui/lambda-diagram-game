@@ -53,7 +53,7 @@
         // Unchanged definitions retain their compiled dependencies even after library changes.
         if(original&&name===editing&&source===original.source){api.toast(`编码 ${name} 已保存`);return;}
         tableView?.cancel();
-        entries=E.define(entries,name,source,api.expand,editing);editing=name;
+        entries=E.define(entries,name,source,api.expand,editing,api.getNumberFormats?.()??{});editing=name;
         api.setSelection(`custom:${name}`);options();error('');api.onChange();api.toast(`已保存编码 ${name}`);
       }catch(e){error(e.message);}
     });
@@ -73,6 +73,7 @@
     options();
     return {
       entries:()=>entries,select,
+      setInputFormat(name,template){entries=E.withInputFormat(entries,name,template,api.getNumberFormats?.()??{});renderList();},
       remember(mappings){
         for(const mapping of mappings)if(entries.some(entry=>entry.name===mapping.name&&entry.term===mapping.definition))entries=E.putMapping(entries,mapping.name,mapping.number,mapping.term);
         tableView.render();

@@ -4,6 +4,42 @@
   const builtins=new Map([['church','church'],['丘奇数','church'],['decimal','decimal'],['列表小数','decimal']]);
   const literalCache=new WeakMap();
   const validName=name=>typeof name==='string'&&/^[\p{L}][\p{L}\p{N}_']*$/u.test(name)&&!builtins.has(name);
+  function validateTemplate(template){
+    if(typeof template!=='string'||template.split('{n}').length!==2)throw new C.LambdaError('输入形式需要且只能包含一个 {n}，例如 C{n}、{n}c 或 [{n}]。');
+    const [prefix,suffix]=template.split('{n}');
+    if(!prefix&&!suffix)throw new C.LambdaError('请给 {n} 加上前缀或后缀；直接输入数字会使用当前编码。');
+    if(/[λ\\().\s{}]/u.test(prefix+suffix))throw new C.LambdaError('输入形式的前后缀不能使用空白、λ、反斜杠、圆括号、点或花括号。');
+    return {prefix,suffix};
+  }
+  function formatSpecs(entries,numberFormats={}){
+    if(!numberFormats||typeof numberFormats!=='object'||Array.isArray(numberFormats)||Object.keys(numberFormats).some(key=>!['church','decimal'].includes(key)))throw new C.LambdaError('内置数字输入形式不合法。');
+    const specs=[{encoding:'church',key:'church',canonical:'{n}_church',template:numberFormats.church??'{n}_church'},{encoding:'decimal',key:'decimal',canonical:'{n}_decimal',template:numberFormats.decimal??'{n}_decimal'},...entries.map(entry=>({encoding:entry.name,key:`custom:${entry.name}`,canonical:`{n}_${entry.name}`,template:entry.inputFormat??`{n}_${entry.name}`}))];
+    const reserved=new Map([['{n}_church','church'],['{n}_丘奇数','church'],['{n}_decimal','decimal'],['{n}_列表小数','decimal'],...entries.map(entry=>[`{n}_${entry.name}`,entry.name])]),seen=new Map();
+    for(const spec of specs){
+      validateTemplate(spec.template);
+      if(reserved.has(spec.template)&&reserved.get(spec.template)!==spec.encoding)throw new C.LambdaError('这个写法属于另一种编码的标准后缀，请换一个输入形式。');
+      if(seen.has(spec.template))throw new C.LambdaError('这个输入形式已被另一种编码使用。');seen.set(spec.template,spec.encoding);
+    }
+    return specs;
+  }
+  function inputFormatFor(selection,entries=[],numberFormats={}){return formatSpecs(entries,numberFormats).find(spec=>spec.key===selection)?.template??'{n}_church';}
+  function literalMatcher(entries,numberFormats={}){
+    const escape=text=>[...text].map(char=>'^$.*+?()[]{}|'.includes(char)?String.fromCharCode(92)+char:char).join('');
+    const patterns=formatSpecs(entries,numberFormats).filter(spec=>spec.template!==spec.canonical).map(spec=>{const {prefix,suffix}=validateTemplate(spec.template);return {...spec,pattern:new RegExp('^'+escape(prefix)+'(-?[0-9]+(?:[.][0-9]+)?)'+escape(suffix),'u')};});
+    const word=char=>!!char&&/[\p{L}\p{N}_']/u.test(char);
+    return (source,position)=>{
+      const matches=[];
+      for(const spec of patterns){
+        const match=spec.pattern.exec(source.slice(position));if(!match)continue;
+        if((word(match[0][0])&&word(source[position-1]))||(word(match[0].at(-1))&&word(source[position+match[0].length])))continue;
+        matches.push({value:match[1],encoding:spec.encoding,length:match[0].length});
+      }
+      if(!matches.length)return null;
+      const longest=Math.max(...matches.map(match=>match.length)),best=matches.filter(match=>match.length===longest);
+      if(best.length>1)throw new C.LambdaError('这个数字同时匹配多个输入形式，请使用明确的「数字_编码名称」。',position);
+      return best[0];
+    };
+  }
   function validate(entries){
     if(!Array.isArray(entries))throw new C.LambdaError('自定义数据编码列表不合法。');
     const names=new Set();
@@ -20,20 +56,20 @@
       }
       names.add(entry.name);
     }
-    return entries;
+    formatSpecs(entries);return entries;
   }
-  function define(entries,name,source,expand=term=>term,editing=null){
+  function define(entries,name,source,expand=term=>term,editing=null,numberFormats={}){
     validate(entries);name=name.trim();
     if(!validName(name))throw new C.LambdaError('编码名称需以字母或汉字开头，可含数字、下划线和单引号；不能使用内置编码名称。');
     if(editing!==null&&!entries.some(entry=>entry.name===editing))throw new C.LambdaError('要编辑的数据编码已不存在。');
     if(entries.some(entry=>entry.name===name&&entry.name!==editing))throw new C.LambdaError(`编码「${name}」已存在，请选择它进行编辑。`);
     // Converter definitions always receive Church numbers; they do not recursively encode themselves.
     const original=entries.find(entry=>entry.name===editing);
-    const term=original?.source===source?original.term:expand(parse(source,entries).term);
-    const entry={name,source,term,...(original?.table?{table:original.term===term?original.table:[]}:{})};validate([entry]);
-    return editing===null?[...entries,entry]:entries.map(old=>old.name===editing?entry:old);
+    const term=original?.source===source?original.term:expand(parse(source,entries,Infinity,'church',numberFormats).term);
+    const entry={name,source,term,...(original?.inputFormat&&original.inputFormat!==`{n}_${original.name}`?{inputFormat:original.inputFormat}:{}),...(original?.table?{table:original.term===term?original.table:[]}:{})};
+    const result=editing===null?[...entries,entry]:entries.map(old=>old.name===editing?entry:old);validate(result);formatSpecs(result,numberFormats);return result;
   }
-  function parse(source,entries=[],maxChars=Infinity,defaultEncoding='church'){
+  function parse(source,entries=[],maxChars=Infinity,defaultEncoding='church',numberFormats={}){
     validate(entries);const registry=new Map(entries.map(entry=>[entry.name,entry.term])),encodings=new Set(),literals=[];
     const selected=defaultEncoding.startsWith('custom:')?defaultEncoding.slice(7):builtins.get(defaultEncoding)||defaultEncoding;
     const term=C.parse(source,maxChars,(value,suffix,position)=>{
@@ -49,11 +85,11 @@
         encodings.add(encoding);const definition=registry.get(encoding),term=C.A(definition,church);
         literals.push({name:encoding,number:naturalNumber(value),definition,term});return term;
       }catch(error){if(error.position===null||error.position===undefined)error.position=position;throw error;}
-    },{suffixes:true});
+    },{suffixes:true,literalMatcher:literalMatcher(entries,numberFormats)});
     return {term,encodings:[...encodings],literals};
   }
   async function compile(source,entries=[],defaultEncoding='church',options={}){
-    const parsed=parse(source,entries,options.maxChars??Infinity,defaultEncoding),replacements=new WeakMap(),mappings=[];
+    const parsed=parse(source,entries,options.maxChars??Infinity,defaultEncoding,options.numberFormats??{}),replacements=new WeakMap(),mappings=[];
     const canceled=()=>{if(options.signal?.aborted){const error=new C.LambdaError('数字编码已取消。');error.name='AbortError';throw error;}};
     for(const literal of parsed.literals){
       canceled();let cache=literalCache.get(literal.definition);if(!cache){cache=new Map();literalCache.set(literal.definition,cache);}
@@ -79,7 +115,10 @@
     }
     return {...parsed,term:rebuilt.get(parsed.term),mappings};
   }
-  const isLiteral=source=>/^-?[0-9]+(?:\.[0-9]+)?(?:_[\p{L}][\p{L}\p{N}_']*)?$/u.test(source.trim());
+  function isLiteral(source,entries=[],numberFormats={}){
+    source=source.trim();if(/^-?[0-9]+(?:\.[0-9]+)?(?:_[\p{L}][\p{L}\p{N}_']*)?$/u.test(source))return true;
+    try{const match=literalMatcher(entries,numberFormats)(source,0);return !!match&&match.length===source.length;}catch{return false;}
+  }
   const label=name=>name==='church'?'丘奇数':name==='decimal'?'列表小数':`${name}（自定义）`;
   function naturalNumber(value){
     if(typeof value!=='string'||!(/^[0-9]+$/.test(value.trim())))throw new C.LambdaError('对照表数字需要是非负整数。');
@@ -100,6 +139,11 @@
     for(const entry of entries)if(selected.has(entry.name))for(const row of entry.table??[])if(C.equal(term,row.term))matches.push({name:entry.name,number:row.number});
     return matches;
   }
-  const API={validName,validate,define,parse,compile,isLiteral,label,naturalNumber,putMapping,removeMapping,lookup};root.LambdaDataEncoding=API;
+  function withInputFormat(entries,name,template,numberFormats={}){
+    if(!entries.some(entry=>entry.name===name))throw new C.LambdaError('这个数据编码已不存在。');
+    const result=entries.map(entry=>{if(entry.name!==name)return entry;const changed={...entry};if(template===`{n}_${name}`)delete changed.inputFormat;else changed.inputFormat=template;return changed;});
+    validate(result);formatSpecs(result,numberFormats);return result;
+  }
+  const API={validName,validate,define,parse,compile,isLiteral,label,naturalNumber,putMapping,removeMapping,lookup,validateTemplate,validateFormats:formatSpecs,inputFormatFor,withInputFormat};root.LambdaDataEncoding=API;
   if(typeof module!=='undefined'&&module.exports)module.exports=API;
 })(typeof globalThis!=='undefined'?globalThis:window);

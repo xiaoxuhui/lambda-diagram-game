@@ -27,12 +27,17 @@
     const {nodes,depth,vars,abstractions,applications}=analyze(term);
     return {nodes,depth,vars,abstractions,applications};
   }
-  function tokenize(source, maxChars = LIMITS.chars, decimal = false, suffixes = false) {
+  function tokenize(source, maxChars = LIMITS.chars, decimal = false, suffixes = false, literalMatcher = null) {
     if (source.length > maxChars) throw new LambdaError(`输入最多 ${maxChars} 个字符。`, maxChars);
     const out = [];
     for (let i = 0; i < source.length;) {
       if (/\s/.test(source[i])) { i++; continue; }
       const start = i, c = source[i];
+      const custom=literalMatcher?.(source,i);
+      if(custom){
+        const raw=source.slice(i,i+custom.length);
+        out.push(/^[A-Za-z][A-Za-z0-9_']*$/.test(raw)?{kind:'name',value:raw,literal:custom,pos:i}:{kind:'number',value:custom.value,suffix:custom.encoding,pos:i});i+=custom.length;continue;
+      }
       if ('λ\\.()'.includes(c)) { out.push({ kind: c === '\\' ? 'λ' : c, pos: i++ }); continue; }
       if(!decimal && c==='-' && /[0-9]/.test(source[i+1]||'')) throw new LambdaError('丘奇数只支持非负整数，不能输入负数。',i);
       const numeric=(decimal?/^-?[0-9]+(?:\.[0-9]+)?/:/^[0-9]+/).exec(source.slice(i));
@@ -55,7 +60,8 @@
     out.push({ kind: 'end', pos: source.length }); return out;
   }
   function parse(source, maxChars = LIMITS.chars, numberFactory = null, options = {}) {
-    const tokens = tokenize(source, maxChars,!!numberFactory,!!options.suffixes); let at = 0, nesting = 0;
+    const tokens = tokenize(source, maxChars,!!numberFactory,!!options.suffixes,options.literalMatcher); let at = 0, nesting = 0;
+    const bindings=new Map();
     const peek = () => tokens[at];
     const fail = message => { throw new LambdaError(message, peek().pos); };
     function expr() {
@@ -66,7 +72,9 @@
         while (peek().kind === 'name') params.push(tokens[at++].value);
         if (!params.length) fail('λ 后面需要一个变量，例如 λx.x。');
         if (peek().kind !== '.') fail('变量后面需要一个点「.」。');
+        for(const param of params)bindings.set(param,(bindings.get(param)||0)+1);
         at++; result = expr();
+        for(const param of params){const count=bindings.get(param)-1;if(count)bindings.set(param,count);else bindings.delete(param);}
         for (let i = params.length - 1; i >= 0; i--) result = L(params[i], result);
       } else {
         result = atom();
@@ -76,7 +84,7 @@
       nesting--; return result;
     }
     function atom() {
-      if (peek().kind === 'name') return V(tokens[at++].value);
+      if (peek().kind === 'name') {const token=tokens[at++];return token.literal&&!bindings.has(token.value)&&numberFactory?numberFactory(token.literal.value,token.literal.encoding,token.pos):V(token.value);}
       if (peek().kind === 'number') {
         const token=tokens[at++],n=token.value;if(numberFactory)return numberFactory(n,token.suffix,token.pos);let body=V('x');
         for(let i=0;i<n;i++)body=A(V('f'),body);

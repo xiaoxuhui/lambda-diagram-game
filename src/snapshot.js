@@ -25,14 +25,14 @@
     const functions=raw.functions.map(f=>{
       if(!object(f))fail('函数定义不完整。');
       if(f.source!==undefined&&typeof f.source!=='string')fail('函数原始定义需为文本。');
-      return {name:f.name,term:ast(f.term),...(f.source===undefined?{}:{source:f.source}),...(f.encodings===undefined?{}:{encodings:f.encodings})};
+      return {name:f.name,term:ast(f.term),...(f.source===undefined?{}:{source:f.source}),...(f.encodings===undefined?{}:{encodings:f.encodings}),...(f.sourceFree===undefined?{}:{sourceFree:f.sourceFree})};
     });L.validate(functions);
     if(raw.dataEncodings!==undefined&&!Array.isArray(raw.dataEncodings))fail('数据编码列表不合法。');
     const dataEncodings=(raw.dataEncodings??[]).map(entry=>{
       if(!object(entry))fail('数据转换函数不完整。');
       if(entry.table!==undefined&&!Array.isArray(entry.table))fail('数字表达式对照表不合法。');
       const table=entry.table?.map(row=>{if(!object(row))fail('对照项不完整。');return {number:row.number,term:ast(row.term)};});
-      return {name:entry.name,source:entry.source,term:ast(entry.term),...(table===undefined?{}:{table})};
+      return {name:entry.name,source:entry.source,term:ast(entry.term),...(entry.inputFormat===undefined?{}:{inputFormat:entry.inputFormat}),...(table===undefined?{}:{table})};
     });E.validate(dataEncodings);
     const encodingDraft=raw.encodingDraft??{name:'',source:''};
     if(!object(encodingDraft)||typeof encodingDraft.name!=='string'||typeof encodingDraft.source!=='string')fail('数据编码草稿不合法。');
@@ -59,6 +59,9 @@
     const strategy=v.strategy===undefined?'normal':v.strategy;if(!C.STRATEGIES.includes(strategy))fail('归约顺序不合法。');
     const direction=v.direction===undefined?'left':v.direction;if(!C.DIRECTIONS.includes(direction))fail('归约方向不合法。');
     const numberEncoding=v.numberEncoding===undefined?'decimal':v.numberEncoding;if(!['church','decimal'].includes(numberEncoding)&&!dataEncodings.some(entry=>numberEncoding===`custom:${entry.name}`))fail('数字编码不合法。');
+    const numberFormats=v.numberFormats??{};E.validateFormats(dataEncodings,numberFormats);
+    const inputFormatDraft=v.inputFormatDraft;
+    if(inputFormatDraft!==undefined&&(!object(inputFormatDraft)||typeof inputFormatDraft.encoding!=='string'||typeof inputFormatDraft.text!=='string'))fail('输入形式草稿不合法。');
     const decimalPlaces=v.decimalPlaces===undefined?6:v.decimalPlaces;if(!Number.isSafeInteger(decimalPlaces)||decimalPlaces<0)fail('小数位数不合法。');
     const panX=v.panX??0,panY=v.panY??0;
     if(!Number.isFinite(panX)||!Number.isFinite(panY)||panX<0||panY<0||panX>5000000||panY>5000000)fail('图示位置不合法。');
@@ -71,7 +74,7 @@
     if(editing!==null&&(!L.validName(editing)||!functions.some(fn=>fn.name===editing)))fail('正在编辑的函数不存在或不合法。');
     return {version:paths===undefined?raw.version:3,savedAt:typeof raw.savedAt==='string'&&Number.isFinite(Date.parse(raw.savedAt))?raw.savedAt:new Date().toISOString(),draft:raw.draft,
       functions,dataEncodings,encodingDraft:{name:encodingDraft.name,source:encodingDraft.source,...(encodingEditing===null?{}:{editing:encodingEditing})},completed:[...new Set(raw.completed)],mode:raw.mode,level:raw.level,
-      session:{original,steps:s.steps,dirty:s.dirty,halt:s.halt,...(s.encodings===undefined?{}:{encodings:[...new Set(encodings)]}),...(paths===undefined?{}:{paths})},view:{speed:v.speed,strategy,direction,numberEncoding,decimalPlaces,scale:v.scale,autoFit:v.autoFit,panX,panY,historyOpen:v.historyOpen,helpOpen:v.helpOpen,hintOpen:v.hintOpen},
+      session:{original,steps:s.steps,dirty:s.dirty,halt:s.halt,...(s.encodings===undefined?{}:{encodings:[...new Set(encodings)]}),...(paths===undefined?{}:{paths})},view:{speed:v.speed,strategy,direction,numberEncoding,decimalPlaces,...(v.numberFormats===undefined?{}:{numberFormats:{...numberFormats}}),...(inputFormatDraft===undefined?{}:{inputFormatDraft:{encoding:inputFormatDraft.encoding,text:inputFormatDraft.text}}),scale:v.scale,autoFit:v.autoFit,panX,panY,historyOpen:v.historyOpen,helpOpen:v.helpOpen,hintOpen:v.hintOpen},
       selection:{start:selection.start,end:selection.end},error:raw.error,functionDraft:{name:functionDraft.name,source:functionDraft.source,...(editing===null?{}:{editing})}};
   }
   function replay(s) {
