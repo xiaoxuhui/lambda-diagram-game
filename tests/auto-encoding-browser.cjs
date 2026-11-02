@@ -12,9 +12,12 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
         if(!await page.locator('#encoding-name').isVisible())await page.locator('#custom-data-panel > summary').click();
         await page.locator('#encoding-new').click();await page.locator('#encoding-name').fill(name);await page.locator('#encoding-source').fill(source);await page.locator('#encoding-save').click();assert.ok(await page.locator('#encoding-error').isHidden());
       };
-      const typed=async(source,label)=>{await page.locator('#expression').fill(source);await page.waitForFunction(label=>document.getElementById('decoded').textContent===label,label);};
-      await check(`${width}px entering zero automatically encodes and reduces without clicking any run or convert button`,async()=>{
-        await define('Box','λn.λk.k n');await typed('0','0_Box');
+      const typed=async(source,label)=>{await page.locator('#expression').fill(source);await page.locator('#convert').click();await page.waitForFunction(label=>document.getElementById('decoded').textContent===label,label);};
+      await check(`${width}px typing zero leaves the graph unchanged and manual conversion automatically reduces its encoding`,async()=>{
+        await define('Box','λn.λk.k n');const previous=await page.locator('#current-expression').textContent(),lines=await page.locator('#diagram-mount line').count();
+        await page.locator('#expression').fill('0');await page.waitForTimeout(350);
+        assert.equal(await page.locator('#current-expression').textContent(),previous);assert.equal(await page.locator('#diagram-mount line').count(),lines);assert.equal(await page.locator('#encoding-table-body tr').count(),1);assert.match(await page.locator('#encoding-progress').textContent(),/已归约就绪/);
+        assert.equal(await page.locator('#state-badge').textContent(),'已编辑 · 请转换');await page.locator('#convert').click();await page.waitForFunction(()=>document.getElementById('decoded').textContent==='0_Box');
         assert.equal(await page.locator('#state-badge').textContent(),'已到正规形');assert.equal(await page.locator('#step-count').textContent(),'0');
         assert.ok(C.equal(C.parse(await page.locator('#current-expression').textContent()),C.parse('λk.k 0')));
         assert.equal(await page.locator('#encoding-table-body tr').count(),1);assert.equal(await page.locator('#encoding-table').evaluate(panel=>panel.open),false);
@@ -26,9 +29,9 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
         const term=C.parse(await page.locator('#current-expression').textContent());assert.ok(C.findRedex(term));assert.equal(C.findRedex(term.arg),null);assert.ok(C.equal(term.arg,C.parse('λk.k 3')));
         await page.locator('#step').click();assert.equal(await page.locator('#decoded').textContent(),'3_Box');assert.equal(await page.locator('#step-count').textContent(),'1');
       });
-      await check(`${width}px explicit names override the menu and typing decimals is also automatic`,async()=>{
+      await check(`${width}px explicit names override the menu and manual conversion handles decimals`,async()=>{
         await typed('0_丘奇数','FALSE / Church 数 0');await page.locator('#number-encoding').selectOption('decimal');await typed('-0.5','小数 -0.5');
-        await typed('0_Box','0_Box');await page.locator('#number-encoding').selectOption('custom:Box');
+        await typed('0_Box','0_Box');const previous=await page.locator('#current-expression').textContent();await page.locator('#number-encoding').selectOption('custom:Box');await page.waitForTimeout(350);assert.equal(await page.locator('#current-expression').textContent(),previous);assert.equal(await page.locator('#state-badge').textContent(),'已编辑 · 请转换');
       });
       await check(`${width}px saved function literals are already encoded and retain their original editable source`,async()=>{
         await page.locator('#function-name').fill('ZEROBOX');await page.locator('#function-source').fill('0_Box');await page.locator('#function-add').click();
@@ -51,9 +54,9 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
         fs.mkdirSync(path.join(__dirname,'artifacts'),{recursive:true});await page.locator('.editor-card').screenshot({path:path.join(__dirname,'artifacts',`auto-encoding-${width}.png`)});
       });
       await check(`${width}px endless automatic encoding is cancellable and cannot overwrite a newly typed value`,async()=>{
-        await define('Loop','λn.(λx.x x) (λx.x x)');await page.locator('#expression').fill('0');await page.locator('#cancel-encoding').waitFor({state:'visible'});
+        await define('Loop','λn.(λx.x x) (λx.x x)');await page.locator('#expression').fill('0');await page.locator('#convert').click();await page.locator('#cancel-encoding').waitFor({state:'visible'});
         await typed('2_church','Church 数 2');assert.equal(await page.locator('#cancel-encoding').isHidden(),true);
-        await page.locator('#expression').fill('0_Loop');await page.locator('#cancel-encoding').waitFor({state:'visible'});await page.locator('#cancel-encoding').click();assert.ok(await page.locator('#cancel-encoding').isHidden());
+        await page.locator('#expression').fill('0_Loop');await page.locator('#convert').click();await page.locator('#cancel-encoding').waitFor({state:'visible'});await page.locator('#cancel-encoding').click();assert.ok(await page.locator('#cancel-encoding').isHidden());
         await typed('3_church','Church 数 3');assert.equal(await page.locator('#expression').inputValue(),'3_church');
       });
       await check(`${width}px function encoding can be canceled before saving and a new definition remains intact`,async()=>{
@@ -63,15 +66,16 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
         await page.waitForFunction(()=>document.getElementById('function-count').textContent==='2 个函数');assert.ok(await page.locator('#function-error').isHidden());
       });await context.close();
     }
-    await check('offline page automatically reduces a custom zero',async()=>{
+    await check('offline manual graph conversion automatically reduces a custom zero',async()=>{
       const context=await browser.newContext(),page=await context.newPage();page.on('pageerror',error=>errors.push(error.message));await page.goto(base+'/dist/lambda-lab.html');
       await page.locator('#custom-data-panel > summary').click();await page.locator('#encoding-name').fill('Own');await page.locator('#encoding-source').fill('λn.λk.k n');await page.locator('#encoding-save').click();
-      await page.locator('#expression').fill('0');await page.waitForFunction(()=>document.getElementById('decoded').textContent==='0_Own');assert.equal(await page.locator('#state-badge').textContent(),'已到正规形');await context.close();
+      await page.locator('#expression').fill('0');await page.locator('#convert').click();await page.waitForFunction(()=>document.getElementById('decoded').textContent==='0_Own');assert.equal(await page.locator('#state-badge').textContent(),'已到正规形');await context.close();
     });
-    await check('refreshing a saved unfinished numeral automatically finishes its encoding',async()=>{
+    await check('restoring an unfinished numeral preserves its exact frame until manual conversion',async()=>{
       const entries=E.define([],'OldBox','λn.λk.k n'),raw={version:2,draft:'0',functions:[],dataEncodings:entries,encodingDraft:{name:'OldBox',source:entries[0].source,editing:'OldBox'},completed:[],mode:'free',level:0,session:{original:E.parse('0',entries,Infinity,'custom:OldBox').term,steps:0,dirty:false,halt:'',encodings:['OldBox']},view:{numberEncoding:'custom:OldBox',speed:600,scale:1,autoFit:true,historyOpen:false,helpOpen:false,hintOpen:false},selection:{start:1,end:1},error:''};
       const context=await browser.newContext(),page=await context.newPage();page.on('pageerror',error=>errors.push(error.message));await page.addInitScript(raw=>localStorage.setItem('lambda-lab-v2',JSON.stringify(raw)),raw);await page.goto(base);
-      await page.waitForFunction(()=>document.getElementById('decoded').textContent==='0_OldBox');assert.equal(await page.locator('#state-badge').textContent(),'已到正规形');await context.close();
+      await page.waitForTimeout(350);assert.ok(C.equal(C.parse(await page.locator('#current-expression').textContent()),raw.session.original));assert.equal(await page.locator('#state-badge').textContent(),'可以归约');
+      await page.locator('#convert').click();await page.waitForFunction(()=>document.getElementById('decoded').textContent==='0_OldBox');assert.equal(await page.locator('#state-badge').textContent(),'已到正规形');await context.close();
     });
     assert.deepEqual(errors,[]);console.log(`Automatic numeral encoding: ${passed} passed, 0 failed; Chromium ${browser.version()}; page errors 0.`);
   }finally{await browser.close();server.close();}

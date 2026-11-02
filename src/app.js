@@ -5,13 +5,23 @@
   const input=$('expression');
   const state={ term:null, original:null, history:[], paths:null, dirty:false, running:false, timer:null,
     mode:'free', level:0, completed:new Set(), halt:'', scale:1, autoFit:true, model:null, speed:600, strategy:'normal', direction:'left',numberEncoding:'church',decimalPlaces:6,fast:false,encodings:null,encodingBusy:false };
-  let toastTimer,workspace,viewer,dataEditor,conversionController=null,compilingDefinitions=null,autoConvertTimer=null,historySource=null,renderedCount=0,diagramTerm=null,diagramRoute=null;
+  let toastTimer,workspace,viewer,dataEditor,conversionController=null,compilingDefinitions=null,preparationTimer=null,historySource=null,renderedCount=0,diagramTerm=null,diagramRoute=null;
   const decodedTerms=new WeakMap(),TRUE=C.parse(P.TRUE),FALSE=C.parse(P.FALSE),IDENTITY=C.parse(P.I);
   const diagramView=window.LambdaDiagramView.init($('diagram-mount'));
   const encodingProgress=document.createElement('p');encodingProgress.className='syntax-note';encodingProgress.id='encoding-progress';encodingProgress.setAttribute('role','status');encodingProgress.hidden=true;
   const cancelEncoding=document.createElement('button');cancelEncoding.type='button';cancelEncoding.id='cancel-encoding';cancelEncoding.className='button';cancelEncoding.textContent='取消数字编码';cancelEncoding.hidden=true;$('convert').after(encodingProgress,cancelEncoding);
-  function cancelConversion(){clearTimeout(autoConvertTimer);autoConvertTimer=null;conversionController?.abort();conversionController=null;compilingDefinitions=null;state.encodingBusy=false;encodingProgress.hidden=true;cancelEncoding.hidden=true;}
-  function queueLiteralConversion(){clearTimeout(autoConvertTimer);if(E.isLiteral(input.value))autoConvertTimer=setTimeout(convert,180);}
+  function cancelConversion(){clearTimeout(preparationTimer);preparationTimer=null;conversionController?.abort();conversionController=null;compilingDefinitions=null;state.encodingBusy=false;encodingProgress.hidden=true;cancelEncoding.hidden=true;}
+  function queueLiteralPreparation(){clearTimeout(preparationTimer);if(E.isLiteral(input.value))preparationTimer=setTimeout(prepareLiteral,180);}
+  async function prepareLiteral(){
+    cancelConversion();const controller=new AbortController();conversionController=controller;compilingDefinitions=new Map(dataEditor.entries().map(entry=>[entry.name,entry.term]));
+    try{
+      const compiled=await E.compile(input.value,dataEditor.entries(),state.numberEncoding,{signal:controller.signal,onProgress:literal=>{encodingProgress.hidden=false;cancelEncoding.hidden=false;encodingProgress.textContent=`正在准备数字编码 ${literal.number}_${literal.name} · ${literal.steps} 步`;}});
+      if(controller.signal.aborted||conversionController!==controller)return;
+      if(compiled.mappings.some(mapping=>!dataEditor.entries().some(entry=>entry.name===mapping.name&&entry.term===mapping.definition)))return;
+      dataEditor.remember(compiled.mappings);encodingProgress.hidden=false;encodingProgress.textContent='数字编码已归约就绪，点击「转换成图示」后显示。';cancelEncoding.hidden=true;save();
+    }catch(error){if(!controller.signal.aborted){encodingProgress.hidden=false;encodingProgress.textContent=error.message;cancelEncoding.hidden=true;}}
+    finally{if(conversionController===controller){conversionController=null;compilingDefinitions=null;cancelEncoding.hidden=true;}}
+  }
   cancelEncoding.addEventListener('click',()=>{cancelConversion();render();});
   function save() { workspace?.queueSave(); }
   function capture() {
@@ -35,7 +45,6 @@
     renderMode();if(s.hasSession)render();else convert();input.setSelectionRange(s.selection.start,s.selection.end);
     if(!state.term){$('zoom-label').textContent=`${Math.round(state.scale*100)}%`;$('fit').setAttribute('aria-pressed',String(state.autoFit));}
     $('diagram-viewport').scrollLeft=s.view.panX;$('diagram-viewport').scrollTop=s.view.panY;
-    if(state.dirty||(s.session.steps===0&&state.term&&C.findRedex(state.term)))queueLiteralConversion();
   }
   function toast(message) {
     clearTimeout(toastTimer); $('toast').textContent=message; $('toast').hidden=false;
@@ -272,7 +281,7 @@
     $('next-level').textContent=l.id===stage.levelIds.at(-1)?'下一阶段 →':'下一关 →';
     toast(`✓ ${l.name} · 挑战完成`);
   }
-  input.addEventListener('input',event=>{changed();if(!event.isComposing)queueLiteralConversion();});
+  input.addEventListener('input',event=>{changed();if(!event.isComposing)queueLiteralPreparation();});
   input.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();convert();}});
   document.querySelectorAll('[data-insert]').forEach(b=>{
     b.addEventListener('mousedown',e=>e.preventDefault());
@@ -293,7 +302,7 @@
   });
   $('convert').addEventListener('click',convert);$('step').addEventListener('click',advance);$('run').addEventListener('click',run);
   $('fast-run').addEventListener('click',()=>{if(state.running){stop();render();return;}if(!state.term||state.dirty)return;state.running=true;state.fast=true;state.halt='';render();schedule();});
-  $('number-encoding').addEventListener('change',()=>{const previous=state.numberEncoding;state.numberEncoding=$('number-encoding').value;dataEditor.select(state.numberEncoding);if(previous!==state.numberEncoding){changed();queueLiteralConversion();}else{render();save();}});
+  $('number-encoding').addEventListener('change',()=>{const previous=state.numberEncoding;state.numberEncoding=$('number-encoding').value;dataEditor.select(state.numberEncoding);if(previous!==state.numberEncoding){changed();queueLiteralPreparation();}else{render();save();}});
   $('decimal-places').addEventListener('input',()=>{const n=$('decimal-places').valueAsNumber;if(!Number.isSafeInteger(n)||n<0){$('decimal-places').setCustomValidity('请输入非负整数');return;}$('decimal-places').setCustomValidity('');state.decimalPlaces=n;if(state.numberEncoding==='decimal')changed();else save();});
   $('back').addEventListener('click',()=>{if(state.history.length>1){stop();state.history.pop();state.paths?.pop();state.term=state.history.at(-1).term;state.halt='';$('challenge-feedback').textContent='';$('next-level').hidden=true;render();}});
   $('reset').addEventListener('click',()=>{if(state.original){stop();state.term=state.original;state.history=[{term:state.original,change:null}];state.paths=null;state.halt='';$('challenge-feedback').textContent='';$('next-level').hidden=true;render();}});
@@ -328,7 +337,7 @@
   $('help-toggle').addEventListener('click',()=>{const show=$('help-panel').hidden;$('help-panel').hidden=!show;$('help-toggle').setAttribute('aria-expanded',String(show));save();});
   $('history-details').addEventListener('toggle',save);
   $('speed').addEventListener('change',save);
-  dataEditor=window.LambdaDataEncodingEditor.init({getSelection:()=>state.numberEncoding,setSelection:value=>{state.numberEncoding=value;},expand:term=>workspace?workspace.expand(term):term,queueSave:save,onChange:()=>{if(compilingDefinitions&&(compilingDefinitions.size!==dataEditor.entries().length||dataEditor.entries().some(entry=>compilingDefinitions.get(entry.name)!==entry.term))){changed();queueLiteralConversion();}else{render();save();}},currentTerm:()=>state.term&&!state.dirty?state.term:null,loadTerm:(term,name)=>{state.numberEncoding=`custom:${name}`;setSource(C.format(term));},toast});
+  dataEditor=window.LambdaDataEncodingEditor.init({getSelection:()=>state.numberEncoding,setSelection:value=>{state.numberEncoding=value;},expand:term=>workspace?workspace.expand(term):term,queueSave:save,onChange:()=>{if(compilingDefinitions&&(compilingDefinitions.size!==dataEditor.entries().length||dataEditor.entries().some(entry=>compilingDefinitions.get(entry.name)!==entry.term))){changed();queueLiteralPreparation();}else{render();save();}},currentTerm:()=>state.term&&!state.dirty?state.term:null,loadTerm:(term,name)=>{state.numberEncoding=`custom:${name}`;setSource(C.format(term));},toast});
   workspace=window.LambdaWorkspace.init({capture,apply:applySnapshot,toast,
     getNumberEncoding:()=>state.numberEncoding,getDecimalPlaces:()=>state.decimalPlaces,getDataEncodings:()=>dataEditor.entries(),
     compileSource:async(source,signal)=>{const compiled=await E.compile(source,dataEditor.entries(),state.numberEncoding,{signal});dataEditor.remember(compiled.mappings);return compiled;},
