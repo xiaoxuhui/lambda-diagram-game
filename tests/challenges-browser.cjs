@@ -48,7 +48,7 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
    await phone.locator('#challenge-panel').screenshot({path:path.join(__dirname,'artifacts','challenges-mobile.png')});
   });
   await check('mobile approximate decimal cannot pass exact division target',async()=>{
-   await phone.locator('#stage-select').selectOption('5');await phone.locator('#level-list button').nth(3).click();await phone.locator('#decimal-places').fill('2');await phone.locator('#expression').fill(D.expression('DIV',['1','8'],2));await phone.locator('#convert').click();await phone.locator('#fast-run').click();await phone.waitForFunction(()=>document.getElementById('state-badge').textContent==='已到正规形',null,{timeout:180000});
+   await phone.locator('#stage-select').selectOption('5');await phone.locator('#level-list button').nth(3).click();await phone.locator('#decimal-places').fill('2');await phone.locator('#expression').fill(D.expression('DIV',['1_decimal','8_decimal'],2));await phone.locator('#convert').click();await phone.locator('#fast-run').click();await phone.waitForFunction(()=>document.getElementById('state-badge').textContent==='已到正规形',null,{timeout:180000});
    assert.equal(await phone.locator('#decoded').textContent(),'小数 ≈ 0.12');await phone.locator('#check-answer').click();assert.match(await phone.locator('#challenge-feedback').textContent(),/还不是/);
   });await mobile.close();
   await check('legacy five-level progress restores and continues into stage two',async()=>{

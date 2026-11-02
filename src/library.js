@@ -13,6 +13,7 @@
     const seen=new Set();let nodes=0,nameChars=0;
     for(const fn of functions) {
       if(fn.source!==undefined&&typeof fn.source!=='string')throw new C.LambdaError('函数原始定义需为文本。');
+      if(fn.encodings!==undefined&&(!Array.isArray(fn.encodings)||fn.encodings.some(name=>typeof name!=='string'||!/^[\p{L}][\p{L}\p{N}_']*$/u.test(name))))throw new C.LambdaError('函数编码标记不合法。');
       if(!validName(fn.name))throw new C.LambdaError('函数名需以英文字母开头，最多 32 字符，可含数字、下划线和单引号。');
       if(seen.has(fn.name))throw new C.LambdaError(`函数「${fn.name}」已存在，请换一个名字。`);
       seen.add(fn.name);nodes+=C.inspect(fn.term).nodes;
@@ -32,28 +33,30 @@
     for(const [placeholder,definition] of replacements)result=C.substitute(result,placeholder,definition);
     C.inspect(result);return result;
   }
-  function add(functions,name,source,maxChars=C.LIMITS.chars,numberEncoding='church',precision=6) {
+  function add(functions,name,source,maxChars=C.LIMITS.chars,numberEncoding='church',precision=6,dataEncodings=null) {
     name=name.trim();
     if(!validName(name))throw new C.LambdaError('函数名需以英文字母开头，最多 32 字符，可含数字、下划线和单引号。');
     if(functions.some(f=>f.name===name))throw new C.LambdaError(`函数「${name}」已存在，请换一个名字。`);
-    const parsed=numberEncoding==='decimal'?C.parseInput(source,maxChars):C.parse(source,maxChars);
+    const compiled=dataEncodings!==null?(root.LambdaDataEncoding||require('./data-encoding.js')).parse(source,dataEncodings,maxChars):null;
+    const parsed=compiled?compiled.term:numberEncoding==='decimal'?C.parseInput(source,maxChars):C.parse(source,maxChars);
     if(C.freeVars(parsed).has(name))throw new C.LambdaError('定义不能直接引用自身。递归请使用显式不动点组合子。');
     const term=expand(parsed,functions);
-    const result=[...functions,{name,source,term}];validate(result);return result;
+    const result=[...functions,{name,source,term,...(compiled?{encodings:[...new Set([...compiled.encodings,...encodingsFor(parsed,functions)])]}:{})}];validate(result);return result;
   }
   const remove=(functions,name)=>functions.filter(f=>f.name!==name);
-  function update(functions,originalName,name,source,numberEncoding='church',precision=6) {
+  function update(functions,originalName,name,source,numberEncoding='church',precision=6,dataEncodings=null) {
     const original=functions.find(fn=>fn.name===originalName);
     if(!original)throw new C.LambdaError('要编辑的函数已不存在。');
     const others=remove(functions,originalName);
     let replacement;
     if(typeof original.source==='string'&&source===original.source){
-      name=name.trim();replacement={name,source,term:original.term};validate([...others,replacement]);
-      const parser=root.LambdaDecimal?C.parseInput:C.parse;
-      if(C.freeVars(parser(source,Infinity)).has(name))throw new C.LambdaError('定义不能直接引用自身。递归请使用显式不动点组合子。');
-    }else replacement=add(others,name,source,Infinity,numberEncoding,precision).at(-1);
+      name=name.trim();replacement={...original,name,source,term:original.term};validate([...others,replacement]);
+      const parsed=C.parse(source,Infinity,()=>C.parse('0'),{suffixes:true});
+      if(C.freeVars(parsed).has(name))throw new C.LambdaError('定义不能直接引用自身。递归请使用显式不动点组合子。');
+    }else replacement=add(others,name,source,Infinity,numberEncoding,precision,dataEncodings).at(-1);
     return functions.map(fn=>fn.name===originalName?replacement:fn);
   }
-  const API={LIMITS,validName,validate,expand,add,update,remove};root.LambdaLibrary=API;
+  function encodingsFor(term,functions){const names=C.freeVars(term);return [...new Set(functions.filter(fn=>names.has(fn.name)).flatMap(fn=>fn.encodings??[]))];}
+  const API={LIMITS,validName,validate,expand,encodingsFor,add,update,remove};root.LambdaLibrary=API;
   if(typeof module!=='undefined'&&module.exports)module.exports=API;
 })(typeof globalThis!=='undefined'?globalThis:window);

@@ -27,7 +27,7 @@
     const {nodes,depth,vars,abstractions,applications}=analyze(term);
     return {nodes,depth,vars,abstractions,applications};
   }
-  function tokenize(source, maxChars = LIMITS.chars, decimal = false) {
+  function tokenize(source, maxChars = LIMITS.chars, decimal = false, suffixes = false) {
     if (source.length > maxChars) throw new LambdaError(`输入最多 ${maxChars} 个字符。`, maxChars);
     const out = [];
     for (let i = 0; i < source.length;) {
@@ -40,7 +40,13 @@
         if(!decimal && source[i+numeric[0].length]==='.') throw new LambdaError('丘奇数只支持非负整数，不能输入小数。',i);
         const value=decimal?numeric[0]:Number(numeric[0]);
         if(!decimal && !Number.isSafeInteger(value)) throw new LambdaError('数字超出可精确表示的整数范围。',i);
-        out.push({kind:'number',value:decimal?numeric[0]:value,pos:i});i+=numeric[0].length;continue;
+        i+=numeric[0].length;let suffix=null;
+        if(suffixes&&source[i]==='_'){
+          const match=/^[\p{L}][\p{L}\p{N}_']*/u.exec(source.slice(i+1));
+          if(!match)throw new LambdaError('下划线后需要数据编码名称，例如 3_MyData。',i);
+          suffix=match[0];i+=1+suffix.length;
+        }
+        out.push({kind:'number',value:decimal?numeric[0]:value,suffix,pos:start});continue;
       }
       const m = /^[a-zA-Z][a-zA-Z0-9_']*/.exec(source.slice(i));
       if (m) { out.push({ kind: 'name', value: m[0], pos: start }); i += m[0].length; continue; }
@@ -48,8 +54,8 @@
     }
     out.push({ kind: 'end', pos: source.length }); return out;
   }
-  function parse(source, maxChars = LIMITS.chars, numberFactory = null) {
-    const tokens = tokenize(source, maxChars,!!numberFactory); let at = 0, nesting = 0;
+  function parse(source, maxChars = LIMITS.chars, numberFactory = null, options = {}) {
+    const tokens = tokenize(source, maxChars,!!numberFactory,!!options.suffixes); let at = 0, nesting = 0;
     const peek = () => tokens[at];
     const fail = message => { throw new LambdaError(message, peek().pos); };
     function expr() {
@@ -72,7 +78,7 @@
     function atom() {
       if (peek().kind === 'name') return V(tokens[at++].value);
       if (peek().kind === 'number') {
-        const n=tokens[at++].value;if(numberFactory)return numberFactory(n);let body=V('x');
+        const token=tokens[at++],n=token.value;if(numberFactory)return numberFactory(n,token.suffix,token.pos);let body=V('x');
         for(let i=0;i<n;i++)body=A(V('f'),body);
         return L('f',L('x',body));
       }

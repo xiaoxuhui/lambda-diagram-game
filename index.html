@@ -35,7 +35,8 @@
         <section class="card editor-card">
           <div class="section-heading"><div><span class="section-number">01</span><h2>写下表达式</h2></div><span class="mini-label">INPUT</span></div>
           <label class="sr-only" for="expression">Lambda 表达式</label>
-          <div class="number-options"><label for="number-encoding">数字编码</label><select id="number-encoding"><option value="decimal" selected>列表小数（默认）</option><option value="church">丘奇自然数（兼容）</option></select><label for="decimal-places">生成除法小数位</label><input id="decimal-places" type="number" min="0" step="1" value="6" inputmode="numeric"></div><p id="number-note" class="syntax-note">默认支持负数和小数。四则示例会填入完整 λ 表达式；除法精度在生成表达式时确定。</p>
+          <div class="number-options"><label for="number-encoding">数字编码</label><select id="number-encoding"><option value="church" selected>丘奇自然数（默认）</option><option value="decimal">列表小数 · _decimal</option></select><label for="decimal-places">生成除法小数位</label><input id="decimal-places" type="number" min="0" step="1" value="6" inputmode="numeric"></div><p id="number-note" class="syntax-note">不带后缀的数字是丘奇数；自定义数字写为 3_编码名称，列表小数写为 0.1_decimal。</p>
+          <details id="custom-data-panel" class="custom-data-panel"><summary>自定义数据编码</summary><p class="syntax-note">输入把丘奇数 n 转成自定义数据的 λ 函数。例如名称 Box、转换 λn.λk.k n；之后用 3_Box。定义中的数字按丘奇数解释，可引用已保存函数。</p><form id="encoding-form"><label for="encoding-name">编码名称</label><input id="encoding-name" autocomplete="off" spellcheck="false" placeholder="例如 Box 或 我的数据"><label for="encoding-source">丘奇数 → 自定义数据</label><textarea id="encoding-source" spellcheck="false" autocapitalize="off" placeholder="λn.λk.k n"></textarea><p id="encoding-error" class="error-message" role="alert" hidden></p><div class="encoding-actions"><button type="submit" id="encoding-save" class="button primary">保存新编码</button><button type="button" id="encoding-new" class="button">新建编码</button><button type="button" id="encoding-delete" class="button" disabled>删除编码</button></div></form></details>
           <div class="editor-wrap"><textarea id="expression" spellcheck="false" autocapitalize="off" autocomplete="off" aria-describedby="syntax-note error-message">(λx.x) (λy.y)</textarea><div class="editor-bottom"><span>λ / \ 均可输入</span><span id="char-count">12 字符</span></div></div>
           <p class="toolbar-caption">快捷输入 <span>插入到光标位置</span></p>
           <div id="symbol-toolbar" class="symbol-toolbar" role="group" aria-label="Lambda 符号快捷栏">
@@ -70,7 +71,7 @@
           <p id="speed-error" class="error-message" role="alert" hidden></p>
           <div class="run-controls"><button id="run" class="button run-button"><span>▶</span> <span id="run-label">运行</span></button><button id="fast-run" class="button" title="批量执行，保留全部步骤与完整图示">快速运行</button><button id="step" class="button">单步 →</button><button id="back" class="button">← 回退</button><button id="reset" class="button reset-button">↺ 重置</button><span class="step-counter"><b id="step-count">0</b> 步</span></div>
           <p id="run-status" class="run-status" role="status" aria-live="polite">准备好了。点击单步，观察一次函数替换。</p>
-          <div class="current-term"><div><span>当前表达式</span><span id="decoded" class="decoded"></span></div><code id="current-expression"></code></div>
+          <div class="current-term"><div><span>当前表达式</span><span id="decoded" class="decoded"></span></div><p id="expression-encoding" class="expression-encoding"></p><code id="current-expression"></code></div>
           <div id="next-explanation" class="next-explanation"></div>
           <details class="history-details" id="history-details"><summary>归约轨迹 <span id="history-count">0 次替换</span></summary><ol id="history-list" class="history-list"></ol></details>
         </section>
@@ -79,6 +80,6 @@
     <footer class="page-footer"><span><b>λ</b> 只有变量、函数和应用。其余，交给计算。</span><span>β 归约 · 本地保存</span></footer>
   </main>
   <div id="toast" class="toast" role="status" hidden></div>
-  <script src="src/core.js"></script><script src="src/decimal.js"></script><script src="src/diagram.js"></script><script src="src/diagram-view.js"></script><script src="src/polynomial.js"></script><script src="src/presets.js"></script><script src="src/challenges.js"></script><script src="src/library.js"></script><script src="src/snapshot.js"></script><script src="src/download.js"></script><script src="src/workspace-tools.js"></script><script src="src/viewport.js"></script><script src="src/app.js"></script>
+  <script src="src/core.js"></script><script src="src/decimal.js"></script><script src="src/data-encoding.js"></script><script src="src/diagram.js"></script><script src="src/diagram-view.js"></script><script src="src/polynomial.js"></script><script src="src/presets.js"></script><script src="src/challenges.js"></script><script src="src/library.js"></script><script src="src/snapshot.js"></script><script src="src/download.js"></script><script src="src/workspace-tools.js"></script><script src="src/viewport.js"></script><script src="src/data-encoding-editor.js"></script><script src="src/app.js"></script>
 </body>
 </html>

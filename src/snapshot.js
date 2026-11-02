@@ -1,6 +1,6 @@
 (function(root) {
   'use strict';
-  const C=root.LambdaCore||require('./core.js'),L=root.LambdaLibrary||require('./library.js'),P=root.LambdaPresets||require('./presets.js');
+  const C=root.LambdaCore||require('./core.js'),L=root.LambdaLibrary||require('./library.js'),P=root.LambdaPresets||require('./presets.js'),E=root.LambdaDataEncoding||require('./data-encoding.js');
   const LEVEL_IDS=new Set(P.levels.map(l=>l.id));
   const MAX_BYTES=2*1024*1024;
   const fail=message=>{throw new C.LambdaError(`存档无效：${message}`);};
@@ -25,13 +25,24 @@
     const functions=raw.functions.map(f=>{
       if(!object(f))fail('函数定义不完整。');
       if(f.source!==undefined&&typeof f.source!=='string')fail('函数原始定义需为文本。');
-      return {name:f.name,term:ast(f.term),...(f.source===undefined?{}:{source:f.source})};
+      return {name:f.name,term:ast(f.term),...(f.source===undefined?{}:{source:f.source}),...(f.encodings===undefined?{}:{encodings:f.encodings})};
     });L.validate(functions);
+    if(raw.dataEncodings!==undefined&&!Array.isArray(raw.dataEncodings))fail('数据编码列表不合法。');
+    const dataEncodings=(raw.dataEncodings??[]).map(entry=>{
+      if(!object(entry))fail('数据转换函数不完整。');
+      return {name:entry.name,source:entry.source,term:ast(entry.term)};
+    });E.validate(dataEncodings);
+    const encodingDraft=raw.encodingDraft??{name:'',source:''};
+    if(!object(encodingDraft)||typeof encodingDraft.name!=='string'||typeof encodingDraft.source!=='string')fail('数据编码草稿不合法。');
+    const encodingEditing=encodingDraft.editing??null;
+    if(encodingEditing!==null&&!dataEncodings.some(entry=>entry.name===encodingEditing))fail('正在编辑的数据编码不存在。');
     if(!Array.isArray(raw.completed)||raw.completed.length>P.levels.length||raw.completed.some(i=>!LEVEL_IDS.has(i)))fail('通关进度不合法。');
     if(raw.mode!=='free'&&raw.mode!=='challenge')fail('游戏模式不合法。');
     if(!Number.isInteger(raw.level)||raw.level<0||raw.level>=P.levels.length)fail('关卡编号不合法。');
     const s=raw.session;if(!object(s)||!Number.isSafeInteger(s.steps)||s.steps<0||typeof s.dirty!=='boolean')fail('归约状态不合法。');
     const original=s.original===null?null:ast(s.original);if(!original&&s.steps!==0)fail('没有起始表达式，无法恢复归约。');
+    const encodings=s.encodings??[];
+    if(!Array.isArray(encodings)||encodings.some(name=>typeof name!=='string'||!(/^[\p{L}][\p{L}\p{N}_']*$/u.test(name))))fail('表达式编码标记不合法。');
     let paths;
     if(s.paths!==undefined){
       if(!Array.isArray(s.paths)||s.paths.length!==s.steps)fail('归约路径数量与步数不一致。');
@@ -45,7 +56,7 @@
     const v=raw.view;if(!object(v)||!Number.isInteger(v.speed)||v.speed<1||v.speed>60000||!Number.isFinite(v.scale)||v.scale<.02||v.scale>16)fail('视图设置不合法。');
     const strategy=v.strategy===undefined?'normal':v.strategy;if(!C.STRATEGIES.includes(strategy))fail('归约顺序不合法。');
     const direction=v.direction===undefined?'left':v.direction;if(!C.DIRECTIONS.includes(direction))fail('归约方向不合法。');
-    const numberEncoding=v.numberEncoding===undefined?'decimal':v.numberEncoding;if(!['church','decimal'].includes(numberEncoding))fail('数字编码不合法。');
+    const numberEncoding=v.numberEncoding===undefined?'decimal':v.numberEncoding;if(!['church','decimal'].includes(numberEncoding)&&!dataEncodings.some(entry=>numberEncoding===`custom:${entry.name}`))fail('数字编码不合法。');
     const decimalPlaces=v.decimalPlaces===undefined?6:v.decimalPlaces;if(!Number.isSafeInteger(decimalPlaces)||decimalPlaces<0)fail('小数位数不合法。');
     const panX=v.panX??0,panY=v.panY??0;
     if(!Number.isFinite(panX)||!Number.isFinite(panY)||panX<0||panY<0||panX>5000000||panY>5000000)fail('图示位置不合法。');
@@ -57,8 +68,8 @@
     const editing=functionDraft.editing??null;
     if(editing!==null&&(!L.validName(editing)||!functions.some(fn=>fn.name===editing)))fail('正在编辑的函数不存在或不合法。');
     return {version:paths===undefined?raw.version:3,savedAt:typeof raw.savedAt==='string'&&Number.isFinite(Date.parse(raw.savedAt))?raw.savedAt:new Date().toISOString(),draft:raw.draft,
-      functions,completed:[...new Set(raw.completed)],mode:raw.mode,level:raw.level,
-      session:{original,steps:s.steps,dirty:s.dirty,halt:s.halt,...(paths===undefined?{}:{paths})},view:{speed:v.speed,strategy,direction,numberEncoding,decimalPlaces,scale:v.scale,autoFit:v.autoFit,panX,panY,historyOpen:v.historyOpen,helpOpen:v.helpOpen,hintOpen:v.hintOpen},
+      functions,dataEncodings,encodingDraft:{name:encodingDraft.name,source:encodingDraft.source,...(encodingEditing===null?{}:{editing:encodingEditing})},completed:[...new Set(raw.completed)],mode:raw.mode,level:raw.level,
+      session:{original,steps:s.steps,dirty:s.dirty,halt:s.halt,...(s.encodings===undefined?{}:{encodings:[...new Set(encodings)]}),...(paths===undefined?{}:{paths})},view:{speed:v.speed,strategy,direction,numberEncoding,decimalPlaces,scale:v.scale,autoFit:v.autoFit,panX,panY,historyOpen:v.historyOpen,helpOpen:v.helpOpen,hintOpen:v.hintOpen},
       selection:{start:selection.start,end:selection.end},error:raw.error,functionDraft:{name:functionDraft.name,source:functionDraft.source,...(editing===null?{}:{editing})}};
   }
   function replay(s) {

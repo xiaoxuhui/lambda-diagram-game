@@ -1,17 +1,17 @@
 (function () {
   'use strict';
-  const C=window.LambdaCore, D=window.LambdaDiagram, P=window.LambdaPresets;
+  const C=window.LambdaCore, D=window.LambdaDiagram, P=window.LambdaPresets,E=window.LambdaDataEncoding;
   const $=id=>document.getElementById(id);
   const input=$('expression');
   const state={ term:null, original:null, history:[], paths:null, dirty:false, running:false, timer:null,
-    mode:'free', level:0, completed:new Set(), halt:'', scale:1, autoFit:true, model:null, speed:600, strategy:'normal', direction:'left',numberEncoding:'decimal',decimalPlaces:6,fast:false };
-  let toastTimer,workspace,viewer,historySource=null,renderedCount=0,diagramTerm=null,diagramRoute=null;
+    mode:'free', level:0, completed:new Set(), halt:'', scale:1, autoFit:true, model:null, speed:600, strategy:'normal', direction:'left',numberEncoding:'church',decimalPlaces:6,fast:false,encodings:null };
+  let toastTimer,workspace,viewer,dataEditor,historySource=null,renderedCount=0,diagramTerm=null,diagramRoute=null;
   const decodedTerms=new WeakMap(),TRUE=C.parse(P.TRUE),FALSE=C.parse(P.FALSE),IDENTITY=C.parse(P.I);
   const diagramView=window.LambdaDiagramView.init($('diagram-mount'));
   function save() { workspace?.queueSave(); }
   function capture() {
-    return {draft:input.value,completed:[...state.completed],mode:state.mode,level:state.level,
-      session:{original:state.original,steps:Math.max(0,state.history.length-1),dirty:state.dirty,halt:state.halt,...(state.paths?{paths:state.paths}:{} )},
+    return {...dataEditor.capture(),draft:input.value,completed:[...state.completed],mode:state.mode,level:state.level,
+      session:{original:state.original,steps:Math.max(0,state.history.length-1),dirty:state.dirty,halt:state.halt,...(state.encodings===null?{}:{encodings:state.encodings}),...(state.paths?{paths:state.paths}:{} )},
       view:{speed:state.speed,strategy:state.strategy,direction:state.direction,numberEncoding:state.numberEncoding,decimalPlaces:state.decimalPlaces,scale:state.scale,autoFit:state.autoFit,panX:$('diagram-viewport').scrollLeft,panY:$('diagram-viewport').scrollTop,historyOpen:$('history-details').open,helpOpen:!$('help-panel').hidden,hintOpen:!$('hint').hidden},
       selection:{start:input.selectionStart,end:input.selectionEnd},error:$('error-message').hidden?'':$('error-message').textContent};
   }
@@ -21,7 +21,8 @@
     revealAnswer(false);
     state.original=s.session.original;state.term=s.term;state.history=s.history;state.paths=s.session.paths??null;state.dirty=s.session.dirty;state.halt=s.session.halt;
     state.scale=s.view.scale;state.autoFit=s.view.autoFit;state.speed=s.view.speed;state.strategy=s.view.strategy??'normal';state.direction=s.view.direction??'left';renderSpeed();
-    state.numberEncoding=s.view.numberEncoding??'decimal';state.decimalPlaces=s.view.decimalPlaces??6;
+    state.numberEncoding=s.view.numberEncoding??'church';state.decimalPlaces=s.view.decimalPlaces??6;
+    state.encodings=s.session.encodings??null;dataEditor.restore(s);
     $('history-details').open=s.view.historyOpen;$('help-panel').hidden=!s.view.helpOpen;$('help-toggle').setAttribute('aria-expanded',String(s.view.helpOpen));
     $('hint').hidden=!s.view.hintOpen;$('hint-toggle').textContent=s.view.hintOpen?'收起提示':'显示提示';$('hint-toggle').setAttribute('aria-expanded',String(s.view.hintOpen));
     $('challenge-feedback').textContent='';$('next-level').hidden=true;$('error-message').textContent=s.error;$('error-message').hidden=!s.error;
@@ -52,12 +53,12 @@
     $('challenge-feedback').textContent=''; $('next-level').hidden=true;
     try {
       if(state.numberEncoding==='decimal'&&!$('decimal-places').checkValidity())throw new C.LambdaError('除法小数位数需为非负整数。');
-      const parsed=state.numberEncoding==='decimal'?C.parseInput(input.value):C.parse(input.value),expanded=workspace?workspace.expand(parsed):parsed;
+      const compiled=E.parse(input.value,dataEditor.entries()),parsed=compiled.term,expanded=workspace?workspace.expand(parsed):parsed;
       const term=expanded;
-      state.term=term; state.original=term; state.history=[{term,change:null}]; state.paths=null;state.dirty=false;
+      state.term=term; state.original=term; state.history=[{term,change:null}]; state.paths=null;state.dirty=false;state.encodings=[...new Set([...compiled.encodings,...(workspace?.encodingsFor(parsed)??[])])];
       state.autoFit=true; render(); save(); return true;
     } catch(e) {
-      state.term=null; state.original=null; state.history=[];state.paths=null; state.dirty=true;
+      state.term=null; state.original=null; state.history=[];state.paths=null; state.dirty=true;state.encodings=null;
       $('error-message').textContent=(e.position!==null&&e.position!==undefined?`第 ${e.position+1} 个字符：`:'')+e.message;
       $('error-message').hidden=false; render(); input.focus();
       if(e.position!==null&&e.position!==undefined) input.setSelectionRange(e.position,e.position+1);
@@ -110,7 +111,7 @@
   function code(text) { const el=document.createElement('code'); el.textContent=text; return el; }
   function render() {
     $('number-encoding').value=state.numberEncoding;$('decimal-places').value=state.decimalPlaces;
-    $('number-note').textContent=state.numberEncoding==='decimal'?`列表小数：支持负数。四则示例直接填入完整 λ 表达式。除法示例生成 ${state.decimalPlaces} 位小数，未除尽标≈；改位数后请重新选择示例，已有文本保持不变。`:'丘奇兼容模式：只接受自然数，保留旧示例与存档的编码；可切回列表小数。';
+    $('number-note').textContent=state.numberEncoding==='decimal'?`列表小数写法：0.1_decimal、-2_decimal。除法示例生成 ${state.decimalPlaces} 位小数，改位数后请重新选择示例。不带后缀的数字仍是丘奇数。`:state.numberEncoding.startsWith('custom:')?`自定义数据写法：3_${state.numberEncoding.slice(7)}。下划线后写编码名称；不带后缀的数字仍是丘奇数。`:'丘奇自然数：直接写3，或3_church。列表小数写0.1_decimal，自定义数字写3_编码名称。';
     const ready=state.term&&!state.dirty, redex=state.term?C.findRedex(state.term,[],state.strategy,state.direction):null;
     $('reduction-order').value=state.strategy;
     $('reduction-direction').value=state.direction;
@@ -136,7 +137,9 @@
     $('run-status').textContent=!state.term?'输入有效表达式后，就能开始运行。':state.dirty?'输入已改变。重新转换后开始新的归约。':
       state.halt|| (state.running?'自动运行中；粉色线路标记下一次函数替换。':!redex?'已到 β 正规形；可点击单步或运行再次尝试，不能归约时保持当前式。':count?'可以继续单步，或回退查看上一帧。':'准备好了。点击单步，观察一次函数替换。');
     $('current-expression').textContent=state.term?C.format(state.term):'—';
-    $('decoded').textContent=ready?decode(state.term):'';
+    $('expression-encoding').textContent=!state.term?'':state.encodings===null?'编码：旧存档保留原表达式':state.encodings.length?`数字来源编码：${state.encodings.map(E.label).join('、')}`:'编码：纯 λ 表达式（无数字字面量）';
+    const hasCustomData=state.encodings?.some(name=>!['church','decimal'].includes(name));
+    $('decoded').textContent=ready?(hasCustomData?'自定义数据':decode(state.term)):'';
     const next=$('next-explanation'); next.replaceChildren();
     if(ready&&redex) {
       next.append('下一步：用 ',code(C.format(redex.term.arg)),' 替换函数体中自由出现的 ',code(redex.term.fn.param),'。必要时自动改名，避免变量捕获。');
@@ -232,7 +235,7 @@
     if(level.strategy)state.strategy=level.strategy;
     if(level.direction)state.direction=level.direction;
     state.level=index;state.mode='challenge';revealAnswer(false);$('hint').hidden=false;$('hint-toggle').textContent='收起提示';$('hint-toggle').setAttribute('aria-expanded','true');
-    renderMode();setSource(P.sourceFor(level,state.decimalPlaces));save();
+    renderMode();setSource(P.inputSourceFor(level,state.decimalPlaces));save();
   }
   function checkAnswer() {
     const feedback=$('challenge-feedback');
@@ -262,14 +265,14 @@
   });
   $('examples').addEventListener('change',()=>{
     const value=$('examples').value;if(value==='')return;const example=P.examples[Number(value)];if(!example)return;
-    state.numberEncoding=example.encoding||'church';setSource(P.sourceFor(example,state.decimalPlaces));$('examples').value='';
+    state.numberEncoding=example.encoding||'church';setSource(P.inputSourceFor(example,state.decimalPlaces));$('examples').value='';
     const expected=example.expectedType==='decimal'?`小数 ${example.expected}`:example.expectedType==='polynomial'?`多项式：${example.expected}`:example.expectedType==='rational'?`有理数 ${example.expected}`:example.expected===undefined?'':decode(C.parse(example.expected));
     $('example-info').textContent=example.description?`${example.description} 预期结果：${example.expectedLabel||expected}。`:'';
     $('example-info').hidden=!example.description;
   });
   $('convert').addEventListener('click',convert);$('step').addEventListener('click',advance);$('run').addEventListener('click',run);
   $('fast-run').addEventListener('click',()=>{if(state.running){stop();render();return;}if(!state.term||state.dirty)return;state.running=true;state.fast=true;state.halt='';render();schedule();});
-  $('number-encoding').addEventListener('change',()=>{state.numberEncoding=$('number-encoding').value;changed();});
+  $('number-encoding').addEventListener('change',()=>{state.numberEncoding=$('number-encoding').value;dataEditor.select(state.numberEncoding);render();save();});
   $('decimal-places').addEventListener('input',()=>{const n=$('decimal-places').valueAsNumber;if(!Number.isSafeInteger(n)||n<0){$('decimal-places').setCustomValidity('请输入非负整数');return;}$('decimal-places').setCustomValidity('');state.decimalPlaces=n;if(state.numberEncoding==='decimal')changed();else save();});
   $('back').addEventListener('click',()=>{if(state.history.length>1){stop();state.history.pop();state.paths?.pop();state.term=state.history.at(-1).term;state.halt='';$('challenge-feedback').textContent='';$('next-level').hidden=true;render();}});
   $('reset').addEventListener('click',()=>{if(state.original){stop();state.term=state.original;state.history=[{term:state.original,change:null}];state.paths=null;state.halt='';$('challenge-feedback').textContent='';$('next-level').hidden=true;render();}});
@@ -304,8 +307,9 @@
   $('help-toggle').addEventListener('click',()=>{const show=$('help-panel').hidden;$('help-panel').hidden=!show;$('help-toggle').setAttribute('aria-expanded',String(show));save();});
   $('history-details').addEventListener('toggle',save);
   $('speed').addEventListener('change',save);
+  dataEditor=window.LambdaDataEncodingEditor.init({getSelection:()=>state.numberEncoding,setSelection:value=>{state.numberEncoding=value;},expand:term=>workspace?workspace.expand(term):term,queueSave:save,onChange:()=>{render();save();},toast});
   workspace=window.LambdaWorkspace.init({capture,apply:applySnapshot,toast,
-    getNumberEncoding:()=>state.numberEncoding,getDecimalPlaces:()=>state.decimalPlaces,
+    getNumberEncoding:()=>state.numberEncoding,getDecimalPlaces:()=>state.decimalPlaces,getDataEncodings:()=>dataEditor.entries(),
     currentExpression:()=>state.term&&!state.dirty?C.format(state.term):input.value,
     insertFunction:name=>{const start=input.selectionStart,end=input.selectionEnd;
       const before=start&&/[A-Za-z0-9_']/.test(input.value[start-1])?' ':'';

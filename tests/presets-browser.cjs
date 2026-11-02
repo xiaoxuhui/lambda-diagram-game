@@ -13,7 +13,7 @@ const P=require('../src/presets.js');process.env.PORT='0';const server=require('
    await check(`${width}px grouped choices all render complete diagrams and descriptions`,async()=>{
     assert.equal(await page.locator('#examples option').count(),P.examples.length+1);assert.equal(await page.locator('#examples optgroup').count(),8);
     assert.equal(await page.locator('#examples optgroup[label="高等数学"] option').count(),13);
-    for(const e of P.examples.filter(e=>e.expected!==undefined)){await select(e.name);assert.equal(await page.locator('#expression').inputValue(),e.term);assert.ok(await page.locator('#diagram-mount line').count()>0);assert.ok(await page.locator('#error-message').isHidden());assert.ok((await page.locator('#example-info').textContent()).includes(e.description));}
+    for(const e of P.examples.filter(e=>e.expected!==undefined)){await select(e.name);assert.equal(await page.locator('#expression').inputValue(),P.inputSourceFor(e));assert.ok(await page.locator('#diagram-mount line').count()>0);assert.ok(await page.locator('#error-message').isHidden());assert.ok((await page.locator('#example-info').textContent()).includes(e.description));}
     assert.equal(await page.locator('#function-count').textContent(),'0 个函数');
    });
    await check(`${width}px recursive guidance preserves the player's order and direction`,async()=>{
