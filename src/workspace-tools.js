@@ -93,23 +93,34 @@
       try{const text=S.encode(captured());root.LambdaDownload.save(`lambda-lab-save-${new Date().toISOString().replace(/[-:]/g,'').slice(0,15)}.json`,text,'application/json');feedback('完整存档已导出。可以在另一台设备导入继续。');}
       catch(e){feedback(e.message,true);}
     });
+    function replaceWithBackup(snapshot,prefix='lambda-lab-backup'){
+      const backup=S.encodeBackup(captured(),checkpoint),targetText=S.encode(snapshot);
+      const previous=[AUTO,CHECKPOINT,LEGACY].map(key=>[key,localStorage.getItem(key)]);
+      const result=root.LambdaDownload.saveBackup(`${prefix}-${new Date().toISOString().replace(/[:.]/g,'-')}.json`,backup);
+      try {localStorage.setItem(AUTO,targetText);localStorage.removeItem(CHECKPOINT);localStorage.removeItem(LEGACY);}
+      catch(error) {
+        for(const [key,text] of previous){try{if(text===null)localStorage.removeItem(key);else localStorage.setItem(key,text);}catch{/* Keep the live scene and exported backup if storage itself is unavailable. */}}
+        throw error;
+      }
+      clearTimeout(saveTimer);apply(snapshot);clearEditor();checkpoint=null;$('restore-state').disabled=true;persist();return result;
+    }
     $('clear-all').addEventListener('click',()=>{
       try {
-        const backup=S.encodeBackup(captured(),checkpoint);
         const empty=S.decode(S.encode({version:2,draft:'',functions:[],functionDraft:{name:'',source:''},completed:[],mode:'free',level:0,
           session:{original:null,steps:0,dirty:false,halt:''},view:{numberEncoding:'church',decimalPlaces:6,speed:600,scale:1,autoFit:true,panX:0,panY:0,historyOpen:false,helpOpen:false,hintOpen:false},
           selection:{start:0,end:0},error:''}));
-        const previous=[AUTO,CHECKPOINT,LEGACY].map(key=>[key,localStorage.getItem(key)]);
-        const result=root.LambdaDownload.saveBackup(`lambda-lab-backup-${new Date().toISOString().replace(/[:.]/g,'-')}.json`,backup);
-        try {localStorage.setItem(AUTO,S.encode(empty));localStorage.removeItem(CHECKPOINT);localStorage.removeItem(LEGACY);}
-        catch(error) {
-          for(const [key,text] of previous){try{if(text===null)localStorage.removeItem(key);else localStorage.setItem(key,text);}catch{/* Storage itself may be unavailable; keep the live scene and exported backup. */}}
-          throw error;
-        }
-        clearTimeout(saveTimer);apply(empty);clearEditor();checkpoint=null;$('restore-state').disabled=true;persist();
+        const result=replaceWithBackup(empty);
         feedback(result==='saved'?'备份已保存，所有游戏内容已清空。可导入备份恢复。':'已发起备份下载，所有游戏内容已清空。请保留下载的 JSON 文件；浏览器无法确认最终保存结果。');
         api.toast('已导出备份并清空');
       }catch(e){feedback(`清空未完成：${e.message}。当前现场保留。`,true);}
+    });
+    $('load-default-state').addEventListener('click',()=>{
+      try{
+        const snapshot=root.LambdaDefaultState.create(),result=replaceWithBackup(snapshot,'lambda-lab-before-default');
+        $('custom-data-panel').open=false;$('input-format-panel').open=false;
+        feedback((result==='saved'?'原存档备份已保存。':'已发起原存档备份下载。')+'已清空并载入默认存档：集合列表数字、15个函数和1 + 2示例。点击「转换成图示」后运行。');
+        api.toast('默认存档已载入');
+      }catch(error){feedback(`默认存档未载入：${error.message}。当前现场保留。`,true);}
     });
     $('import-state').addEventListener('click',()=>$('import-file').click());
     $('import-file').addEventListener('change',async()=>{

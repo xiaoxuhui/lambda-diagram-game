@@ -61,7 +61,7 @@
       <div><h2>怎么写、怎么看</h2><p>用快捷栏插入 λ；也可用 <code>\</code>。<code>λx y.x</code> 等同 <code>λx.λy.x</code>。变量之间用空格：<code>xy</code> 是一个名字。λ 的作用域延伸到右侧，作为参数时需加括号。</p><p>同色竖线连接绑定横线；应用横线连接子式最左变量。粉色标记下一步归约，自由变量以虚线显示。可选择正规序（外层优先）或应用序（内部优先），都包含函数内部归约。<a href="https://tromp.github.io/cl/diagrams.html" target="_blank" rel="noopener">John Tromp 原始说明 ↗</a></p></div>
     </section>
     <nav class="mode-row" aria-label="游戏模式"><div class="mode-tabs"><button id="mode-free" class="mode-tab active" aria-pressed="true">自由实验</button><button id="mode-challenge" class="mode-tab" aria-pressed="false">闯关模式 <span id="challenge-count">30</span></button></div><span id="progress-text" class="progress-label">探索 · 输入 · 归约</span></nav>
-    <section class="save-bar" aria-label="状态与进度存档"><div class="save-info"><strong>状态与进度</strong><span id="storage-status" role="status">自动保存准备中</span><small>包含函数库、归约轨迹与关卡进度</small></div><div class="save-actions"><button id="save-state" class="button primary">保存当前状态</button><button id="restore-state" class="button" disabled>恢复已保存状态</button><button id="export-state" class="button">导出存档 ↓</button><button id="import-state" class="button">导入存档 ↑</button><button id="clear-all" type="button" class="button danger" aria-describedby="clear-note">导出存档并清空</button><input id="import-file" type="file" accept=".json,application/json" hidden></div><p id="clear-note" class="clear-note">清空会删除表达式、函数库、运行记录、关卡进度及保存点，并自动导出备份。</p><p id="save-feedback" class="save-feedback" role="status" hidden></p></section>
+    <section class="save-bar" aria-label="状态与进度存档"><div class="save-info"><strong>状态与进度</strong><span id="storage-status" role="status">自动保存准备中</span><small>包含函数库、归约轨迹与关卡进度</small></div><div class="save-actions"><button id="save-state" class="button primary">保存当前状态</button><button id="restore-state" class="button" disabled>恢复已保存状态</button><button id="export-state" class="button">导出存档 ↓</button><button id="import-state" class="button">导入存档 ↑</button><button id="load-default-state" type="button" class="button" aria-describedby="default-note">载入默认存档</button><button id="clear-all" type="button" class="button danger" aria-describedby="clear-note">导出存档并清空</button><input id="import-file" type="file" accept=".json,application/json" hidden></div><p id="clear-note" class="clear-note">清空会删除表达式、函数库、运行记录、关卡进度及保存点，并自动导出备份。</p><p id="default-note" class="clear-note">默认存档包含集合列表数字和示例函数；每次载入前自动导出现有完整备份，再清空载入。0 = []，后继把当前列表本身追加到末尾。</p><p id="save-feedback" class="save-feedback" role="status" hidden></p></section>
     <section id="challenge-panel" class="challenge-panel" hidden>
       <div class="stage-row"><label for="stage-select">选择阶段 <select id="stage-select" aria-label="选择挑战阶段"></select></label><span id="stage-progress" role="status"></span></div>
       <div class="level-list" id="level-list" aria-label="选择关卡"></div>
@@ -1175,6 +1175,47 @@
 })(typeof globalThis!=='undefined'?globalThis:window);
 
 </script><script>
+(function(root){
+  'use strict';
+  const C=root.LambdaCore||require('./core.js'),L=root.LambdaLibrary||require('./library.js'),E=root.LambdaDataEncoding||require('./data-encoding.js'),S=root.LambdaSnapshot||require('./snapshot.js');
+  const definitions=[
+    ['CHURCH_SUCC','λn f x.f (n f x)'],
+    ['LIST_EMPTY','λc n.n'],
+    ['LIST_CONS','λh t c n.c h (t c n)'],
+    ['LIST_ONE','λx c n.c x n'],
+    ['LIST_APPEND','λa b c n.a c (b c n)'],
+    ['LIST_HEAD','λl d.l (λh r.h) d'],
+    ['LIST_LENGTH','λl.l (λh r.CHURCH_SUCC r) 0_church'],
+    ['LIST_IS_EMPTY','λl.l (λh r.λx y.y) (λx y.x)'],
+    ['LIST_TAIL','λl.(l (λh p.(λa b k.k a b) (LIST_CONS h (p (λx y.x))) (p (λx y.x))) ((λa b k.k a b) LIST_EMPTY LIST_EMPTY)) (λx y.y)'],
+    ['SET_ZERO','LIST_EMPTY'],
+    ['SET_SUCC','λs.LIST_APPEND s (LIST_ONE s)'],
+    ['SET_FROM_CHURCH','λn.n SET_SUCC SET_ZERO'],
+    ['SET_TO_CHURCH','LIST_LENGTH'],
+    ['SET_ADD','λa b.(SET_TO_CHURCH b) SET_SUCC a'],
+    ['SET_MUL','λa b.(SET_TO_CHURCH b) (SET_ADD a) SET_ZERO']
+  ];
+  function create(){
+    let functions=[];
+    for(const [name,source] of definitions)functions=L.add(functions,name,source,Infinity,'church',6,[],E.parse(source));
+    let dataEncodings=E.define([],'Set','SET_FROM_CHURCH',term=>L.expand(term,functions));
+    dataEncodings=E.withInputFormat(dataEncodings,'Set','s{n}');
+    for(let number=0;number<=5;number++){
+      const result=C.normalize(C.A(dataEncodings[0].term,C.parse(String(number))),Infinity);
+      if(result.status!=='normal')throw new C.LambdaError('默认集合数字未能归约到正规形。');
+      dataEncodings=E.putMapping(dataEncodings,'Set',String(number),result.term);
+    }
+    const raw={version:2,draft:'SET_ADD 1_Set 2_Set',functions,dataEncodings,encodingDraft:{name:'',source:''},functionDraft:{name:'',source:''},completed:[],mode:'free',level:0,
+      session:{original:null,steps:0,dirty:true,halt:'',encodings:[]},
+      view:{numberEncoding:'custom:Set',numberFormats:{},decimalPlaces:6,speed:10,strategy:'normal',direction:'left',scale:1,autoFit:true,panX:0,panY:0,historyOpen:false,helpOpen:false,hintOpen:false},
+      selection:{start:0,end:0},error:''};
+    return S.decode(S.encode(raw));
+  }
+  const API={create,definitions};root.LambdaDefaultState=API;
+  if(typeof module!=='undefined'&&module.exports)module.exports=API;
+})(typeof globalThis!=='undefined'?globalThis:window);
+
+</script><script>
 (function(root) {
   'use strict';
   const C=root.LambdaCore,L=root.LambdaLibrary,S=root.LambdaSnapshot;
@@ -1270,23 +1311,34 @@
       try{const text=S.encode(captured());root.LambdaDownload.save(`lambda-lab-save-${new Date().toISOString().replace(/[-:]/g,'').slice(0,15)}.json`,text,'application/json');feedback('完整存档已导出。可以在另一台设备导入继续。');}
       catch(e){feedback(e.message,true);}
     });
+    function replaceWithBackup(snapshot,prefix='lambda-lab-backup'){
+      const backup=S.encodeBackup(captured(),checkpoint),targetText=S.encode(snapshot);
+      const previous=[AUTO,CHECKPOINT,LEGACY].map(key=>[key,localStorage.getItem(key)]);
+      const result=root.LambdaDownload.saveBackup(`${prefix}-${new Date().toISOString().replace(/[:.]/g,'-')}.json`,backup);
+      try {localStorage.setItem(AUTO,targetText);localStorage.removeItem(CHECKPOINT);localStorage.removeItem(LEGACY);}
+      catch(error) {
+        for(const [key,text] of previous){try{if(text===null)localStorage.removeItem(key);else localStorage.setItem(key,text);}catch{/* Keep the live scene and exported backup if storage itself is unavailable. */}}
+        throw error;
+      }
+      clearTimeout(saveTimer);apply(snapshot);clearEditor();checkpoint=null;$('restore-state').disabled=true;persist();return result;
+    }
     $('clear-all').addEventListener('click',()=>{
       try {
-        const backup=S.encodeBackup(captured(),checkpoint);
         const empty=S.decode(S.encode({version:2,draft:'',functions:[],functionDraft:{name:'',source:''},completed:[],mode:'free',level:0,
           session:{original:null,steps:0,dirty:false,halt:''},view:{numberEncoding:'church',decimalPlaces:6,speed:600,scale:1,autoFit:true,panX:0,panY:0,historyOpen:false,helpOpen:false,hintOpen:false},
           selection:{start:0,end:0},error:''}));
-        const previous=[AUTO,CHECKPOINT,LEGACY].map(key=>[key,localStorage.getItem(key)]);
-        const result=root.LambdaDownload.saveBackup(`lambda-lab-backup-${new Date().toISOString().replace(/[:.]/g,'-')}.json`,backup);
-        try {localStorage.setItem(AUTO,S.encode(empty));localStorage.removeItem(CHECKPOINT);localStorage.removeItem(LEGACY);}
-        catch(error) {
-          for(const [key,text] of previous){try{if(text===null)localStorage.removeItem(key);else localStorage.setItem(key,text);}catch{/* Storage itself may be unavailable; keep the live scene and exported backup. */}}
-          throw error;
-        }
-        clearTimeout(saveTimer);apply(empty);clearEditor();checkpoint=null;$('restore-state').disabled=true;persist();
+        const result=replaceWithBackup(empty);
         feedback(result==='saved'?'备份已保存，所有游戏内容已清空。可导入备份恢复。':'已发起备份下载，所有游戏内容已清空。请保留下载的 JSON 文件；浏览器无法确认最终保存结果。');
         api.toast('已导出备份并清空');
       }catch(e){feedback(`清空未完成：${e.message}。当前现场保留。`,true);}
+    });
+    $('load-default-state').addEventListener('click',()=>{
+      try{
+        const snapshot=root.LambdaDefaultState.create(),result=replaceWithBackup(snapshot,'lambda-lab-before-default');
+        $('custom-data-panel').open=false;$('input-format-panel').open=false;
+        feedback((result==='saved'?'原存档备份已保存。':'已发起原存档备份下载。')+'已清空并载入默认存档：集合列表数字、15个函数和1 + 2示例。点击「转换成图示」后运行。');
+        api.toast('默认存档已载入');
+      }catch(error){feedback(`默认存档未载入：${error.message}。当前现场保留。`,true);}
     });
     $('import-state').addEventListener('click',()=>$('import-file').click());
     $('import-file').addEventListener('change',async()=>{
