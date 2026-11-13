@@ -32,6 +32,7 @@
   }
   function applySnapshot(s) {
     cancelConversion();
+    viewer?.cancelZoom();
     $('example-info').hidden=true;
     stop();input.value=s.draft;state.completed=new Set(s.completed);state.mode=s.mode;state.level=s.level;
     revealAnswer(false);
@@ -78,10 +79,12 @@
       const parsed=compiled.term,expanded=workspace?workspace.expand(parsed):parsed;
       dataEditor.remember(compiled.mappings);
       const term=expanded;
+      viewer?.cancelZoom();
       state.term=term; state.original=term; state.history=[{term,change:null}]; state.paths=null;state.dirty=false;state.encodingBusy=false;state.encodings=[...new Set([...compiled.encodings,...(workspace?.encodingsFor(parsed)??[])])];
       state.autoFit=true; render(); save(); return true;
     } catch(e) {
       if(e.name==='AbortError'||controller.signal.aborted)return false;
+      viewer?.cancelZoom();
       state.term=null; state.original=null; state.history=[];state.paths=null; state.dirty=true;state.encodings=null;state.encodingBusy=false;
       $('error-message').textContent=(e.position!==null&&e.position!==undefined?`第 ${e.position+1} 个字符：`:'')+e.message;
       $('error-message').hidden=false; render(); input.focus();
@@ -91,7 +94,7 @@
       if(conversionController===controller){conversionController=null;compilingDefinitions=null;state.encodingBusy=false;encodingProgress.hidden=true;cancelEncoding.hidden=true;if(showedProgress&&state.dirty)render();}
     }
   }
-  function renderDiagram(redex) {
+  function renderDiagram(redex, duration) {
     const mount=$('diagram-mount');
     const route=state.dirty?null:redex?.path??null;
     diagramView.setEnabled(!state.dirty);
@@ -103,7 +106,7 @@
     const anchor=state.autoFit?null:viewer?.anchor();
     if(!state.term) { diagramView.clear(); $('diagram-empty').hidden=false; state.model=null; return; }
     $('diagram-empty').hidden=true;
-    state.model=D.layout(state.term,route);diagramView.render(state.model);
+    state.model=D.layout(state.term,route);diagramView.render(state.model,duration);
     mount.style.opacity=state.dirty?'0.35':'1';
     applyScale();
     viewer?.restore(anchor);
@@ -135,7 +138,7 @@
     decodedTerms.set(t,text);return text;
   }
   function code(text) { const el=document.createElement('code'); el.textContent=text; return el; }
-  function render() {
+  function render(duration=0) {
     formatEditor?.render();
     $('number-encoding').value=state.numberEncoding;$('decimal-places').value=state.decimalPlaces;
     $('number-note').textContent=state.numberEncoding==='decimal'?`当前编码：列表小数。直接写0.1或-2，也可写0.1_decimal。用3_church或3_丘奇数指定丘奇数。除法示例生成 ${state.decimalPlaces} 位小数，改位数后请重新选择示例。`:state.numberEncoding.startsWith('custom:')?`当前编码：${state.numberEncoding.slice(7)}。直接写3即可转换，也可写3_${state.numberEncoding.slice(7)}；用3_church或3_丘奇数指定丘奇数。`:'当前编码：丘奇自然数。直接写3，也可写3_church或3_丘奇数。带后缀的数字使用指定编码，例如0.1_decimal。';
@@ -186,7 +189,7 @@
       if(entry.change) { const note=document.createElement('small'); note.textContent=`${entry.change.param} ← ${C.format(entry.change.argument)}`;body.append(note); }
       li.append(num,body);history.append(li);renderedCount++;
     }
-    renderDiagram(redex);
+    renderDiagram(redex,duration);
     save();
   }
   function advance(path=null,display=true) {
@@ -196,10 +199,11 @@
       const recordPath=selected||state.strategy==='applicative'||state.direction==='right';
       if(recordPath&&!state.paths)state.paths=Array(state.history.length-1).fill(null);
       if(state.paths)state.paths.push(recordPath?result.path:null);
+      const duration=state.running?Math.min(180,state.speed*.7):180;
       state.term=result.term;state.history.push({term:result.term,change:result});state.halt='';
       // The preview is only a hint: confirm with an actual attempt before stopping.
       if(state.running&&!C.findRedex(state.term,[],state.strategy,state.direction)&&C.step(state.term,state.strategy,state.direction)===null)stop();
-      if(display)render(); return true;
+      if(display)render(duration); return true;
     } catch(e) {stop();state.halt=e.message;if(display)render();return false;}
   }
   function captureTap(target){const selection=diagramView.selection(target);return !state.dirty&&selection?{...selection,term:state.term}:null;}
@@ -305,8 +309,8 @@
   $('fast-run').addEventListener('click',()=>{if(state.running){stop();render();return;}if(!state.term||state.dirty)return;state.running=true;state.fast=true;state.halt='';render();schedule();});
   $('number-encoding').addEventListener('change',()=>{const previous=state.numberEncoding;state.numberEncoding=$('number-encoding').value;dataEditor.select(state.numberEncoding);if(previous!==state.numberEncoding){changed();queueLiteralPreparation();}else{render();save();}});
   $('decimal-places').addEventListener('input',()=>{const n=$('decimal-places').valueAsNumber;if(!Number.isSafeInteger(n)||n<0){$('decimal-places').setCustomValidity('请输入非负整数');return;}$('decimal-places').setCustomValidity('');state.decimalPlaces=n;if(state.numberEncoding==='decimal')changed();else save();});
-  $('back').addEventListener('click',()=>{if(state.history.length>1){stop();state.history.pop();state.paths?.pop();state.term=state.history.at(-1).term;state.halt='';$('challenge-feedback').textContent='';$('next-level').hidden=true;render();}});
-  $('reset').addEventListener('click',()=>{if(state.original){stop();state.term=state.original;state.history=[{term:state.original,change:null}];state.paths=null;state.halt='';$('challenge-feedback').textContent='';$('next-level').hidden=true;render();}});
+  $('back').addEventListener('click',()=>{if(state.history.length>1){stop();state.history.pop();state.paths?.pop();state.term=state.history.at(-1).term;state.halt='';$('challenge-feedback').textContent='';$('next-level').hidden=true;render(180);}});
+  $('reset').addEventListener('click',()=>{if(state.original){stop();state.term=state.original;state.history=[{term:state.original,change:null}];state.paths=null;state.halt='';$('challenge-feedback').textContent='';$('next-level').hidden=true;render(180);}});
   $('speed').addEventListener('change',()=>{if($('speed').value==='custom'){$('speed-ms').focus();$('speed-ms').select();}else setSpeed(Number($('speed').value));});
   $('speed-ms').addEventListener('input',()=>setSpeed($('speed-ms').value===''?NaN:Number($('speed-ms').value)));
   function setReductionPreference(key,value,allowed){

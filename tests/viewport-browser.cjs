@@ -4,7 +4,7 @@ let pw;try{pw=require('playwright');}catch{pw=require(path.resolve(path.dirname(
 process.env.PORT='0';const server=require('../scripts/serve.cjs');
 (async()=>{
   if(!server.listening)await new Promise(r=>server.once('listening',r));const base=`http://127.0.0.1:${server.address().port}`;
-  const browser=await pw.chromium.launch({headless:true}),context=await browser.newContext({viewport:{width:1440,height:1080}});
+  const browser=await pw.chromium.launch({headless:true}),context=await browser.newContext({viewport:{width:1440,height:1080},reducedMotion:'reduce'});
   const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));let count=0;
   const check=async(name,fn)=>{await fn();console.log(`PASS V${++count} ${name}`);};
   const source=async(text)=>{await page.locator('#number-encoding').selectOption('church');await page.locator('#expression').fill(text);await page.locator('#convert').click();};
@@ -34,6 +34,23 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
       assert.ok(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));fs.mkdirSync(path.join(__dirname,'artifacts'),{recursive:true});await p.screenshot({path:path.join(__dirname,'artifacts','viewport-mobile.png'),fullPage:true});await mobileContext.close();
     });
     await check('offline build has working zoom navigation',async()=>{const p=await context.newPage();p.on('pageerror',e=>errors.push(e.message));await p.goto(pathToFileURL(path.resolve(__dirname,'../dist/lambda-lab.html')).href);await p.locator('#actual-size').click();await p.locator('#zoom-in').click();assert.equal(await p.locator('#zoom-label').textContent(),'125%');await p.close();});
+    await check('animated zoom accumulates clicks and reduction fades at the configured pace',async()=>{
+      await page.emulateMedia({reducedMotion:'no-preference'});await source('(λx.x) 20');
+      await page.locator('#actual-size').click();
+      await page.waitForFunction(()=>document.querySelector('#zoom-label').textContent==='100%');
+      const before=await world();
+      const widths=await page.evaluate(async()=>{
+        const svg=document.querySelector('#diagram-mount svg'),width=()=>Number(svg.getAttribute('width'));
+        const start=width();document.querySelector('#zoom-in').click();document.querySelector('#zoom-in').click();
+        return [start,await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve(width()))))];
+      });
+      await page.waitForFunction(()=>document.querySelector('#zoom-label').textContent==='156%');
+      const end=Number(await page.locator('#diagram-mount svg').getAttribute('width'));
+      assert.ok(widths[0]<widths[1]&&widths[1]<end);
+      const after=await world();assert.ok(Math.abs(before.x-after.x)<2&&Math.abs(before.y-after.y)<2);
+      const duration=await page.evaluate(()=>{document.querySelector('#step').click();return document.querySelector('#diagram-mount svg').getAnimations()[0]?.effect.getTiming().duration;});
+      assert.equal(duration,180);assert.equal(await page.locator('#step-count').textContent(),'1');
+    });
     await check('viewport navigation has no script errors',async()=>assert.deepEqual(errors,[]));
     console.log(`Viewport browser checks: ${count} passed, 0 failed.`);
   }finally{await browser.close();server.close();}
