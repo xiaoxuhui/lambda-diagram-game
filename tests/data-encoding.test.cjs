@@ -104,10 +104,59 @@ test('archives reject malformed or duplicate converters without evaluating user 
   assert.doesNotThrow(()=>E.define([],'Loop','(λx.x x) (λx.x x)'));
 });
 test('decimal examples explicitly annotate operands for the new editor parser',()=>{
-  for(const example of P.examples.filter(e=>e.decimalOperation)){
+  for(const example of P.examples.filter(e=>e.decimalOperation&&e.category!=='高等小数')){
     const parsed=E.parse(P.inputSourceFor(example));assert.deepEqual(parsed.encodings,['decimal']);
     assert.equal(D.format(D.read(normalize(parsed.term))),example.expected);
   }
+});
+test('Church list and Boolean literals support selection, suffixes and templates',()=>{
+  for(const [source,encoding,label] of [
+    ['120','list','丘奇列表 [1, 2, 0]'],
+    ['0_丘奇列表','church','丘奇列表 [0]'],
+    ['1_bool','church','丘奇布尔 TRUE（1）'],
+    ['0','bool','丘奇布尔 FALSE（0）'],
+    ['B1','list','丘奇布尔 TRUE（1）']
+  ]){
+    const parsed=E.parse(source,[],Infinity,encoding,{bool:'B{n}'});
+    assert.equal(E.readBuiltin(parsed.term,parsed.encodings[0]),label);
+  }
+  assert.throws(()=>E.parse('2_bool'),/0（假）或 1（真）/);
+  for(const encoding of ['list','bool']){
+    const raw=sample();raw.view.numberEncoding=encoding;raw.view.numberFormats={[encoding]:'N{n}'};
+    assert.equal(S.decode(S.encode(raw)).view.numberEncoding,encoding);
+  }
+  const raw=sample();
+  raw.dataEncodings=[{...raw.dataEncodings[0],name:'list'}];
+  raw.view.numberEncoding='custom:list';
+  raw.encodingDraft.editing='list';
+  const saved=S.decode(S.encode(raw));
+  assert.equal(E.parse('3_list',saved.dataEncodings).literals[0].name,'list');
+  assert.equal(E.readBuiltin(E.parse('3',saved.dataEncodings,Infinity,'list').term,'list'),'丘奇列表 [3]');
+});
+test('bracket lists parse complete items and preserve lexical scope',()=>{
+  assert.equal(E.readChurchList(E.parse('[12, [2, 3], v]',[],Infinity,'list').term),'丘奇列表 [12, [2, 3], v]');
+  assert.equal(E.readBuiltin(E.parse('[]').term,'list'),'丘奇列表 []');
+  const term=C.normalize(E.parse('(λc.[c, n]) z').term,50).term;
+  assert.equal(E.readChurchList(term),'丘奇列表 [z, n]');
+  assert.equal(E.readChurchList(C.parse('λc n.c c n')),null);
+  const wrapped=E.parse('[3]',[],Infinity,'church',{church:'[{n}]'});
+  assert.equal(C.churchNumber(wrapped.term),3);
+  assert.throws(()=>E.parse('[1, 2'),/末尾需要/);
+});
+test('signed integers support default and explicit encodings, and restore from a save',()=>{
+  for(const [source,encoding,value] of [
+    ['-12','int','-12'],['-3_int','church','-3'],['-0_丘奇整数','decimal','0'],['4','int','4']
+  ]){
+    const parsed=E.parse(source,[],Infinity,encoding);
+    assert.deepEqual(parsed.encodings,['int']);
+    assert.equal(E.readBuiltin(parsed.term,'int'),`丘奇整数 ${value}`);
+  }
+  assert.throws(()=>E.parse('-1.25_int'),/只接受整数/);
+  const raw=sample();
+  raw.view.numberEncoding='int';raw.view.numberFormats={int:'I{n}'};
+  const saved=S.decode(S.encode(raw));
+  assert.equal(saved.view.numberEncoding,'int');
+  assert.equal(E.readBuiltin(E.parse('I-3',[],Infinity,'int',saved.view.numberFormats).term,'int'),'丘奇整数 -3');
 });
 test('mapping tables match alpha-equivalent normal forms and replace one numeral immutably',()=>{
   const entries=E.putMapping(box(),'Box','003',C.parse('λk.k 3'));

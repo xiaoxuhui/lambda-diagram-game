@@ -26,7 +26,8 @@ const factorial=`(${Y}) (λr n.(${ZERO}) n 1 ((${MULT}) n (r ((${PRED}) n)))) 3`
       assert.equal(await page.locator('#step-count').textContent(),'2048');assert.equal(await page.locator('#history-list li').count(),2049);
       assert.equal(await page.locator('#diagram-mount line').count(),4099);
       assert.equal(await page.locator('#diagram-mount [data-kind="variable"]').count(),1025);
-      await page.locator('#actual-size').click();assert.equal(await page.locator('#zoom-label').textContent(),'100%');
+      await page.locator('#actual-size').click();
+      await page.waitForFunction(()=>document.getElementById('zoom-label').textContent==='100%');
       fs.mkdirSync(path.join(__dirname,'artifacts'),{recursive:true});await page.locator('.diagram-card').screenshot({path:path.join(__dirname,'artifacts','unlimited-power.png')});
       await page.locator('#save-state').click();await page.reload();assert.equal(await page.locator('#decoded').textContent(),'Church 数 1024');assert.equal(await page.locator('#history-list li').count(),2049);
     });

@@ -20,6 +20,7 @@
 .function-actions{flex-wrap:wrap}.function-item-head{flex-wrap:wrap}.function-item-buttons{margin-left:auto}#function-edit-status{color:var(--mint);overflow-wrap:anywhere}
 .strategy-control{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:7px 12px;margin:12px 0;color:#7c8b81;font-size:11px}.strategy-control select{width:100%;max-width:240px}.strategy-control small{grid-column:1/-1;font-size:10px;color:#89978d}
 .diagram-mount line{transition:none}
+.diagram-previous,.diagram-wire-motion{position:absolute;overflow:hidden;pointer-events:none}
 .diagram-mount [data-redex-hit]{cursor:pointer}
 .diagram-mount [data-redex-hit]:hover,.diagram-mount [data-redex-hit]:focus-visible{stroke:#ff91b7;stroke-opacity:.25;outline:none}
 .diagram-mount [data-redex-hit][aria-disabled="true"]{cursor:default;stroke:transparent}

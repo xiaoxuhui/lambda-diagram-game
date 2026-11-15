@@ -30,7 +30,7 @@
     function options(){
       $('number-encoding').querySelectorAll('[data-custom-encoding]').forEach(option=>option.remove());
       for(const entry of entries){const option=document.createElement('option');option.value=`custom:${entry.name}`;option.textContent=`自定义数据 · ${entry.name}`;option.dataset.customEncoding='';$('number-encoding').append(option);}
-      if(!['church','decimal',...entries.map(entry=>`custom:${entry.name}`)].includes(api.getSelection()))api.setSelection('church');
+      if(!E.isBuiltin(api.getSelection())&&!entries.some(entry=>api.getSelection()===`custom:${entry.name}`))api.setSelection('church');
       $('number-encoding').value=api.getSelection();buttons();renderList();
     }
     function fresh(){tableView?.cancel();editing=null;$('encoding-name').value='';$('encoding-source').value='';error('');buttons();api.queueSave();}

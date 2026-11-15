@@ -35,7 +35,7 @@
         <section class="card editor-card">
           <div class="section-heading"><div><span class="section-number">01</span><h2>写下表达式</h2></div><span class="mini-label">INPUT</span></div>
           <label class="sr-only" for="expression">Lambda 表达式</label>
-          <div class="number-options"><label for="number-encoding">数字编码</label><select id="number-encoding"><option value="church" selected>丘奇自然数（默认）</option><option value="decimal">列表小数 · _decimal</option></select><label for="decimal-places">生成除法小数位</label><input id="decimal-places" type="number" min="0" step="1" value="6" inputmode="numeric"></div><p id="number-note" class="syntax-note">不带后缀的数字使用当前选中的编码；用 3_church、0.1_decimal 或 3_编码名称明确指定编码。</p>
+          <div class="number-options"><label for="number-encoding">数字编码</label><select id="number-encoding"><option value="church" selected>丘奇自然数（默认）</option><option value="decimal">列表小数 · _decimal</option><option value="list">丘奇列表 · _list</option><option value="bool">丘奇布尔 · _bool</option><option value="int">丘奇整数（支持负数） · _int</option></select><label for="decimal-places">生成除法小数位</label><input id="decimal-places" type="number" min="0" step="1" value="6" inputmode="numeric"></div><p id="number-note" class="syntax-note">不带后缀的数字使用当前选中的编码；用 3_church、0.1_decimal 或 3_编码名称明确指定编码。</p>
           <details id="custom-data-panel" class="custom-data-panel"><summary>自定义数据编码</summary><p class="syntax-note">输入把丘奇数 n 转成自定义数据的 λ 函数。例如名称 Box、转换 λn.λk.k n；之后用 3_Box。定义中的数字按丘奇数解释，可引用已保存函数。</p><form id="encoding-form"><label for="encoding-name">编码名称</label><input id="encoding-name" autocomplete="off" spellcheck="false" placeholder="例如 Box 或 我的数据"><label for="encoding-source">丘奇数 → 自定义数据</label><textarea id="encoding-source" spellcheck="false" autocapitalize="off" placeholder="λn.λk.k n"></textarea><div class="function-keys"><button type="button" id="encoding-lambda" aria-label="转换函数插入 λ">λ</button></div><p id="encoding-error" class="error-message" role="alert" hidden></p><div class="encoding-actions"><button type="submit" id="encoding-save" class="button primary">保存新编码</button><button type="button" id="encoding-new" class="button">新建编码</button><button type="button" id="encoding-delete" class="button" disabled>删除编码</button></div></form></details>
           <div class="editor-wrap"><textarea id="expression" spellcheck="false" autocapitalize="off" autocomplete="off" aria-describedby="syntax-note error-message">(λx.x) (λy.y)</textarea><div class="editor-bottom"><span>λ / \ 均可输入</span><span id="char-count">12 字符</span></div></div>
           <p class="toolbar-caption">快捷输入 <span>插入到光标位置</span></p>
@@ -46,6 +46,12 @@
           <div id="error-message" class="error-message" role="alert" hidden></div>
           <button id="convert" class="button primary convert-button">转换成图示 <span>→</span></button>
           <p class="key-hint">Ctrl / ⌘ + Enter 快速转换</p>
+          <details class="input-format-panel">
+            <summary>用 λ 解释 λ</summary>
+            <p>先写完整算式，例如 <code>(λx.λy.x) y</code>，再生成。生成后点击「转换成图示」，再点击「运行」，解释器会用正规序批量执行。也可以点击「单步」观察。</p>
+            <button type="button" id="compile-meta-lambda" class="button">生成解释器表达式</button>
+            <button type="button" id="edit-meta-source" class="button">还原待解释表达式</button>
+          </details>
           <div class="example-row"><label for="examples">试试示例</label><select id="examples" aria-describedby="example-info"><option value="">选择一个表达式…</option></select></div>
           <p id="example-info" class="example-info" role="status" hidden></p>
         </section>
@@ -69,7 +75,8 @@
           <div class="execution-top"><div class="section-heading"><div><span class="section-number">03</span><h2>运行与归约</h2></div></div><div class="speed-label"><label for="speed">速度</label><select id="speed"><option value="1200">慢速</option><option value="600" selected>正常</option><option value="180">快速</option><option value="10">极速</option><option value="custom">自定义</option></select><label class="sr-only" for="speed-ms">每步间隔，毫秒</label><input id="speed-ms" type="number" min="1" max="60000" step="1" value="600" inputmode="numeric" title="每步间隔 1–60000 毫秒，数字越小运行越快" aria-describedby="speed-error"><span>ms/步</span></div></div>
           <div class="strategy-control"><label for="reduction-order">归约顺序</label><select id="reduction-order"><option value="normal">正规序（外层优先）</option><option value="applicative">应用序（内部优先）</option></select><label for="reduction-direction">归约方向</label><select id="reduction-direction"><option value="left">从左到右</option><option value="right">从右到左</option></select><small id="strategy-hint">先替换最左侧外层项，再处理内部。</small></div>
           <p id="speed-error" class="error-message" role="alert" hidden></p>
-          <div class="run-controls"><button id="run" class="button run-button"><span>▶</span> <span id="run-label">运行</span></button><button id="fast-run" class="button" title="批量执行，保留全部步骤与完整图示">快速运行</button><button id="step" class="button">单步 →</button><button id="back" class="button">← 回退</button><button id="reset" class="button reset-button">↺ 重置</button><span class="step-counter"><b id="step-count">0</b> 步</span></div>
+          <div class="run-controls"><button id="run" class="button run-button"><span>▶</span> <span id="run-label">运行</span></button><button id="fast-run" class="button" title="批量执行，保留全部步骤与完整图示">快速运行</button><button id="decimal-value" class="button" title="直接求正规形，不记录逐步轨迹" hidden>快速求值</button><button id="step" class="button">单步 →</button><button id="back" class="button">← 回退</button><button id="reset" class="button reset-button">↺ 重置</button><span class="step-counter"><b id="step-count">0</b> 步</span></div>
+          <p id="decimal-value-result" class="example-info" role="status" hidden></p>
           <p id="run-status" class="run-status" role="status" aria-live="polite">准备好了。点击单步，观察一次函数替换。</p>
           <div class="current-term"><div><span>当前表达式</span><span id="decoded" class="decoded"></span></div><p id="expression-encoding" class="expression-encoding"></p><code id="current-expression"></code></div>
           <div id="next-explanation" class="next-explanation"></div>
@@ -80,6 +87,6 @@
     <footer class="page-footer"><span><b>λ</b> 只有变量、函数和应用。其余，交给计算。</span><span>β 归约 · 本地保存</span></footer>
   </main>
   <div id="toast" class="toast" role="status" hidden></div>
-  <script src="src/core.js"></script><script src="src/decimal.js"></script><script src="src/data-encoding.js"></script><script src="src/diagram.js"></script><script src="src/diagram-view.js"></script><script src="src/polynomial.js"></script><script src="src/presets.js"></script><script src="src/challenges.js"></script><script src="src/library.js"></script><script src="src/snapshot.js"></script><script src="src/download.js"></script><script src="src/default-state.js"></script><script src="src/workspace-tools.js"></script><script src="src/viewport.js"></script><script src="src/encoding-table.js"></script><script src="src/data-encoding-editor.js"></script><script src="src/input-format-editor.js"></script><script src="src/app.js"></script>
+  <script src="src/core.js"></script><script src="src/lazy-eval.js"></script><script src="src/meta-lambda.js"></script><script src="src/decimal.js"></script><script src="src/data-encoding.js"></script><script src="src/diagram.js"></script><script src="src/diagram-view.js"></script><script src="src/polynomial.js"></script><script src="src/presets.js"></script><script src="src/challenges.js"></script><script src="src/library.js"></script><script src="src/snapshot.js"></script><script src="src/download.js"></script><script src="src/default-state.js"></script><script src="src/workspace-tools.js"></script><script src="src/viewport.js"></script><script src="src/encoding-table.js"></script><script src="src/data-encoding-editor.js"></script><script src="src/input-format-editor.js"></script><script src="src/app.js"></script>
 </body>
 </html>

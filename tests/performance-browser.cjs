@@ -26,6 +26,13 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
       assert.equal(await page.evaluate(()=>originalSvg===document.querySelector('#diagram-mount svg')&&originalLine===document.querySelector('#diagram-mount line')),true);
       await assertDiagram(page);
       assert.equal(await page.locator('#diagram-mount line').first().evaluate(node=>getComputedStyle(node).transitionDuration),'0s');
+      const history=page.locator('#history-list li');
+      assert.equal(await history.locator('code').count(),0);
+      await page.locator('#history-details summary').click();
+      await history.last().getByRole('button',{name:'查看此步'}).click();
+      assert.equal(await history.last().locator('code').textContent(),await page.locator('#current-expression').textContent());
+      assert.equal(await history.last().locator('small').textContent(),'x ← y');
+      await page.locator('#history-details summary').click();
     });
     await check('normal attempts and mode refresh reuse all unchanged SVG and history nodes',async()=>{
       await page.evaluate(()=>{window.historyNode=document.querySelector('#history-list li');window.mutations=[];window.observer=new MutationObserver(entries=>mutations.push(...entries));observer.observe(document.getElementById('diagram-mount'),{childList:true,subtree:true});});

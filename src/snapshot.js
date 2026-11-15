@@ -58,7 +58,7 @@
     const v=raw.view;if(!object(v)||!Number.isInteger(v.speed)||v.speed<1||v.speed>60000||!Number.isFinite(v.scale)||v.scale<.02||v.scale>16)fail('视图设置不合法。');
     const strategy=v.strategy===undefined?'normal':v.strategy;if(!C.STRATEGIES.includes(strategy))fail('归约顺序不合法。');
     const direction=v.direction===undefined?'left':v.direction;if(!C.DIRECTIONS.includes(direction))fail('归约方向不合法。');
-    const numberEncoding=v.numberEncoding===undefined?'decimal':v.numberEncoding;if(!['church','decimal'].includes(numberEncoding)&&!dataEncodings.some(entry=>numberEncoding===`custom:${entry.name}`))fail('数字编码不合法。');
+    const numberEncoding=v.numberEncoding===undefined?'decimal':v.numberEncoding;if(!E.isBuiltin(numberEncoding)&&!dataEncodings.some(entry=>numberEncoding===`custom:${entry.name}`))fail('数字编码不合法。');
     const numberFormats=v.numberFormats??{};E.validateFormats(dataEncodings,numberFormats);
     const inputFormatDraft=v.inputFormatDraft;
     if(inputFormatDraft!==undefined&&(!object(inputFormatDraft)||typeof inputFormatDraft.encoding!=='string'||typeof inputFormatDraft.text!=='string'))fail('输入形式草稿不合法。');

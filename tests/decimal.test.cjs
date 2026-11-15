@@ -1,4 +1,5 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),C=require('../src/core.js'),D=require('../src/decimal.js');
+const E=require('../src/data-encoding.js'),Lazy=require('../src/lazy-eval.js');
 function calculate(op,a,b,precision=6){let t=C.A(C.A(D.program(op,precision),D.encodeLiteral(a)),D.encodeLiteral(b));
  for(let n=0;n<250000;n++){const r=C.step(t);if(!r){const value=D.read(t);assert.ok(value);return D.format(value);}t=r.term;}assert.fail('test reduction budget exceeded');
 }
@@ -8,6 +9,24 @@ test('signed digit lists preserve decimals without Number rounding',()=>{
 });
 test('digit addition and subtraction align places, carry, borrow and signs',()=>{
  for(const [op,a,b,want] of [['ADD','0.1','0.2','0.3'],['ADD','9.9','0.1','10'],['ADD','1.2','0.03','1.23'],['ADD','-2.5','1.25','-1.25'],['ADD','-1','1','0'],['SUB','1','2','-1'],['SUB','1.01','0.02','0.99'],['SUB','-1','-2','1']])assert.equal(calculate(op,a,b),want,`${a} ${op} ${b}`);
+});
+test('single-bit decimal shifts compose with Church numerals and preserve long exact digits',async()=>{
+ const tiny='0.'+'0'.repeat(159)+'1';
+ const shifted=(op,value,count)=>`${count}_church ${D.expression(op,[value+'_decimal'],0)}`;
+ for(const [source,expected] of [
+  [D.expression('SHL',['-1.25_decimal']),'-2.5'],
+  [D.expression('SHR',['1.25_decimal']),'0.625'],
+  [shifted('SHL','-1.25',3),'-10'],
+  [shifted('SHR','1.25',3),'0.15625'],
+  [shifted('SHR','-1.25',0),'-1.25'],
+  [shifted('SHR',tiny,4),'0.'+'0'.repeat(161)+'625'],
+  [shifted('SHL',tiny,3),'0.'+'0'.repeat(159)+'8'],
+  [D.expression('ADD',['0.'+'9'.repeat(160)+'_decimal',tiny+'_decimal']),'1'],
+  [D.expression('ADD',['1_decimal','-'+tiny+'_decimal']),'0.'+'9'.repeat(160)]
+ ]){
+  const value=await Lazy.normalize(E.parse(source).term,{signal:AbortSignal.timeout(15000)});
+  assert.equal(D.format(D.read(value)),expected);
+ }
 });
 test('digit multiplication keeps the decimal position and sign',()=>{
  for(const [a,b,want] of [['0.2','0.3','0.06'],['-1.2','0.5','-0.6'],['-2','-3','6'],['0','123.45','0'],['1.5','1.5','2.25']])assert.equal(calculate('MUL',a,b),want,`${a}*${b}`);

@@ -103,7 +103,8 @@ const C=require('../src/core.js'),P=require('../src/presets.js');
     });
     await check('zoom controls and fit change SVG size',async()=>{
       await source(P.examples[5].term);const w=await page.locator('#diagram-mount svg').getAttribute('width');
-      await page.locator('#zoom-in').click();assert.ok(Number(await page.locator('#diagram-mount svg').getAttribute('width'))>Number(w));
+      await page.locator('#zoom-in').click();
+      await page.waitForFunction(width=>Number(document.querySelector('#diagram-mount svg').getAttribute('width'))>width,Number(w));
       await page.locator('#zoom-out').click();await page.locator('#fit').click();
       assert.equal(await page.locator('#diagram-mount svg').getAttribute('width'),w);
     });
@@ -175,6 +176,63 @@ const C=require('../src/core.js'),P=require('../src/presets.js');
       const isolated=await browser.newContext();await isolated.addInitScript(()=>{Object.defineProperty(window,'localStorage',{get(){throw Error('storage unavailable');}});});
       const p=await isolated.newPage();p.on('pageerror',e=>errors.push(e.message));await p.goto(base);await p.locator('#step').click();
       assert.equal(await p.locator('#current-expression').textContent(),'λy.y');await isolated.close();
+    });
+    await check('the Lambda interpreter runs in the normal editor and its result survives reload',async()=>{
+      await source('(λx.λy.x) y');
+      await page.locator('summary').filter({hasText:'用 λ 解释 λ'}).click();
+      await page.locator('#compile-meta-lambda').click();
+      assert.equal(await page.locator('#current-expression').textContent(),'(λx.λy.x) y');
+      assert.equal(await page.locator('#fast-run').isDisabled(),true);
+      await page.locator('#convert').click();
+      await page.locator('#reduction-order').selectOption('normal');
+      await page.locator('#fast-run').click();
+      await page.waitForFunction(()=>document.getElementById('decoded').textContent==='解释器结果：λx0.y');
+      assert.ok(Number(await page.locator('#step-count').textContent())>1);
+      await page.locator('#save-state').click();
+      await page.reload();
+      assert.equal(await page.locator('#decoded').textContent(),'解释器结果：λx0.y');
+    });
+    await check('pasting a generated interpreter with a trailing function evaluates the complete input',async()=>{
+      await page.locator('#function-name').fill('succ');
+      await page.locator('#function-source').fill('λn f x.n f (f x)');
+      await page.locator('#function-add').click();
+      await page.waitForFunction(()=>document.getElementById('function-list').textContent.includes('succ'));
+      const generated=await page.evaluate(()=>LambdaMeta.compile('succ 2'));
+      await source(generated+' ((λn f x.n f (f x)) 2)');
+      await page.locator('#reduction-order').selectOption('applicative');
+      await page.locator('#reduction-direction').selectOption('right');
+      await page.locator('#run').click();
+      await page.waitForFunction(()=>document.getElementById('decoded').textContent==='解释器结果：丘奇数 27');
+      assert.equal(await page.locator('#reduction-order').inputValue(),'normal');
+      assert.equal(await page.locator('#reduction-direction').inputValue(),'left');
+      const count=Number(await page.locator('#step-count').textContent());
+      assert.equal(await page.locator('#history-list li').count(),count+1);
+      await page.locator('#history-details').evaluate(details=>details.open=true);
+      await page.locator('#history-list li').last().getByRole('button',{name:'查看此步'}).click();
+      assert.ok(await page.locator('#history-list li').last().locator('code').textContent());
+    });
+    await check('restoring the old interpreter runs the pasted example without any saved functions',async()=>{
+      const legacy=fs.readFileSync(path.join(__dirname,'fixtures/meta-lambda-legacy.txt'),'utf8');
+      const isolated=await browser.newContext();
+      try{
+        const restored=await isolated.newPage();
+        restored.on('pageerror',e=>errors.push(e.message));
+        await restored.addInitScript(({draft,original})=>{
+          const key='lambda-lab-v2';
+          if(!localStorage.getItem(key)||sessionStorage.getItem('legacy-fixture-installed'))return;
+          const snapshot=JSON.parse(localStorage.getItem(key));
+          snapshot.draft=draft;
+          snapshot.session={original,steps:0,dirty:false,halt:''};
+          snapshot.view.strategy='applicative';snapshot.view.direction='right';
+          localStorage.setItem(key,JSON.stringify(snapshot));
+          sessionStorage.setItem('legacy-fixture-installed','1');
+        },{draft:legacy,original:C.parse(legacy)});
+        await restored.goto(base);
+        await restored.reload();
+        assert.equal(await restored.locator('#function-count').textContent(),'0 个函数');
+        await restored.locator('#run').click();
+        await restored.waitForFunction(()=>document.getElementById('decoded').textContent==='解释器结果：丘奇数 27');
+      }finally{await isolated.close();}
     });
     await check('no browser JavaScript errors',async()=>assert.deepEqual(errors,[]));
     console.log(`Browser checks: ${passed} passed, 0 failed.`);

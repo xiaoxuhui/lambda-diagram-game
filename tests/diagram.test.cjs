@@ -4,9 +4,33 @@ const C = require('../src/core.js');
 const D = require('../src/diagram.js');
 const P = require('../src/presets.js');
 const before=require('./fixtures/diagram-before-performance.cjs');
-const Decimal=require('../src/decimal.js');
-const parseExample=s=>P.examples.some(e=>e.term===s&&e.encoding==='decimal')?C.parseInput(s):C.parse(s);
+const E=require('../src/data-encoding.js');
+const parseExample=s=>E.parse(s,[],Infinity,P.examples.find(e=>e.term===s)?.encoding??'church').term;
 const model = s => D.layout(parseExample(s));
+
+test('parameter wires disappear, move or split according to free occurrences',()=>{
+  for(const [source,copies] of [
+    ['(λx.z) (λq.q)',0],
+    ['(λx.x) (λq.q)',1],
+    ['λz.(λx.x (λx.x) x) (λq.q)',2],
+    ['(λx.λy.x x) y',2]
+  ]){
+    const term=C.parse(source),change=C.step(term);
+    const before=D.layout(term),after=D.layout(change.term);
+    const {lineOrigins}=D.reductionOrigins(before,after,change);
+    assert.equal(lineOrigins.length,after.lines.length);
+    assert.ok([...lineOrigins].every(index=>Number.isInteger(index)));
+    const prefix=[...change.path,'arg'];
+    for(const [index,line] of before.lines.entries()){
+      if(!line.path||!prefix.every((part,i)=>line.path[i]===part))continue;
+      assert.equal(lineOrigins.filter(origin=>origin===index).length,copies);
+    }
+    for(const [index,line] of before.lines.entries()){
+      if(line.kind==='abstraction'&&line.name==='q')
+        assert.equal(lineOrigins.filter(origin=>origin===index).length,copies);
+    }
+  }
+});
 test('large numeral emits every line without compression',()=>{const m=D.svg(C.parse('1024'));assert.equal(m.model.leaves.length,1025);assert.equal(m.model.lines.length,4099);assert.equal((m.markup.match(/<line /g)||[]).length,4099);});
 test('long free-variable labels stay complete',()=>assert.ok(D.svg(C.parse('variableName')).markup.includes('>variableName</text>')));
 test('identity has one horizontal binder and one bound wire', () => {

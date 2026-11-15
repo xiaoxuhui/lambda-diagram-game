@@ -4,6 +4,13 @@
   const V = name => Object.freeze({ type: 'var', name });
   const L = (param, body) => Object.freeze({ type: 'abs', param, body });
   const A = (fn, arg) => Object.freeze({ type: 'app', fn, arg });
+  function churchList(items) {
+    const free=new Set();
+    for(const item of items)for(const name of freeVars(item))free.add(name);
+    const fresh=base=>{let name=base,i=0;while(free.has(name))name=base+(++i);return name;};
+    const cons=fresh('c'),nil=fresh('n');
+    return L(cons,L(nil,items.reduceRight((tail,item)=>A(A(V(cons),item),tail),V(nil))));
+  }
   const facts=new WeakMap(),formatted=new WeakMap(),freeSets=new WeakMap(),occurrences=new WeakMap();
 
   class LambdaError extends Error {
@@ -38,7 +45,7 @@
         const raw=source.slice(i,i+custom.length);
         out.push(/^[A-Za-z][A-Za-z0-9_']*$/.test(raw)?{kind:'name',value:raw,literal:custom,pos:i}:{kind:'number',value:custom.value,suffix:custom.encoding,pos:i});i+=custom.length;continue;
       }
-      if ('λ\\.()'.includes(c)) { out.push({ kind: c === '\\' ? 'λ' : c, pos: i++ }); continue; }
+      if ('λ\\.()[],'.includes(c)) { out.push({ kind: c === '\\' ? 'λ' : c, pos: i++ }); continue; }
       if(!decimal && c==='-' && /[0-9]/.test(source[i+1]||'')) throw new LambdaError('丘奇数只支持非负整数，不能输入负数。',i);
       const numeric=(decimal?/^-?[0-9]+(?:\.[0-9]+)?/:/^[0-9]+/).exec(source.slice(i));
       if(numeric) {
@@ -60,7 +67,7 @@
     out.push({ kind: 'end', pos: source.length }); return out;
   }
   function parse(source, maxChars = LIMITS.chars, numberFactory = null, options = {}) {
-    const tokens = tokenize(source, maxChars,!!numberFactory,!!options.suffixes,options.literalMatcher); let at = 0, nesting = 0;
+    const tokens = tokenize(source, maxChars,!!numberFactory,!!options.suffixes,options.literalMatcher); let at = 0, nesting = 0,listDepth=0;
     const bindings=new Map();
     const peek = () => tokens[at];
     const fail = message => { throw new LambdaError(message, peek().pos); };
@@ -78,7 +85,7 @@
         for (let i = params.length - 1; i >= 0; i--) result = L(params[i], result);
       } else {
         result = atom();
-        while (peek().kind === 'name' || peek().kind === 'number' || peek().kind === '(') result = A(result, atom());
+        while (peek().kind === 'name' || peek().kind === 'number' || peek().kind === '(' || peek().kind === '[') result = A(result, atom());
         if (peek().kind === 'λ') fail('作为参数的 λ 表达式需要括号，例如 f (λx.x)。');
       }
       nesting--; return result;
@@ -86,7 +93,7 @@
     function atom() {
       if (peek().kind === 'name') {const token=tokens[at++];return token.literal&&!bindings.has(token.value)&&numberFactory?numberFactory(token.literal.value,token.literal.encoding,token.pos):V(token.value);}
       if (peek().kind === 'number') {
-        const token=tokens[at++],n=token.value;if(numberFactory)return numberFactory(n,token.suffix,token.pos);let body=V('x');
+        const token=tokens[at++],n=token.value;if(numberFactory)return numberFactory(n,token.suffix,token.pos,listDepth);let body=V('x');
         for(let i=0;i<n;i++)body=A(V('f'),body);
         return L('f',L('x',body));
       }
@@ -94,6 +101,17 @@
         at++; const t = expr();
         if (peek().kind !== ')') fail('缺少右括号「)」。');
         at++; return t;
+      }
+      if (peek().kind === '[') {
+        at++;listDepth++;
+        const items=[];
+        if(peek().kind!==']'){
+          items.push(expr());
+          while(peek().kind===','){at++;items.push(expr());}
+        }
+        if(peek().kind!==']')fail('列表元素之间用逗号隔开，末尾需要「]」。');
+        at++;listDepth--;options.onList?.();
+        return churchList(items);
       }
       fail(peek().kind === 'end' ? '这里需要一个表达式。' : '这里需要变量或括号内的表达式。');
     }
@@ -199,40 +217,53 @@
   }
   const STRATEGIES=Object.freeze(['normal','applicative']);
   const DIRECTIONS=Object.freeze(['left','right']);
-  function findRedex(t, path = [], strategy='normal', direction='left') {
+  const hasRedex=t=>analyze(t).redex;
+  function locateRedex(t, route, strategy, direction, parents) {
     if(!STRATEGIES.includes(strategy))throw new LambdaError('归约顺序不合法。');
     if(!DIRECTIONS.includes(direction))throw new LambdaError('归约方向不合法。');
     const first=direction==='right'?'arg':'fn',second=direction==='right'?'fn':'arg';
-    const route=[...path];
     while(true){
-      if(strategy==='normal'&&t.type==='app'&&t.fn.type==='abs')return {term:t,path:route};
-      if(!analyze(t).redex)return null;
-      if(t.type==='abs'){route.push('body');t=t.body;}
-      else if(analyze(t[first]).redex){route.push(first);t=t[first];}
-      else if(analyze(t[second]).redex){route.push(second);t=t[second];}
-      else return {term:t,path:route};
+      if(strategy==='normal'&&t.type==='app'&&t.fn.type==='abs')return t;
+      if(!hasRedex(t))return null;
+      let part;
+      if(t.type==='abs')part='body';
+      else if(hasRedex(t[first]))part=first;
+      else if(hasRedex(t[second]))part=second;
+      else return t;
+      parents?.push(t);
+      route.push(part);
+      t=t[part];
     }
   }
-  function replaceAt(t, path, replacement, i = 0) {
-    const parents=[];for(;i<path.length;i++){const part=path[i];parents.push([t,part]);t=t[part];}
-    for(let j=parents.length-1;j>=0;j--){const [parent,part]=parents[j];replacement=part==='body'?L(parent.param,replacement):part==='fn'?A(replacement,parent.arg):A(parent.fn,replacement);}
-    return replacement;
+  function findRedex(t, path = [], strategy='normal', direction='left') {
+    const route=[...path],term=locateRedex(t,route,strategy,direction);
+    return term?{term,path:route}:null;
+  }
+  function reduce(selected,path,parents) {
+    const {fn,arg}=selected;
+    const replacement=rewrite(fn.body,fn.param,arg,true);
+    let term=replacement;
+    for(let i=parents.length-1;i>=0;i--){
+      const parent=parents[i],part=path[i];
+      term=part==='body'?L(parent.param,term):part==='fn'?A(term,parent.arg):A(parent.fn,term);
+    }
+    analyze(term);
+    return {term,path,before:selected,replacement,param:fn.param,argument:arg};
   }
   function stepAt(t, path) {
     if(!Array.isArray(path))return null;
-    let selected=t;
+    const parents=[];let selected=t;
     for(const part of path){
       if(!selected||!((part==='body'&&selected.type==='abs')||((part==='fn'||part==='arg')&&selected.type==='app')))return null;
+      parents.push(selected);
       selected=selected[part];
     }
     if(!selected||selected.type!=='app'||selected.fn.type!=='abs')return null;
-    const { fn, arg } = selected;
-    const replacement = substitute(fn.body, fn.param, arg);
-    const result = replaceAt(t, path, replacement); inspect(result);
-    return { term: result, path: path.slice(), before: selected, replacement, param: fn.param, argument: arg };
+    return reduce(selected,path.slice(),parents);
   }
   function step(t,strategy='normal',direction='left') {
-    const redex=findRedex(t,[],strategy,direction);return redex?stepAt(t,redex.path):null;
+    const path=[],parents=[],selected=locateRedex(t,path,strategy,direction,parents);
+    return selected?reduce(selected,path,parents):null;
   }
   function normalize(t, max = LIMITS.steps,strategy='normal',direction='left') {
     if(!STRATEGIES.includes(strategy))throw new LambdaError('归约顺序不合法。');
@@ -253,7 +284,7 @@
     return body.type === 'var' && body.name === x ? n : null;
   }
   function parseInput(source,maxChars=LIMITS.chars){if(!root.LambdaDecimal)throw new LambdaError('列表小数模块尚未加载。');return parse(source,maxChars,root.LambdaDecimal.encodeLiteral);}
-  const API = { LIMITS, STRATEGIES, DIRECTIONS, LambdaError, V, L, A, parse, parseInput, format, inspect, freeVars, substitute, alphaKey, key, equal, findRedex, step, stepAt, normalize, churchNumber };
+  const API = { LIMITS, STRATEGIES, DIRECTIONS, LambdaError, V, L, A, churchList, parse, parseInput, format, inspect, freeVars, substitute, alphaKey, key, equal, hasRedex, findRedex, step, stepAt, normalize, churchNumber };
   root.LambdaCore = API;
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
 })(typeof globalThis !== 'undefined' ? globalThis : window);

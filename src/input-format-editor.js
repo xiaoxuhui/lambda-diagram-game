@@ -7,7 +7,7 @@
     document.getElementById('number-note').after(panel);const $=id=>panel.querySelector(`#${id}`);
     let lastSelection=null,lastTemplate=null;
     const current=()=>E.inputFormatFor(api.getSelection(),api.getEntries(),api.getNumberFormats());
-    const example=template=>template.replace('{n}',api.getSelection()==='decimal'?'-1.5':'3');
+    const example=template=>template.replace('{n}',api.getSelection()==='decimal'?'-1.5':api.getSelection()==='int'?'-3':api.getSelection()==='bool'?'1':'3');
     function preview(){
       try{E.validateTemplate($('input-format').value);$('input-format-preview').textContent=`例如：${example($('input-format').value)}；标准的「数字_编码名称」仍可使用。`;}
       catch{$('input-format-preview').textContent='用一个 {n} 表示数字，前后可以加字母或符号。';}

@@ -17,6 +17,33 @@
   const GEOMETRIC_SUM=`λb n.(n (λp.(${PAIR}) ((${MULT}) b (p (${TRUE}))) ((${ADD}) (p (${FALSE})) (p (${TRUE})))) ((${PAIR}) 1 0)) (${FALSE})`;
   const BINOMIAL=`λa b n.((${SUCC}) n (λp.(λk.(${PAIR}) ((${SUCC}) k) ((${ADD}) (p (${FALSE})) ((${MULT}) ((${CHOOSE}) n k) ((${MULT}) ((${POW}) a ((${SUB}) n k)) ((${POW}) b k))))) (p (${TRUE}))) ((${PAIR}) 0 0)) (${FALSE})`;
   const POLYNOMIAL=`λx.(${ADD}) ((${MULT}) ((${ADD}) ((${MULT}) 2 x) 3) x) 1`;
+  const POWER='λb e f x.e b f x';
+  const TETRATION=`λb h.h ((${POWER}) b) 1`;
+  const PENTATION=`λb h.h ((${TETRATION}) b) 1`;
+  // The Scott list supplies one unit of fuel per successor. The continuation
+  // can return as soon as fuel runs out, even if the Church output is huge.
+  const AT_MOST=`λm n.m (λlater fuel.fuel (λrest.later rest) (${FALSE})) (λfuel.(${TRUE}))
+    (n (λrest next done.next rest) (λnext done.done))`;
+  const FLOOR_INVERSE=`λop target start.
+    ((${Y}) (λsearch candidate previous.
+      (λvalue.(${AT_MOST}) value target
+        ((${AT_MOST}) target value candidate (search ((${SUCC}) candidate) candidate))
+        previous)
+      (op candidate))) start 0`;
+  const QUOTIENT=`λn divisor.(${ZERO}) divisor (λk.k (λa b c.a) 0)
+    ((${FLOOR_INVERSE}) ((${MULT}) divisor) n 0)`;
+  const PAIR_DIVISION=`λm n.(${ZERO}) n (λk.k (λa b c.a) 0)
+    ((m (λp.p (λr q.(${AT_MOST}) n r
+      ((${PAIR}) ((${SUB}) r n) ((${SUCC}) q))
+      ((${PAIR}) r q)))
+      ((${PAIR}) m 0)) (λr q k.k (${TRUE}) r q))`;
+  const rootOf=operator=>`λn degree.(${ZERO}) degree (${I})
+    ((${FLOOR_INVERSE}) (λbase.(${operator}) base degree) n 1)`;
+  const logOf=operator=>`λbase n.(${AT_MOST}) base 1 (${I})
+    ((${ZERO}) n (${I}) ((${FLOOR_INVERSE}) ((${operator}) base) n 0))`;
+  const SQRT=rootOf(POWER);
+  const LOG=logOf(POWER), SUPER_ROOT=rootOf(TETRATION), SUPER_LOG=logOf(TETRATION);
+  const PENTA_ROOT=rootOf(PENTATION), PENTA_LOG=logOf(PENTATION);
   const DERIVATIVE=M.derivativeAt([0,3,1]),INTEGRAL=M.integralFunction([0,2]);
   const recursiveHint='使用显式 Y 不动点组合子。建议选择「正规序」「从左到右」运行，先判断终止条件；其他顺序可能无法终止。';
   const NIL='λc n.n', CONS='λh t c n.c h (t c n)';
@@ -27,7 +54,7 @@
   const MAP='λf l c n.l (λh r.c (f h) r) n', APPEND='λa b c n.a c (b c n)';
   const REVERSE=`λl.l (λh r a.r ((${CONS}) h a)) (${I}) (${NIL})`;
   const FILTER='λp l c n.l (λh r.p h (c h r) r) n';
-  const listExample=(name,term,expected,description,expectedLabel)=>({name,category:'丘奇列表',encoding:'church',term,expected,description,expectedLabel});
+  const listExample=(name,term,expected,description,expectedLabel)=>({name,category:'丘奇列表',encoding:term===NIL?'list':'church',term,expected,description,expectedLabel});
   const examples = [
     { name:'恒等函数 I', term:I },
     { name:'TRUE · 选择第一个', term:TRUE },
@@ -40,12 +67,12 @@
     { name:'组合子 B · 连续加一 → 5', category:'组合子', term:`(λf g x.f (g x)) (${SUCC}) (${SUCC}) 3`, expected:'5', description:'B 把两个函数串起来：先执行 g，再执行 f。把两个加一组合起来，3 变成 5。' },
     { name:'组合子 C · 交换参数 → 3', category:'组合子', term:`(λf x y.f y x) (${TRUE}) 2 3`, expected:'3', description:'C 交换函数的两个参数。TRUE 原本选择第一个，交换 2 和 3 后返回 3。' },
     { name:'组合子 W · 复制参数 → 9', category:'组合子', term:`(λf x.f x x) (${MULT}) 3`, expected:'9', description:'W 把一个参数交给函数两次。把乘法和 3 交给它，得到 3 × 3 = 9。' },
-    { name:'乘法 · 2 × 3 → 6', category:'算术与判断', term:`(${MULT}) 2 3`, expected:'6', description:'把重复 3 次的函数再重复 2 次，结果是 Church 数 6。' },
-    { name:'乘方 · 2⁴ → 16', category:'算术与判断', term:`(${POW}) 2 4`, expected:'16', description:'Church 数也能当函数使用：指数 4 作用在底数 2 上，归约得到 16。' },
-    { name:'前驱 · 3 − 1 → 2', category:'算术与判断', term:`(${PRED}) 3`, expected:'2', description:'前驱函数去掉一次函数作用；0 的前驱仍然是 0。' },
-    { name:'减法 · 5 − 2 → 3', category:'算术与判断', term:`(${SUB}) 5 2`, expected:'3', description:'对 5 连续取两次前驱，得到 3。这是自然数减法，小于 0 时停在 0。' },
-    { name:'零判断 · 0 = 0 → TRUE', category:'算术与判断', term:`(${ZERO}) 0`, expected:TRUE, description:'把数字变成布尔选择器：输入 0 返回 TRUE，其他自然数返回 FALSE。' },
-    { name:'比较 · 2 ≤ 3 → TRUE', category:'算术与判断', term:`(λm n.(${ZERO}) ((${SUB}) m n)) 2 3`, expected:TRUE, description:'自然数减法 2 − 3 截断为 0，因此零判断为真，表示 2 ≤ 3。' },
+    { name:'乘法 · 2 × 3 → 6', category:'基础数学', term:`(${MULT}) 2 3`, expected:'6', description:'把重复 3 次的函数再重复 2 次，结果是 Church 数 6。' },
+    { name:'乘方 · 2⁴ → 16', category:'基础数学', term:`(${POW}) 2 4`, expected:'16', parameters:['底数 2','指数 4'], description:'Church 数也能当函数使用：指数 4 作用在底数 2 上，归约得到 16。' },
+    { name:'前驱 · 3 − 1 → 2', category:'基础数学', term:`(${PRED}) 3`, expected:'2', description:'前驱函数去掉一次函数作用；0 的前驱仍然是 0。' },
+    { name:'减法 · 5 − 2 → 3', category:'基础数学', term:`(${SUB}) 5 2`, expected:'3', description:'对 5 连续取两次前驱，得到 3。这是自然数减法，小于 0 时停在 0。' },
+    { name:'零判断 · 0 = 0 → TRUE', category:'基础数学', term:`(${ZERO}) 0`, expected:TRUE, description:'把数字变成布尔选择器：输入 0 返回 TRUE，其他自然数返回 FALSE。' },
+    { name:'比较 · 2 ≤ 3 → TRUE', category:'基础数学', term:`(λm n.(${ZERO}) ((${SUB}) m n)) 2 3`, expected:TRUE, description:'自然数减法 2 − 3 截断为 0，因此零判断为真，表示 2 ≤ 3。' },
     { name:'有序对 · 读取 (3, 5) 的第二项 → 5', category:'数据结构', term:`(${PAIR}) 3 5 (${FALSE})`, expected:'5', description:'有序对也是函数：保存两个值，再用 TRUE 或 FALSE 选择第一项或第二项。这里取出 5。' },
     { name:'阶乘 · 迭代计算 3! → 6', category:'阶乘与递归', term:`(${FACTORIAL}) 3`, expected:'6', description:'用 Church 数重复更新「当前数字、累计乘积」有序对，计算 1 × 2 × 3 = 6；不需要递归。' },
     { name:'阶乘 · Y 递归计算 3! → 6', category:'阶乘与递归', term:`(${RECURSIVE_FACTORIAL}) 3`, expected:'6', description:`递归规则：0! = 1，n! = n × (n − 1)!。${recursiveHint}` },
@@ -63,7 +90,7 @@
     { name:'定积分 · ∫₀³ 2x dx → 9', category:'高等数学', term:`(${INTEGRAL}) 0 3`, expected:'9', expectedType:'rational', description:'输入的是原多项式 2x（降序系数 [2,0]）。Lambda程序先按次数生成原函数系数，再分别代入上下限并相减，得到 9；没有预先把 x² 当成输入。系数限非负有理数，端点限自然数 a≤b。' },
     { name:'生成导函数 · x² + 3x → 2x + 3', category:'高等数学', term:M.differentiate([0,3,1]), expected:'2x + 3', expectedType:'polynomial', description:'原式：x² + 3x。输入列表按次数降序存储 [1,3,0]，每项是有理数。Lambda程序按次数乘系数、去掉原常数项，实际生成新多项式；运行后结果区显示导函数 2x + 3。' },
     { name:'生成原函数 · 2x → x²（C=0）', category:'高等数学', term:M.integrate([0,2]), expected:'x²', expectedType:'polynomial', description:'原式：2x。输入列表只含原系数 [2,0]；Lambda程序按次数+1除系数，并追加积分常数0，实际生成原函数。这里取 C=0；同一算法输入 x 会生成 1/2x²，不是预置答案。' },
-    { name:'列表小数加法 · 0.1 + 0.2 → 0.3', category:'列表小数四则', encoding:'decimal',term:D.expression('ADD',["0.1","0.2"]),decimalOperation:'ADD',operands:["0.1","0.2"],expected:'0.3',expectedType:'decimal',description:'默认数值编码：符号、十进制数字列表、小数位置。逐位对齐、进位得到精确0.3，不使用浮点数预算答案；可用快速运行保留全部步骤。' },
+    { name:'列表小数加法 · 0.1 + 0.2 → 0.3', category:'列表小数四则', encoding:'decimal',term:D.expression('ADD',["0.1","0.2"]),decimalOperation:'ADD',operands:["0.1","0.2"],expected:'0.3',expectedType:'decimal',description:'组合子 B 把「取较大的小数位数」和「补零对齐」接起来。例如 1.2 和 0.03 对齐为 1.20 和 0.03。对齐后同号逐位加，异号用大绝对值减小绝对值。结果保留全部有效位数。' },
     { name:'列表小数减法 · 1 − 2 → −1', category:'列表小数四则', encoding:'decimal',term:D.expression('SUB',["1","2"]),decimalOperation:'SUB',operands:["1","2"],expected:'-1',expectedType:'decimal',description:'默认整数也采用列表编码。先比较绝对值，再逐位借位并确定符号，结果为负数−1。' },
     { name:'列表小数乘法 · 0.2 × 0.3 → 0.06', category:'列表小数四则', encoding:'decimal',term:D.expression('MUL',["0.2","0.3"]),decimalOperation:'MUL',operands:["0.2","0.3"],expected:'0.06',expectedType:'decimal',description:'逐位竖式相乘，小数位数相加，结果为精确0.06。' },
     { name:'列表小数除法 · 1 ÷ 8 → 0.125', category:'列表小数四则', encoding:'decimal',term:D.expression('DIV',["1","8"]),decimalOperation:'DIV',operands:["1","8"],expected:'0.125',expectedType:'decimal',description:'用十进制长除法生成小数数字。精度至少3位时结果精确为0.125；精度不足会标≈。选择快速运行可保留全部归约步骤。' }
@@ -83,6 +110,49 @@
     listExample('丘奇列表 · 折叠求和 → 6',`(${list123}) (${ADD}) 0`,'6','Church 列表本身就是右折叠：l c n。将 c 换成加法、n 设为0，计算1 + (2 + (3 + 0))。'),
     listExample('丘奇列表 · 折叠乘积 → 6',`(${list123}) (${MULT}) 1`,'6','将组合函数换成乘法、初值设为1，计算1 × (2 × (3 × 1))；空表乘积为1。'),
     listExample('丘奇列表 · 过滤 FILTER 去零 → [2, 3]',`(${FILTER}) (λh.(${ZERO}) h (${FALSE}) (${TRUE})) (${churchList([0,2,0,3])})`,churchList([2,3]),'FILTER 接收布尔谓词和列表，只保留谓词返回 TRUE 的元素；此处筛掉0，保持剩余元素顺序。','丘奇列表 [2, 3]')
+  );
+  const integerExample=(name,formula,args,expected,description,labels)=>({
+    name,category:'高等数学',encoding:'church',term:`(${formula}) ${args}`,expected,description,
+    parameters:args.split(' ').map((value,index)=>`${labels[index]} ${value}`)
+  });
+  examples.push(
+    integerExample('超幂 · 2 ↑↑ 3 → 16',TETRATION,'2 3','16','从 1 开始，重复 3 次「用 2 作底数乘方」，得到 2^(2^2) = 16。',['底数','幂塔高度']),
+    integerExample('超超幂 · 2 ↑↑↑ 2 → 4',PENTATION,'2 2','4','从 1 开始，重复 2 次「用 2 作底数做超幂」。',['底数','重复次数']),
+    integerExample('开根号 · √10 向下取整 → 3',SQRT,'10 2','3','找最大的自然数，使它的平方不超过 10。要开立方根，把末尾的 2 改成 3。根指数为 0 时返回 I。',['根号内的数','根指数']),
+    integerExample('整数除法 · 7 ÷ 2 → 3',QUOTIENT,'7 2','3','找最大的自然数商，使商乘以除数不超过被除数。除数必须大于 0。小数商可用「列表小数四则」里的除法。',['被除数','除数']),
+    integerExample('对数 · log₂ 9 向下取整 → 3',LOG,'2 9','3','固定底数，找最大的自然数指数，使幂值不超过输入。底数小于 2 或输入为 0 时返回 I。',['对数底数','真数（要求对数的数）']),
+    integerExample('超对数 · 2 ↑↑ h = 16 → h = 3',SUPER_LOG,'2 16','3','固定底数，找最大的自然数高度 h，使 2 ↑↑ h 不超过输入。底数小于 2 或输入为 0 时返回 I。',['底数','目标值']),
+    integerExample('超根号 · b ↑↑ 2 = 4 → b = 2',SUPER_ROOT,'4 2','2','固定高度，找最大的正整数底数 b，使 b ↑↑ 2 不超过输入。高度为 0 时返回 I。',['目标值','幂塔高度']),
+    integerExample('超超根号 · b ↑↑↑ 2 = 4 → b = 2',PENTA_ROOT,'4 2','2','固定重复次数，找最大的正整数底数 b，使 b ↑↑↑ 2 不超过输入。次数为 0 时返回 I。',['目标值','重复次数']),
+    integerExample('超超对数 · 2 ↑↑↑ h = 4 → h = 2',PENTA_LOG,'2 4','2','固定底数，找最大的自然数次数 h，使 2 ↑↑↑ h 不超过输入。底数小于 2 或输入为 0 时返回 I。',['底数','目标值'])
+  );
+  examples.push({
+    name:'序对除法 · 7 ÷ 2 → 商 3，余数 1', category:'基础数学', encoding:'church',
+    term:`(${PAIR_DIVISION}) 7 2`, expected:`λk.k (${TRUE}) 1 3`,expectedLabel:'余数 1，商 3',parameters:['被除数 7','除数 2'],
+    description:'序对按（剩余量，商）排列。从 (7, 0) 开始，每次减去除数 2，商加 1，依次得到 (5, 1)、(3, 2)、(1, 3)。余量小于除数后，迭代原样返回序对。输出附上 TRUE 标记，供结果区识别。最后两个参数可以编辑，除数为 0 时返回除零错误。'
+  });
+  const advancedDecimal=(name,operation,operands,expected,description,operandEncodings)=>({
+    name,category:'高等小数',encoding:'decimal',decimalOperation:operation,operands,operandEncodings,
+    term:D.expression(operation,operands.map((value,index)=>operandEncodings?.[index]==='church'?`${value}_church`:value)),
+    expected,expectedType:'decimal',description
+  });
+  const angleNote='角度用弧度，可输入 −1000 到 1000。先按周期缩小角度，再用泰勒多项式近似。可点「快速求值」。';
+  const hyperbolicNote='输入范围 −1 到 1。泰勒多项式给出约三位小数，可点「快速求值」。';
+  examples.push(
+    advancedDecimal('取负 · −(1.25)','NEG',['1.25'],'-1.25','把符号位翻转，数字列表保持原值，零仍为零。'),
+    advancedDecimal('绝对值 · |−2.75|','ABS',['-2.75'],'2.75','清除负号，保留整数和小数数位。'),
+    advancedDecimal('幂函数 · (−0.5)³','POW',['-0.5','3'],'-0.125','底数用列表小数，指数用丘奇自然数。指数决定小数乘法的次数。',['decimal','church']),
+    advancedDecimal('小数二进制左移一位 · −1.25 → −2.5','SHL',['-1.25'],'-2.5','点击「运行」显示结果。只接收一个小数，数字列表加上自身，值翻倍且保留负号。要移三位，可在整个示例表达式前加 3_church。'),
+    advancedDecimal('小数二进制右移一位 · 1.25 → 0.625','SHR',['1.25'],'0.625','点击「运行」显示结果。只接收一个小数，数位列表乘以 5，小数位数加 1，等于精确除以 2。要移三位，可在整个示例表达式前加 3_church。'),
+    advancedDecimal('带符号除法 · −7.5 ÷ 2','DIV',['-7.5','2'],'-3.75','用列表长除法求商，再根据两个输入的符号确定结果正负。'),
+    advancedDecimal('倒数 · 1 ÷ 0.4','DIV',['1','0.4'],'2.5','把 1 除以第二个参数，可编辑第二个参数求其他数的倒数。'),
+    advancedDecimal('开根号 · √2','SQRT',['2'],'≈ 1.414','反复取当前估计与「输入除以当前估计」的平均值，得到非负实数平方根的近似值。可点「快速求值」。'),
+    advancedDecimal('正弦 · sin(0.5)','SIN',['0.5'],'≈ 0.479',angleNote),
+    advancedDecimal('余弦 · cos(0.5)','COS',['0.5'],'≈ 0.877',angleNote),
+    advancedDecimal('正切 · tan(0.5)','TAN',['0.5'],'≈ 0.546',angleNote),
+    advancedDecimal('双曲正弦 · sinh(−0.5)','SINH',['-0.5'],'≈ -0.521',hyperbolicNote),
+    advancedDecimal('双曲余弦 · cosh(0.5)','COSH',['0.5'],'≈ 1.127',hyperbolicNote),
+    advancedDecimal('双曲正切 · tanh(0.5)','TANH',['0.5'],'≈ 0.462',hyperbolicNote)
   );
   const levels = [
     { id:1, name:'原样返回', topic:'恒等函数', description:'让恒等函数接收一个函数，看看它如何把输入原样返回。', start:'(λx.x) (λy.y)', target:I, targetLabel:'I · 恒等函数', hint:'λx.x 会把参数直接返回。点击「单步」，观察 x 被整个参数替换。' },
@@ -117,9 +187,14 @@
     { id:30, name:'最后一关：曲线下面积', topic:'定积分', description:'从原多项式 2x 出发，先生成原函数，再计算从 0 到 3 的定积分。', start:M.definite([0,2],0,3), target:'9', targetType:'rational', targetLabel:'有理数 9', hint:'先按次数生成原函数系数，分别代入上下限，再相减。检查这三个步骤的顺序；所有转换都经过 β 归约。' }
   ];
   const stages=['入门五关','函数与绑定','逻辑与数据','自然数进阶','列表小数','高等数学'].map((name,index)=>({id:index+1,name,levelIds:levels.slice(index*5,index*5+5).map(l=>l.id)}));
-  function sourceFor(item,precision=item.decimalPlaces??6){return item.decimalOperation?D.expression(item.decimalOperation,item.operands,precision):item.term??item.start;}
-  function inputSourceFor(item,precision=item.decimalPlaces??6){return item.decimalOperation?D.expression(item.decimalOperation,item.operands.map(value=>`${value}_decimal`),precision):sourceFor(item,precision);}
-  const API={ examples, levels, stages, sourceFor, inputSourceFor, I, TRUE, FALSE, churchLists:{encode:churchList,nil:NIL,cons:CONS,head:HEAD,tail:TAIL,isEmpty:EMPTY,length:LENGTH,map:MAP,append:APPEND,reverse:REVERSE,filter:FILTER}, advanced:{factorial:FACTORIAL,recursiveFactorial:RECURSIVE_FACTORIAL,choose:CHOOSE,permutations:PERMUTATIONS,sumPowers,geometricSum:GEOMETRIC_SUM,binomial:BINOMIAL,polynomial:POLYNOMIAL,derivative:DERIVATIVE,integral:INTEGRAL} };
+  function sourceFor(item,precision=item.decimalPlaces??6){return item.decimalOperation?D.expression(item.decimalOperation,item.operands.map((value,index)=>item.operandEncodings?.[index]==='church'?`${value}_church`:value),precision):item.term??item.start;}
+  function inputSourceFor(item,precision=item.decimalPlaces??6){return item.decimalOperation?D.expression(item.decimalOperation,item.operands.map((value,index)=>`${value}_${item.operandEncodings?.[index]??'decimal'}`),precision):sourceFor(item,precision);}
+  function parametersFor(item){
+    if(item.parameters)return item.parameters;
+    const labels={ADD:['第一个加数','第二个加数'],DIV:['被除数','除数'],POW:['底数','指数'],SQRT:['根号内的数'],SHL:['原小数'],SHR:['原小数']}[item.decimalOperation];
+    return labels?.map((label,index)=>`${label} ${item.operands[index]}_${item.operandEncodings?.[index]??'decimal'}`)??[];
+  }
+  const API={ examples, levels, stages, sourceFor, inputSourceFor, parametersFor, I, TRUE, FALSE, churchLists:{encode:churchList,nil:NIL,cons:CONS,head:HEAD,tail:TAIL,isEmpty:EMPTY,length:LENGTH,map:MAP,append:APPEND,reverse:REVERSE,filter:FILTER}, advanced:{factorial:FACTORIAL,recursiveFactorial:RECURSIVE_FACTORIAL,choose:CHOOSE,permutations:PERMUTATIONS,sumPowers,geometricSum:GEOMETRIC_SUM,binomial:BINOMIAL,polynomial:POLYNOMIAL,derivative:DERIVATIVE,integral:INTEGRAL} };
   root.LambdaPresets=API;
   if(typeof module !== 'undefined' && module.exports) module.exports=API;
 })(typeof globalThis !== 'undefined' ? globalThis : window);

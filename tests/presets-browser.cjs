@@ -11,8 +11,8 @@ const P=require('../src/presets.js');process.env.PORT='0';const server=require('
    const select=async(fragment)=>{const i=P.examples.findIndex(e=>e.name.includes(fragment));assert.ok(i>=0,fragment);await page.locator('#examples').selectOption(String(i));return P.examples[i];};
    const run=async(number)=>{await page.locator('#speed-ms').fill('1');await page.locator('#run').click();await page.waitForFunction(()=>document.getElementById('state-badge').textContent==='已到正规形',null,{timeout:180000});assert.equal(await page.locator('#decoded').textContent(),`Church 数 ${number}`);};
    await check(`${width}px grouped choices all render complete diagrams and descriptions`,async()=>{
-    assert.equal(await page.locator('#examples option').count(),P.examples.length+1);assert.equal(await page.locator('#examples optgroup').count(),8);
-    assert.equal(await page.locator('#examples optgroup[label="高等数学"] option').count(),13);
+    assert.equal(await page.locator('#examples option').count(),P.examples.length+1);assert.equal(await page.locator('#examples optgroup').count(),9);
+    assert.equal(await page.locator('#examples optgroup[label="高等数学"] option').count(),22);
     for(const e of P.examples.filter(e=>e.expected!==undefined)){await select(e.name);assert.equal(await page.locator('#expression').inputValue(),P.inputSourceFor(e));assert.ok(await page.locator('#diagram-mount line').count()>0);assert.ok(await page.locator('#error-message').isHidden());assert.ok((await page.locator('#example-info').textContent()).includes(e.description));}
     assert.equal(await page.locator('#function-count').textContent(),'0 个函数');
    });
@@ -20,6 +20,69 @@ const P=require('../src/presets.js');process.env.PORT='0';const server=require('
     await page.locator('#reduction-order').selectOption('applicative');await page.locator('#reduction-direction').selectOption('right');await select('Y 递归');
     assert.equal(await page.locator('#reduction-order').inputValue(),'applicative');assert.equal(await page.locator('#reduction-direction').inputValue(),'right');assert.match(await page.locator('#example-info').textContent(),/正规序.*从左到右/);
     await page.locator('#reduction-order').selectOption('normal');await page.locator('#reduction-direction').selectOption('left');
+   });
+   await check(`${width}px example help identifies the arguments in editor order`,async()=>{
+    for(const [name,tail,guide] of [
+      ['整数除法','7 2','被除数 7、除数 2'],
+      ['乘方 ·','2 4','底数 2、指数 4'],
+      ['对数 · log','2 9','对数底数 2、真数（要求对数的数） 9'],
+      ['√10','10 2','根号内的数 10、根指数 2'],
+      ['幂函数','(-0.5_decimal) (3_church)','底数 -0.5_decimal、指数 3_church'],
+      ['√2','(2_decimal)','根号内的数 2_decimal']
+    ]){
+      await select(name);
+      assert.ok((await page.locator('#expression').inputValue()).endsWith(tail),name);
+      assert.ok((await page.locator('#example-info strong').textContent()).includes(guide),name);
+    }
+   });
+   await check(`${width}px basic pair division displays remainder and quotient`,async()=>{
+    const group=page.locator('#examples optgroup[label="基础数学"]');
+    assert.equal(await group.getByRole('option',{name:/序对除法/}).count(),1);
+    await select('序对除法');
+    await page.locator('#fast-run').click();
+    await page.waitForFunction(()=>document.getElementById('decoded').textContent==='余数 1，商 3');
+   });
+   await check(`${width}px advanced decimals evaluate the edited input from the normal menu`,async()=>{
+    const example=await select('正弦 · sin');
+    assert.equal(example.category,'高等小数');
+    await page.locator('#decimal-value').click();
+    await page.waitForFunction(()=>document.getElementById('decimal-value-result').textContent==='小数 ≈ 0.479');
+    await page.locator('#expression').fill(P.inputSourceFor(example).replace('0.5_decimal','-0.5_decimal'));
+    await page.locator('#convert').click();
+    await page.locator('#decimal-value').click();
+    await page.waitForFunction(()=>document.getElementById('decimal-value-result').textContent==='小数 ≈ -0.479');
+    assert.equal(await page.locator('#step-count').textContent(),'0');
+   });
+   await check(`${width}px single-bit decimal shifts can be repeated with Church numerals`,async()=>{
+    for(const [name,single,repeated] of [
+      ['小数二进制左移一位','-2.5','-10'],
+      ['小数二进制右移一位','0.625','0.15625']
+    ]){
+      const example=await select(name);
+      assert.equal(example.operands.length,1);
+      assert.match(await page.locator('#run').getAttribute('title'),/直接计算移位结果/);
+      await page.locator('#run').click();
+      await page.waitForFunction(value=>document.getElementById('decimal-value-result').textContent===`小数 ${value}`,single);
+      await page.locator('#expression').fill('3_church '+P.inputSourceFor(example));
+      await page.locator('#convert').click();
+      await page.locator('#run').click();
+      await page.waitForFunction(value=>document.getElementById('decimal-value-result').textContent===`小数 ${value}`,repeated);
+      assert.equal(await page.locator('#step-count').textContent(),'0');
+    }
+    await page.locator('#number-encoding').selectOption('int');
+    await page.locator('#expression').fill('-12');
+    await page.locator('#convert').click();
+    assert.equal(await page.locator('#decoded').textContent(),'丘奇整数 -12');
+   });
+   await check(`${width}px Church lists and Booleans are selectable and readable`,async()=>{
+    await page.locator('#number-encoding').selectOption('list');
+    await page.locator('#expression').fill('120');
+    await page.locator('#convert').click();
+    assert.equal(await page.locator('#decoded').textContent(),'丘奇列表 [1, 2, 0]');
+    await page.locator('#number-encoding').selectOption('bool');
+    await page.locator('#expression').fill('1');
+    await page.locator('#convert').click();
+    assert.equal(await page.locator('#decoded').textContent(),'丘奇布尔 TRUE（1）');
    });
    await check(`${width}px iterative 3! runs to 6, saves and restores`,async()=>{
     await select('迭代计算');await run(6);await page.locator('#save-state').click();const steps=await page.locator('#step-count').textContent();await page.reload();assert.equal(await page.locator('#decoded').textContent(),'Church 数 6');assert.equal(await page.locator('#step-count').textContent(),steps);assert.ok(await page.locator('#example-info').isHidden());

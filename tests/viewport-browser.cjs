@@ -34,7 +34,7 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
       assert.ok(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));fs.mkdirSync(path.join(__dirname,'artifacts'),{recursive:true});await p.screenshot({path:path.join(__dirname,'artifacts','viewport-mobile.png'),fullPage:true});await mobileContext.close();
     });
     await check('offline build has working zoom navigation',async()=>{const p=await context.newPage();p.on('pageerror',e=>errors.push(e.message));await p.goto(pathToFileURL(path.resolve(__dirname,'../dist/lambda-lab.html')).href);await p.locator('#actual-size').click();await p.locator('#zoom-in').click();assert.equal(await p.locator('#zoom-label').textContent(),'125%');await p.close();});
-    await check('animated zoom accumulates clicks and reduction fades at the configured pace',async()=>{
+    await check('animated zoom accumulates clicks and a step animates individual wires',async()=>{
       await page.emulateMedia({reducedMotion:'no-preference'});await source('(λx.x) 20');
       await page.locator('#actual-size').click();
       await page.waitForFunction(()=>document.querySelector('#zoom-label').textContent==='100%');
@@ -48,8 +48,67 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
       const end=Number(await page.locator('#diagram-mount svg').getAttribute('width'));
       assert.ok(widths[0]<widths[1]&&widths[1]<end);
       const after=await world();assert.ok(Math.abs(before.x-after.x)<2&&Math.abs(before.y-after.y)<2);
-      const duration=await page.evaluate(()=>{document.querySelector('#step').click();return document.querySelector('#diagram-mount svg').getAnimations()[0]?.effect.getTiming().duration;});
-      assert.equal(duration,180);assert.equal(await page.locator('#step-count').textContent(),'1');
+      const animating=await page.evaluate(()=>{document.querySelector('#step').click();return !!document.querySelector('.diagram-wire-motion canvas');});
+      assert.equal(animating,true);assert.equal(await page.locator('#step-count').textContent(),'1');
+      await page.locator('.diagram-wire-motion').waitFor({state:'detached'});
+    });
+    await check('undo reverses line motion for duplicated, moved and discarded arguments',async()=>{
+      for(const expression of ['(λx.x x) (λy.y)','(λx.x) (λy.y)','(λx.z) (λy.y)']){
+        await source(expression);
+        const original=await page.locator('#current-expression').textContent();
+        const wireCount=await page.locator('#diagram-mount line').count();
+        await page.locator('#step').click();
+        await page.locator('.diagram-wire-motion').waitFor({state:'detached'});
+        const animated=await page.evaluate(()=>{
+          document.querySelector('#back').click();
+          return !!document.querySelector('.diagram-wire-motion canvas');
+        });
+        assert.equal(animated,true);
+        assert.equal(await page.locator('#current-expression').textContent(),original);
+        assert.equal(await page.locator('#step-count').textContent(),'0');
+        assert.equal(await page.locator('#diagram-mount line').count(),wireCount);
+        await page.locator('.diagram-wire-motion').waitFor({state:'detached'});
+        assert.equal(await page.locator('#diagram-mount svg').evaluate(svg=>getComputedStyle(svg).opacity),'1');
+      }
+      await source('(λx.x x) (λy.y)');
+      assert.equal(await page.evaluate(async()=>{
+        document.querySelector('#step').click();
+        await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+        document.querySelector('#back').click();
+        return document.querySelectorAll('.diagram-wire-motion canvas').length;
+      }),1);
+      await page.locator('.diagram-wire-motion').waitFor({state:'detached'});
+      assert.equal(await page.locator('#step-count').textContent(),'0');
+    });
+    await check('normal, extreme and fast runs animate and preserve every step',async()=>{
+      for(const [button,speed] of [['run','600'],['run','10'],['fast-run','10']]){
+        await source('(λx.x) ((λy.y) ((λz.z) a))');
+        await page.locator('#speed-ms').fill(speed);
+        const seen=await page.evaluate(id=>new Promise((resolve,reject)=>{
+          const viewport=document.querySelector('#diagram-viewport');
+          const timer=setTimeout(()=>{observer.disconnect();reject(Error('No outgoing frame'));},1500);
+          const observer=new MutationObserver(()=>{
+            const old=viewport.querySelector('.diagram-wire-motion,.diagram-previous');
+            if(!old)return;
+            clearTimeout(timer);observer.disconnect();
+            resolve({canvas:!!old.querySelector('canvas'),hit:old.querySelector('[data-redex-hit]')!==null,
+              outgoing:old.getAnimations().length});
+          });
+          observer.observe(viewport,{childList:true});
+          document.getElementById(id).click();
+        }),button);
+        assert.equal(seen.hit,false);
+        if(speed==='600')assert.equal(seen.canvas,true);else assert.equal(seen.canvas||seen.outgoing===1,true);
+        await page.waitForFunction(()=>document.querySelector('#step-count').textContent==='3');
+        assert.equal(await page.locator('#current-expression').textContent(),'a');
+        assert.equal(await page.locator('#history-list li').count(),4);
+        await page.locator('.diagram-wire-motion,.diagram-previous').waitFor({state:'detached'});
+      }
+      await page.emulateMedia({reducedMotion:'reduce'});
+      await source('(λx.x) a');
+      await page.locator('#fast-run').click();
+      await page.waitForFunction(()=>document.querySelector('#step-count').textContent==='1');
+      assert.equal(await page.locator('.diagram-wire-motion,.diagram-previous').count(),0);
     });
     await check('viewport navigation has no script errors',async()=>assert.deepEqual(errors,[]));
     console.log(`Viewport browser checks: ${count} passed, 0 failed.`);

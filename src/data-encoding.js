@@ -1,9 +1,13 @@
 (function(root){
   'use strict';
   const C=root.LambdaCore||require('./core.js');
-  const builtins=new Map([['church','church'],['丘奇数','church'],['decimal','decimal'],['列表小数','decimal']]);
+  const builtinLabels={church:'丘奇数',decimal:'列表小数',list:'丘奇列表',bool:'丘奇布尔',int:'丘奇整数'};
+  const builtinKeys=Object.keys(builtinLabels);
+  const isBuiltin=name=>builtinKeys.includes(name);
+  const builtins=new Map(Object.entries(builtinLabels).flatMap(([key,label])=>[[key,key],[label,key]]));
   const literalCache=new WeakMap();
-  const validName=name=>typeof name==='string'&&/^[\p{L}][\p{L}\p{N}_']*$/u.test(name)&&!builtins.has(name);
+  const validStoredName=name=>typeof name==='string'&&/^[\p{L}][\p{L}\p{N}_']*$/u.test(name)&&!['church','丘奇数','decimal','列表小数'].includes(name);
+  const validName=name=>validStoredName(name)&&!builtins.has(name);
   function validateTemplate(template){
     if(typeof template!=='string'||template.split('{n}').length!==2)throw new C.LambdaError('输入形式需要且只能包含一个 {n}，例如 C{n}、{n}c 或 [{n}]。');
     const [prefix,suffix]=template.split('{n}');
@@ -12,13 +16,16 @@
     return {prefix,suffix};
   }
   function formatSpecs(entries,numberFormats={}){
-    if(!numberFormats||typeof numberFormats!=='object'||Array.isArray(numberFormats)||Object.keys(numberFormats).some(key=>!['church','decimal'].includes(key)))throw new C.LambdaError('内置数字输入形式不合法。');
-    const specs=[{encoding:'church',key:'church',canonical:'{n}_church',template:numberFormats.church??'{n}_church'},{encoding:'decimal',key:'decimal',canonical:'{n}_decimal',template:numberFormats.decimal??'{n}_decimal'},...entries.map(entry=>({encoding:entry.name,key:`custom:${entry.name}`,canonical:`{n}_${entry.name}`,template:entry.inputFormat??`{n}_${entry.name}`}))];
-    const reserved=new Map([['{n}_church','church'],['{n}_丘奇数','church'],['{n}_decimal','decimal'],['{n}_列表小数','decimal'],...entries.map(entry=>[`{n}_${entry.name}`,entry.name])]),seen=new Map();
+    if(!numberFormats||typeof numberFormats!=='object'||Array.isArray(numberFormats)||Object.keys(numberFormats).some(key=>!isBuiltin(key)))throw new C.LambdaError('内置数字输入形式不合法。');
+    const specs=[...builtinKeys.map(key=>({encoding:key,key,canonical:`{n}_${key}`,template:numberFormats[key]??`{n}_${key}`})),...entries.map(entry=>({encoding:entry.name,key:`custom:${entry.name}`,canonical:`{n}_${entry.name}`,template:entry.inputFormat??`{n}_${entry.name}`}))];
+    const reserved=new Map([...Array.from(builtins,([name,key])=>[`{n}_${name}`,key]),...entries.map(entry=>[`{n}_${entry.name}`,`custom:${entry.name}`])]),seen=new Set();
     for(const spec of specs){
       validateTemplate(spec.template);
-      if(reserved.has(spec.template)&&reserved.get(spec.template)!==spec.encoding)throw new C.LambdaError('这个写法属于另一种编码的标准后缀，请换一个输入形式。');
-      if(seen.has(spec.template))throw new C.LambdaError('这个输入形式已被另一种编码使用。');seen.set(spec.template,spec.encoding);
+      // These new default spellings must not invalidate older custom formats.
+      if(['list','bool','int'].includes(spec.key)&&spec.template===spec.canonical)continue;
+      const owner=reserved.get(spec.template);
+      if(owner&&owner!==spec.key&&!['list','bool','int'].includes(owner))throw new C.LambdaError('这个写法属于另一种编码的标准后缀，请换一个输入形式。');
+      if(seen.has(spec.template))throw new C.LambdaError('这个输入形式已被另一种编码使用。');seen.add(spec.template);
     }
     return specs;
   }
@@ -44,7 +51,7 @@
     if(!Array.isArray(entries))throw new C.LambdaError('自定义数据编码列表不合法。');
     const names=new Set();
     for(const entry of entries){
-      if(!entry||!validName(entry.name)||names.has(entry.name))throw new C.LambdaError('编码名称重复或不合法；请以字母或汉字开头，内置编码名称不能占用。');
+      if(!entry||!validStoredName(entry.name)||names.has(entry.name))throw new C.LambdaError('编码名称重复或不合法；请以字母或汉字开头，内置编码名称不能占用。');
       if(typeof entry.source!=='string'||!entry.term)throw new C.LambdaError('数据转换函数缺失。');
       C.inspect(entry.term);if(C.freeVars(entry.term).size)throw new C.LambdaError('数据转换函数不能含未定义的自由变量。');
       if(entry.table!==undefined&&!Array.isArray(entry.table))throw new C.LambdaError('数字表达式对照表不合法。');
@@ -60,7 +67,7 @@
   }
   function define(entries,name,source,expand=term=>term,editing=null,numberFormats={}){
     validate(entries);name=name.trim();
-    if(!validName(name))throw new C.LambdaError('编码名称需以字母或汉字开头，可含数字、下划线和单引号；不能使用内置编码名称。');
+    if(name===editing?!validStoredName(name):!validName(name))throw new C.LambdaError('编码名称需以字母或汉字开头，可含数字、下划线和单引号；不能使用内置编码名称。');
     if(editing!==null&&!entries.some(entry=>entry.name===editing))throw new C.LambdaError('要编辑的数据编码已不存在。');
     if(entries.some(entry=>entry.name===name&&entry.name!==editing))throw new C.LambdaError(`编码「${name}」已存在，请选择它进行编辑。`);
     // Converter definitions always receive Church numbers; they do not recursively encode themselves.
@@ -71,21 +78,38 @@
   }
   function parse(source,entries=[],maxChars=Infinity,defaultEncoding='church',numberFormats={}){
     validate(entries);const registry=new Map(entries.map(entry=>[entry.name,entry.term])),encodings=new Set(),literals=[];
-    const selected=defaultEncoding.startsWith('custom:')?defaultEncoding.slice(7):builtins.get(defaultEncoding)||defaultEncoding;
-    const term=C.parse(source,maxChars,(value,suffix,position)=>{
-      const encoding=suffix===null?selected:builtins.get(suffix)||suffix;
+    const selected=defaultEncoding.startsWith('custom:')?defaultEncoding:builtins.get(defaultEncoding)||defaultEncoding;
+    const term=C.parse(source,maxChars,(value,suffix,position,listDepth)=>{
+      const encoding=suffix===null?(selected==='list'&&listDepth>0?'church':selected):registry.has(suffix)?`custom:${suffix}`:builtins.get(suffix)||suffix;
       try{
         if(encoding==='decimal'){
           const D=root.LambdaDecimal||require('./decimal.js');encodings.add('decimal');return D.encodeLiteral(value);
         }
-        if(!/^[0-9]+$/.test(value))throw new C.LambdaError('丘奇数及自定义转换的输入必须为非负整数；负数或小数请使用 _decimal。');
+        if(encoding==='int'){
+          if(!/^-?[0-9]+$/.test(value))throw new C.LambdaError('丘奇整数只接受整数；小数请使用 _decimal。');
+          const negative=value.startsWith('-')&&!/^-0+$/.test(value);
+          const magnitude=C.parse(value.replace(/^-/, ''));
+          encodings.add(encoding);
+          return C.L('k',C.A(C.A(C.A(C.V('k'),integerTag),negative?TRUE:FALSE),magnitude));
+        }
+        if(!/^[0-9]+$/.test(value))throw new C.LambdaError('这个编码需要非负整数；负整数可用 _int，负小数可用 _decimal。');
+        if(encoding==='bool'){
+          const number=BigInt(value);
+          if(number>1n)throw new C.LambdaError('丘奇布尔只接受 0（假）或 1（真）。');
+          encodings.add(encoding);return number===0n?FALSE:TRUE;
+        }
+        if(encoding==='list'){
+          encodings.add(encoding);
+          return C.churchList([...BigInt(value).toString()].map(digit=>C.parse(digit)));
+        }
         const church=C.parse(value);
         if(encoding==='church'){encodings.add('church');return church;}
-        if(!registry.has(encoding))throw new C.LambdaError(`未定义数据编码「${encoding}」。请先保存对应转换函数。`);
-        encodings.add(encoding);const definition=registry.get(encoding),term=C.A(definition,church);
-        literals.push({name:encoding,number:naturalNumber(value),definition,term});return term;
+        const name=encoding.startsWith('custom:')?encoding.slice(7):encoding;
+        if(!registry.has(name))throw new C.LambdaError(`未定义数据编码「${name}」。请先保存对应转换函数。`);
+        encodings.add(name);const definition=registry.get(name),term=C.A(definition,church);
+        literals.push({name,number:naturalNumber(value),definition,term});return term;
       }catch(error){if(error.position===null||error.position===undefined)error.position=position;throw error;}
-    },{suffixes:true,literalMatcher:literalMatcher(entries,numberFormats)});
+    },{suffixes:true,literalMatcher:literalMatcher(entries,numberFormats),onList:()=>encodings.add('list')});
     return {term,encodings:[...encodings],literals};
   }
   async function compile(source,entries=[],defaultEncoding='church',options={}){
@@ -119,7 +143,52 @@
     source=source.trim();if(/^-?[0-9]+(?:\.[0-9]+)?(?:_[\p{L}][\p{L}\p{N}_']*)?$/u.test(source))return true;
     try{const match=literalMatcher(entries,numberFormats)(source,0);return !!match&&match.length===source.length;}catch{return false;}
   }
-  const label=name=>name==='church'?'丘奇数':name==='decimal'?'列表小数':`${name}（自定义）`;
+  const TRUE=C.parse('λx y.x'),FALSE=C.parse('λx y.y'),integerTag=C.parse('λa b c d.d');
+  const label=name=>isBuiltin(name)?builtinLabels[name]:`${name}（自定义）`;
+  function readBuiltin(term,encoding){
+    if(encoding==='bool')return C.equal(term,TRUE)?'丘奇布尔 TRUE（1）':C.equal(term,FALSE)?'丘奇布尔 FALSE（0）':null;
+    if(encoding==='int'){
+      if(term.type!=='abs')return null;
+      const {body}=term;
+      if(body.type!=='app'||body.fn.type!=='app'||body.fn.fn.type!=='app')return null;
+      const {fn:head,arg:tag}=body.fn.fn;
+      if(head.type!=='var'||head.name!==term.param||!C.equal(tag,integerTag))return null;
+      const negative=C.equal(body.fn.arg,TRUE);
+      const magnitude=C.churchNumber(body.arg);
+      if(magnitude===null||(!negative&&!C.equal(body.fn.arg,FALSE)))return null;
+      return `丘奇整数 ${negative&&magnitude!==0?'-':''}${magnitude}`;
+    }
+    return encoding==='list'?readChurchList(term,true):null;
+  }
+  function listItems(term){
+    if(term.type!=='abs'||term.body.type!=='abs'||term.param===term.body.param)return null;
+    const c=term.param,n=term.body.param,items=[];let body=term.body.body;
+    while(body.type==='app'&&body.fn.type==='app'&&body.fn.fn.type==='var'&&body.fn.fn.name===c){
+      const item=body.fn.arg,free=C.freeVars(item);
+      if(free.has(c)||free.has(n))return null;
+      items.push(item);body=body.arg;
+    }
+    return body.type==='var'&&body.name===n?items:null;
+  }
+  function readChurchList(term,allowEmpty=false){
+    const items=listItems(term);
+    if(!items||(!allowEmpty&&!items.length))return null;
+    const parts=['丘奇列表 '],stack=[items];
+    while(stack.length){
+      const entry=stack.pop();
+      if(typeof entry==='string'){parts.push(entry);continue;}
+      if(Array.isArray(entry)){
+        parts.push('[');stack.push(']');
+        for(let i=entry.length-1;i>=0;i--){stack.push(entry[i]);if(i)stack.push(', ');}
+        continue;
+      }
+      const number=C.churchNumber(entry);
+      if(number!==null){parts.push(String(number));continue;}
+      const nested=listItems(entry);
+      if(nested?.length)stack.push(nested);else parts.push(C.format(entry));
+    }
+    return parts.join('');
+  }
   function naturalNumber(value){
     if(typeof value!=='string'||!(/^[0-9]+$/.test(value.trim())))throw new C.LambdaError('对照表数字需要是非负整数。');
     return BigInt(value.trim()).toString();
@@ -144,6 +213,6 @@
     const result=entries.map(entry=>{if(entry.name!==name)return entry;const changed={...entry};if(template===`{n}_${name}`)delete changed.inputFormat;else changed.inputFormat=template;return changed;});
     validate(result);formatSpecs(result,numberFormats);return result;
   }
-  const API={validName,validate,define,parse,compile,isLiteral,label,naturalNumber,putMapping,removeMapping,lookup,validateTemplate,validateFormats:formatSpecs,inputFormatFor,withInputFormat};root.LambdaDataEncoding=API;
+  const API={isBuiltin,readBuiltin,readChurchList,validName,validate,define,parse,compile,isLiteral,label,naturalNumber,putMapping,removeMapping,lookup,validateTemplate,validateFormats:formatSpecs,inputFormatFor,withInputFormat};root.LambdaDataEncoding=API;
   if(typeof module!=='undefined'&&module.exports)module.exports=API;
 })(typeof globalThis!=='undefined'?globalThis:window);

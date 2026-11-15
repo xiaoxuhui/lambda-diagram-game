@@ -23,22 +23,30 @@
   ['longdiv','y (λr xs b q rem.xs (λh rest.divstep (trim (cons h rem)) b (λdigit remainder.forceDigit digit (λd.forceList remainder (λrr.r rest b (cons d q) rr)))) (pair (trim q) rem))'],
   ['sign','λv.v (λtag s d p e.s)'],['digits','λv.v (λtag s d p e.d)'],['scale','λv.v (λtag s d p e.p)'],['approx','λv.v (λtag s d p e.e)'],
   ['make','λs ds p e.(λd.λk.k i (and s (not (empty d))) d p e) (trim ds)'],
-  ['align','λa b k.(λp.k (pad (digits a) (sub p (scale a))) (pad (digits b) (sub p (scale b))) p) (lt (scale a) (scale b) (scale b) (scale a))'],
+  ['compose','λf g x.f (g x)'],
+  ['maxScale','λa b.lt a b b a'],
+  ['alignAt','λa b p k.k (pad (digits a) (sub p (scale a))) (pad (digits b) (sub p (scale b))) p'],
+  ['align','λa b.compose (alignAt a b) (maxScale (scale a)) (scale b)'],
   ['negate','λa.make (not (sign a)) (digits a) (scale a) (approx a)'],
-  ['dadd','λa b.align a b (λx z p.(λe.xor (sign a) (sign b) (eq (cmp x z) 1 (make (sign b) (minus z x 0) p e) (make (sign a) (minus x z 0) p e)) (make (sign a) (plus x z 0) p e)) (or (approx a) (approx b)))'],
+  ['sumAligned',`λsa sb e x z p.
+    (λemit.xor sa sb
+      (eq (cmp x z) 1 (emit sb (minus z x 0)) (emit sa (minus x z 0)))
+      (emit sa (plus x z 0)))
+    (λs ds.make s ds p e)`],
+  ['dadd','λa b.align a b (sumAligned (sign a) (sign b) (or (approx a) (approx b)))'],
   ['dsub','λa b.dadd a (negate b)'],
   ['dmul','λa b.make (xor (sign a) (sign b)) (times (digits a) (digits b)) (add (scale a) (scale b)) (or (approx a) (approx b))'],
   ['error','λk.k (λa b c.a) 0'],
   ['ddiv','λprecision a b.empty (digits b) error (align a b (λx z p.longdiv (reverse (pad x precision)) z nil nil (λq rem.make (xor (sign a) (sign b)) q precision (or (or (approx a) (approx b)) (not (empty rem))))))']
- ].map(([name,source])=>({name,source,free:C.freeVars(C.parse(source,Infinity))}));
+ ];
  const cache=new Map();
  function program(operation,precision=6){
-  if(!['ADD','SUB','MUL','DIV'].includes(operation))throw new C.LambdaError('未知小数运算。');
+  if(!operations.has(operation))throw new C.LambdaError('未知小数运算。');
   if(!Number.isSafeInteger(precision)||precision<0)throw new C.LambdaError('除法小数位数需为非负整数。');
   const key=operation+precision;if(cache.has(key))return cache.get(key);
   let body=operation==='DIV'?`ddiv ${precision}`:`d${operation.toLowerCase()}`;
   const needed=new Set(C.freeVars(C.parse(body,Infinity)));
-  for(let j=definitions.length-1;j>=0;j--){const d=definitions[j];if(!needed.has(d.name))continue;body=`(λ${d.name}.${body}) (${d.source})`;needed.delete(d.name);for(const name of d.free)needed.add(name);}
+  for(let j=bindings.length-1;j>=0;j--){const d=bindings[j];if(!needed.has(d.name))continue;body=`(λ${d.name}.${body}) (${d.source})`;needed.delete(d.name);for(const name of d.free)needed.add(name);}
   if(needed.size)throw new Error('Unbound decimal program: '+[...needed]);
   const term=C.parse(body,Infinity);cache.set(key,term);return term;
  }
@@ -56,7 +64,10 @@
   if(term?.type!=='abs')return null;const args=[];let body=term.body;
   while(body.type==='app'){args.unshift(body.arg);body=body.fn;}
   if(!isVar(body,term.param))return null;
-  if(args.length===2&&C.equal(args[0],C.parse('λa b c.a'))&&nat(args[1])===0)return {error:'除数不能为0'};
+  if(args.length===2&&C.equal(args[0],C.parse('λa b c.a'))){
+   const error=['除数不能为0','实数平方根要求输入非负','双曲示例的输入范围是 −1 到 1','三角示例的角度范围是 −1000 到 1000 弧度'][nat(args[1])];
+   if(error)return {error};
+  }
   if(args.length!==5||!C.equal(args[0],identity))return null;
   const negative=C.equal(args[1],truth),positive=C.equal(args[1],falsity),approximate=C.equal(args[4],truth),exact=C.equal(args[4],falsity),places=nat(args[3]);
   if((!negative&&!positive)||(!approximate&&!exact)||places===null)return null;
@@ -79,5 +90,69 @@
  function expression(operation,args=[],precision=6){
   return `(${C.format(program(operation,precision))})`+args.map(arg=>` (${arg})`).join('');
  }
- const API={encodeLiteral,read,format,program,expression};root.LambdaDecimal=API;if(typeof module!=='undefined'&&module.exports)module.exports=API;
+ const shiftExpressions=new WeakMap();
+ function isShiftExpression(term){
+  if(term?.type!=='app')return false;
+  if(shiftExpressions.has(term))return shiftExpressions.get(term);
+  const fn=term.fn;
+  const shift=fn.type==='app'&&C.churchNumber(fn.fn)!==null?fn.arg:fn;
+  const result=C.equal(shift,program('SHL'))||C.equal(shift,program('SHR'));
+  shiftExpressions.set(term,result);
+  return result;
+ }
+ // Fixed decimal coefficients and working precision are part of the Lambda algorithms.
+ const literal=text=>`(${C.format(encodeLiteral(text))})`;
+ const series=(coefficients,odd)=>{
+  const terms=coefficients.map(literal);
+  let body=odd?'dmul x v0':'v0';
+  for(let i=0;i<terms.length-1;i++)body=`work (dadd ${terms[i]} (dmul z v${i+1})) (λv${i}.${body})`;
+  return `λx.work (dmul x x) (λz.(λv${terms.length-1}.${body}) ${terms.at(-1)})`;
+ };
+ definitions.push(
+  ['dneg','negate'],
+  ['one',literal('1')],
+  ['half',literal('0.5')],
+  ['cut','λplaces a.(λcount.make (sign a) (count tail (digits a)) (sub (scale a) count) (approx a)) (sub (scale a) places)'],
+  ['forceNat','λn k.n (λstep value.step (λf x.f (value f x))) k 0'],
+  ['force','λa k.a (λtag s ds p e.s (λnext.next t) (λnext.next f) (λsg.forceList ds (λdigitsNorm.forceNat p (λplaces.e (k (λresult.result i sg digitsNorm places t)) (k (λresult.result i sg digitsNorm places f))))))'],
+  ['dshl','λa.a (λtag s ds p e.make s (plus ds ds 0) p e)'],
+  // Dividing a finite decimal by 2 multiplies its digits by 5 and adds one place.
+  ['dshr','λa.a (λtag s ds p e.make s (timesdigit ds 5 0) (succ p) e)'],
+  ['work','λa k.force a (λvalue.force (cut 4 value) k)'],
+  ['estimate','λa.(cut 3 a) (λtag s ds p e.λk.k tag s ds p t)'],
+  ['powerBy','y (λr a n acc.zero n acc (force (dmul a acc) (λnext.r a (pred n) next)))'],
+  ['dpow','λa n.powerBy a n one'],
+  ['dabs','λa.make f (digits a) (scale a) (approx a)'],
+  ['domain','λk.k (λa b c.a) 1'],
+  ['rangeError','λk.k (λa b c.a) 2'],
+  ['angleError','λk.k (λa b c.a) 3'],
+  ['nonnegativeLess','λa b.align a b (λx z p.eq (cmp x z) 1)'],
+  ['dsqrt','λa.sign a domain (empty (digits a) a (estimate ((y (λr current.force (ddiv 4 a current) (λratio.work (dmul half (dadd current ratio)) (λnext.empty (digits next) next (nonnegativeLess next current (r next) current))))) (nonnegativeLess a one one a))))'],
+  ['sinSeries',series(['1','-0.166667','0.008333','-0.000198'],true)],
+  ['cosSeries',series(['1','-0.5','0.041667','-0.001389','0.000025'],false)],
+  ['sinhSeries',series(['1','0.166667','0.008333','0.000198'],true)],
+  ['coshSeries',series(['1','0.5','0.041667','0.001389','0.000025'],false)],
+  ['withinRange','λop x.nonnegativeLess one (dabs x) rangeError (op x)'],
+  ['pi',literal('3.14159265')],
+  ['halfPi',literal('1.570796325')],
+  ['quarterPi',literal('0.7853981625')],
+  ['period',literal('6.28318530')],
+  ['smallSin','λx.nonnegativeLess quarterPi x (cosSeries (dsub halfPi x)) (sinSeries x)'],
+  ['halfWave','λx.nonnegativeLess halfPi x (smallSin (dsub pi x)) (smallSin x)'],
+  ['fullWave','λx.nonnegativeLess pi x (negate (halfWave (dsub x pi))) (halfWave x)'],
+  ['sinAngle',`λx.(λa.(λvalue.sign x (negate value) value)
+    (nonnegativeLess a period (fullWave a)
+      (force (ddiv 0 a period) (λturns.force (dmul turns period) (λcycles.fullWave (dsub a cycles)))))) (dabs x)`],
+  ['cosAngle','λx.force (dadd x halfPi) sinAngle'],
+  ['withinAngle',`λop x.nonnegativeLess ${literal('1000')} (dabs x) angleError (op x)`],
+  ['dsin','withinAngle (λx.estimate (sinAngle x))'],
+  ['dcos','withinAngle (λx.estimate (cosAngle x))'],
+  ['dsinh','withinRange (λx.estimate (sinhSeries x))'],
+  ['dcosh','withinRange (λx.estimate (coshSeries x))'],
+  ['dtan','withinAngle (λx.force (sinAngle x) (λs.force (cosAngle x) (λc.(λvalue.empty (digits value) error (estimate (ddiv 4 s c))) (cut 4 c))))'],
+  ['dtanh','withinRange (λx.force (sinhSeries x) (λs.force (coshSeries x) (λc.estimate (ddiv 4 s c))))']
+ );
+ const bindings=definitions.map(([name,source])=>({name,source,free:C.freeVars(C.parse(source))}));
+ const operations=new Set(['ADD','SUB','MUL','DIV','NEG','ABS','POW','SQRT','SHL','SHR','SIN','COS','TAN','SINH','COSH','TANH']);
+ const API={encodeLiteral,read,format,program,expression,isShiftExpression};root.LambdaDecimal=API;if(typeof module!=='undefined'&&module.exports)module.exports=API;
 })(typeof globalThis!=='undefined'?globalThis:window);
