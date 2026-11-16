@@ -1,18 +1,36 @@
 (function () {
   'use strict';
   const C=window.LambdaCore, D=window.LambdaDiagram, P=window.LambdaPresets,E=window.LambdaDataEncoding;
+  const Palette=window.LambdaPalette,Trace=window.LambdaTrace;
   const $=id=>document.getElementById(id);
   const input=$('expression');
-  const decimalValue=$('decimal-value'),decimalResult=$('decimal-value-result');
-  let decimalJob=null,decimalSource=null;
-  const state={ term:null, original:null, history:[], paths:null, dirty:false, running:false, timer:null,
+  const valueButton=$('decimal-value'),valueResult=$('decimal-value-result'),valueDetails=$('normal-form');
+  let valueJob=null,valueSource=null,normalForm=null;
+  const state={ term:null, original:null, history:Trace.create(), dirty:false, running:false, timer:null,
     mode:'free', level:0, completed:new Set(), halt:'', scale:1, autoFit:true, model:null, speed:600, strategy:'normal', direction:'left',numberEncoding:'church',numberFormats:{},decimalPlaces:6,fast:false,encodings:null,encodingBusy:false };
   let toastTimer,workspace,viewer,dataEditor,formatEditor,conversionController=null,compilingDefinitions=null,preparationTimer=null,historySource=null,renderedCount=0,diagramTerm=null,diagramRoute=null;
   const RUN_PAINT_INTERVAL=120;
   const INLINE_HISTORY_NODES=256;
-  let lastRunPaint=0,diagramHistoryIndex=-1,diagramHistory=null;
+  const HISTORY_PAGE_SIZE=32;
+  let historyPage=null,shownStart=0,rewindJob=null,historyJob=null,openHistoryEntry=null;
+  let lastRunPaint=0,diagramHistoryIndex=-1,diagramHistory=null,diagramPalette=null;
+  let palette=Palette.defaults,paletteFrame=null;
   const decodedTerms=new WeakMap(),TRUE=C.parse(P.TRUE),FALSE=C.parse(P.FALSE),IDENTITY=C.parse(P.I);
   const diagramView=window.LambdaDiagramView.init($('diagram-mount'));
+  const paletteEditor=Palette.init($('diagram-palette'),colors=>{
+    applyPalette(colors);
+    if(paletteFrame===null)paletteFrame=requestAnimationFrame(()=>{
+      paletteFrame=null;
+      renderDiagram(state.term&&!state.dirty?C.findRedex(state.term,[],state.strategy,state.direction):null,0);
+    });
+    save();
+  });
+  function applyPalette(colors){
+    palette=colors;
+    const style=$('diagram-palette').closest('.diagram-card').style;
+    style.setProperty('--diagram-binding',colors.binders[0]);
+    style.setProperty('--diagram-highlight',colors.highlight);
+  }
   const encodingProgress=document.createElement('p');encodingProgress.className='syntax-note';encodingProgress.id='encoding-progress';encodingProgress.setAttribute('role','status');encodingProgress.hidden=true;
   const cancelEncoding=document.createElement('button');cancelEncoding.type='button';cancelEncoding.id='cancel-encoding';cancelEncoding.className='button';cancelEncoding.textContent='取消数字编码';cancelEncoding.hidden=true;$('convert').after(encodingProgress,cancelEncoding);
   function cancelConversion(){clearTimeout(preparationTimer);preparationTimer=null;conversionController?.abort();conversionController=null;compilingDefinitions=null;state.encodingBusy=false;encodingProgress.hidden=true;cancelEncoding.hidden=true;}
@@ -31,21 +49,23 @@
   function save() { workspace?.queueSave(); }
   function capture() {
     return {...dataEditor.capture(),draft:input.value,completed:[...state.completed],mode:state.mode,level:state.level,
-      session:{original:state.original,steps:Math.max(0,state.history.length-1),dirty:state.dirty,halt:state.halt,...(state.encodings===null?{}:{encodings:state.encodings}),...(state.paths?{paths:state.paths}:{} )},
-      view:{speed:state.speed,strategy:state.strategy,direction:state.direction,numberEncoding:state.numberEncoding,numberFormats:state.numberFormats,inputFormatDraft:formatEditor.capture(),decimalPlaces:state.decimalPlaces,scale:state.scale,autoFit:state.autoFit,panX:$('diagram-viewport').scrollLeft,panY:$('diagram-viewport').scrollTop,historyOpen:$('history-details').open,helpOpen:!$('help-panel').hidden,hintOpen:!$('hint').hidden},
+      session:{original:state.original,steps:Math.max(0,state.history.length-1),dirty:state.dirty,halt:state.halt,...(state.encodings===null?{}:{encodings:state.encodings}),...(state.history.choices.length?{choices:state.history.choices}:{})},
+      view:{speed:state.speed,strategy:state.strategy,direction:state.direction,numberEncoding:state.numberEncoding,numberFormats:state.numberFormats,inputFormatDraft:formatEditor.capture(),decimalPlaces:state.decimalPlaces,...(palette===Palette.defaults?{}:{palette}),scale:state.scale,autoFit:state.autoFit,panX:$('diagram-viewport').scrollLeft,panY:$('diagram-viewport').scrollTop,historyOpen:$('history-details').open,helpOpen:!$('help-panel').hidden,hintOpen:!$('hint').hidden},
       selection:{start:input.selectionStart,end:input.selectionEnd},error:$('error-message').hidden?'':$('error-message').textContent};
   }
   function applySnapshot(s) {
+    cancelRewind();
     cancelConversion();
     viewer?.cancelZoom();
     diagramView.cancelTransition();
     $('example-info').hidden=true;
     stop();input.value=s.draft;state.completed=new Set(s.completed);state.mode=s.mode;state.level=s.level;
     revealAnswer(false);
-    state.original=s.session.original;state.term=s.term;state.history=s.history;state.paths=s.session.paths??null;state.dirty=s.session.dirty;state.halt=s.session.halt;
+    state.original=s.session.original;state.term=s.term;state.history=s.trace??Trace.create(s.session.original);state.dirty=s.session.dirty;state.halt=s.session.halt;
     state.scale=s.view.scale;state.autoFit=s.view.autoFit;state.speed=s.view.speed;state.strategy=s.view.strategy??'normal';state.direction=s.view.direction??'left';renderSpeed();
     state.numberEncoding=s.view.numberEncoding??'church';state.numberFormats=s.view.numberFormats??{};state.decimalPlaces=s.view.decimalPlaces??6;
     state.encodings=s.session.encodings??null;dataEditor.restore(s);formatEditor.restore(s.view.inputFormatDraft);
+    applyPalette(s.view.palette??Palette.defaults);paletteEditor.restore(palette);
     $('history-details').open=s.view.historyOpen;$('help-panel').hidden=!s.view.helpOpen;$('help-toggle').setAttribute('aria-expanded',String(s.view.helpOpen));
     $('hint').hidden=!s.view.hintOpen;$('hint-toggle').textContent=s.view.hintOpen?'收起提示':'显示提示';$('hint-toggle').setAttribute('aria-expanded',String(s.view.hintOpen));
     $('challenge-feedback').textContent='';$('next-level').hidden=true;$('error-message').textContent=s.error;$('error-message').hidden=!s.error;
@@ -58,7 +78,9 @@
     toastTimer=setTimeout(()=>$('toast').hidden=true,2400);
   }
   function stop() { clearTimeout(state.timer); state.timer=null; state.running=false;state.fast=false; }
+  function cancelRewind(){rewindJob?.abort();rewindJob=null;}
   function changed() {
+    cancelRewind();
     cancelConversion();
     $('example-info').hidden=true;
     stop(); state.dirty=true; state.halt=''; $('error-message').hidden=true;
@@ -73,6 +95,7 @@
     changed();
   }
   async function convert() {
+    cancelRewind();
     cancelConversion();const controller=new AbortController();conversionController=controller;let showedProgress=false;
     diagramView.cancelTransition();
     compilingDefinitions=new Map(dataEditor.entries().map(entry=>[entry.name,entry.term]));
@@ -92,12 +115,12 @@
       dataEditor.remember(compiled.mappings);
       const term=parsed===compiled.term?expanded(parsed):parsed;
       viewer?.cancelZoom();
-      state.term=term; state.original=term; state.history=[{term,change:null}]; state.paths=null;state.dirty=false;state.encodingBusy=false;state.encodings=[...new Set([...compiled.encodings,...(workspace?.encodingsFor(parsed)??[])])];
+      state.term=term; state.original=term; state.history=Trace.create(term);state.dirty=false;state.encodingBusy=false;state.encodings=[...new Set([...compiled.encodings,...(workspace?.encodingsFor(parsed)??[])])];
       state.autoFit=true; render(); save(); return true;
     } catch(e) {
       if(e.name==='AbortError'||controller.signal.aborted)return false;
       viewer?.cancelZoom();
-      state.term=null; state.original=null; state.history=[];state.paths=null; state.dirty=true;state.encodings=null;state.encodingBusy=false;
+      state.term=null; state.original=null; state.history=Trace.create();state.dirty=true;state.encodings=null;state.encodingBusy=false;
       $('error-message').textContent=(e.position!==null&&e.position!==undefined?`第 ${e.position+1} 个字符：`:'')+e.message;
       $('error-message').hidden=false; render(); input.focus();
       if(e.position!==null&&e.position!==undefined) input.setSelectionRange(e.position,e.position+1);
@@ -115,17 +138,17 @@
     const sameHistory=duration>0&&diagramHistory===state.history;
     const reverse=sameHistory&&undone&&historyIndex===diagramHistoryIndex-1;
     const change=reverse?undone:sameHistory&&historyIndex===diagramHistoryIndex+1
-      ?state.history[historyIndex].change:null;
+      ?state.history.peek(historyIndex).change:null;
     diagramHistory=state.history;diagramHistoryIndex=historyIndex;
-    if(!change&&state.term&&diagramTerm===state.term&&(route===diagramRoute||(route&&diagramRoute&&route.length===diagramRoute.length&&route.every((part,i)=>part===diagramRoute[i])))){
+    if(!change&&state.term&&diagramTerm===state.term&&diagramPalette===palette&&(route===diagramRoute||(route&&diagramRoute&&route.length===diagramRoute.length&&route.every((part,i)=>part===diagramRoute[i])))){
       applyScale();return;
     }
-    diagramTerm=state.term;diagramRoute=route;
+    diagramTerm=state.term;diagramRoute=route;diagramPalette=palette;
     const anchor=state.autoFit?null:viewer?.anchor();
     if(!state.term) { diagramView.clear(); $('diagram-empty').hidden=false; state.model=null; return; }
     $('diagram-empty').hidden=true;
     const previous=duration>0?diagramView.captureFrame():null;
-    state.model=D.layout(state.term,route);diagramView.render(state.model);
+    state.model=D.layout(state.term,route,palette);diagramView.render(state.model);
     mount.style.opacity=state.dirty?'0.35':'1';
     applyScale();
     viewer?.restore(anchor);
@@ -145,7 +168,7 @@
     $('zoom-label').textContent=`${Math.round(state.scale*100)}%`;
     $('fit').setAttribute('aria-pressed',String(state.autoFit));
   }
-  function decode(t) {
+  function decode(t, showFreeVariables=true) {
     if(decodedTerms.has(t))return decodedTerms.get(t);
     const interpreted=window.LambdaMeta.read(t);
     if(interpreted!==null){
@@ -177,7 +200,8 @@
       if(rational)text=`有理数 ${M.formatRational(rational)}`;
       else if(polynomial?.length)text=`多项式：${M.formatPolynomial(polynomial)}`;
       else{
-        text=!C.findRedex(t)?E.readChurchList(t):null;
+        text=!C.hasRedex(t)?E.readChurchList(t):null;
+        if(text===null&&!showFreeVariables)return '已求得正规形';
         if(text===null){const free=C.freeVars(t);text=free.size?`${free.size} 个自由变量`:'闭合表达式';}
       }
     }
@@ -186,28 +210,39 @@
   function code(text) { const el=document.createElement('code'); el.textContent=text; return el; }
   const runsShiftDirectly=()=>window.LambdaDecimal.isShiftExpression(state.original);
   function updateValueButtons(){
-    decimalValue.textContent=decimalJob?'取消求值':'快速求值';
-    $('run-label').textContent=state.running?'暂停':runsShiftDirectly()&&decimalJob?'取消求值':'运行';
+    valueButton.textContent=valueJob?'取消求值':'快速求值';
+    $('run-label').textContent=state.running?'暂停':runsShiftDirectly()&&valueJob?'取消求值':'运行';
     $('run').title=runsShiftDirectly()?'直接计算移位结果。使用「单步」或「快速运行」查看逐步归约。':'';
   }
-  function clearDecimalValue(){
-    decimalJob?.abort();decimalJob=null;decimalSource=null;
-    decimalResult.hidden=true;updateValueButtons();
+  function clearValue(){
+    valueJob?.abort();valueJob=null;valueSource=null;normalForm=null;
+    valueResult.hidden=true;valueDetails.hidden=true;valueDetails.open=false;
+    $('normal-form-expression').textContent='';updateValueButtons();
   }
-  async function evaluateDecimal(){
-    if(decimalJob){clearDecimalValue();return;}
-    const controller=new AbortController();decimalJob=controller;decimalSource=state.term;
-    updateValueButtons();decimalResult.hidden=false;decimalResult.textContent='正在求值…';
+  async function evaluateValue(){
+    if(valueJob){clearValue();return;}
+    if(!state.term||state.dirty||state.running||rewindJob)return;
+    clearValue();
+    const controller=new AbortController();valueJob=controller;valueSource=state.term;
+    updateValueButtons();valueResult.hidden=false;valueResult.textContent='正在求值…';
     try{
-      const result=await window.LambdaLazyEval.normalize(decimalSource,{signal:controller.signal});
-      if(decimalJob===controller)decimalResult.textContent=decode(result);
+      const result=await window.LambdaLazyEval.normalize(valueSource,{signal:controller.signal});
+      if(valueJob===controller){
+        normalForm=result;
+        valueResult.textContent=decode(result,false);
+        valueDetails.hidden=false;
+      }
     }catch(error){
-      if(decimalJob===controller)decimalResult.textContent=error.message;
+      if(valueJob===controller)valueResult.textContent=error.message;
     }finally{
-      if(decimalJob===controller){decimalJob=null;updateValueButtons();}
+      if(valueJob===controller){valueJob=null;updateValueButtons();}
     }
   }
-  decimalValue.addEventListener('click',evaluateDecimal);
+  valueButton.addEventListener('click',evaluateValue);
+  valueDetails.addEventListener('toggle',()=>{
+    const expression=$('normal-form-expression');
+    if(normalForm&&valueDetails.open&&!expression.textContent)expression.textContent=C.format(normalForm);
+  });
   function showHistoryEntry(body,entry) {
     body.replaceChildren(code(C.format(entry.term)));
     if(entry.change){
@@ -216,6 +251,69 @@
       body.append(note);
     }
   }
+  function historyButton(index){
+    const button=document.createElement('button');button.type='button';button.textContent='查看此步';
+    button.dataset.historyStep=index;
+    return button;
+  }
+  $('history-list').addEventListener('click',async event=>{
+    const button=event.target.closest('[data-history-step]');
+    if(!button)return;
+    historyJob?.abort();
+    const trace=state.history,index=Number(button.dataset.historyStep),controller=new AbortController();
+    historyJob=controller;
+    button.disabled=true;button.textContent='正在重算…';
+    try{
+      const entry=trace.peek(index)??await trace.replay(index,{signal:controller.signal});
+      if(controller.signal.aborted||!button.isConnected)return;
+      if(openHistoryEntry?.body.isConnected)openHistoryEntry.body.replaceChildren(historyButton(openHistoryEntry.index));
+      const body=button.parentElement;
+      showHistoryEntry(body,entry);
+      openHistoryEntry={body,index};
+    }catch(error){if(!controller.signal.aborted)toast(error.message);}
+    finally{
+      button.disabled=false;button.textContent='查看此步';
+      if(historyJob===controller)historyJob=null;
+    }
+  });
+  function renderHistory(){
+    const trace=state.history,history=$('history-list'),lastPage=Math.max(0,Math.floor((trace.length-1)/HISTORY_PAGE_SIZE));
+    const changed=historySource!==trace;
+    if(changed)historyPage=null;
+    if(historyPage!==null&&historyPage>=lastPage)historyPage=null;
+    const page=historyPage??lastPage,start=page*HISTORY_PAGE_SIZE,end=Math.min(trace.length,start+HISTORY_PAGE_SIZE);
+    if(changed||shownStart!==start){
+      historyJob?.abort();openHistoryEntry=null;
+      history.replaceChildren();renderedCount=start;shownStart=start;historySource=trace;
+    }
+    while(renderedCount>end){history.lastElementChild.remove();renderedCount--;}
+    if(openHistoryEntry&&!openHistoryEntry.body.isConnected)openHistoryEntry=null;
+    const interpreter=state.original&&window.LambdaMeta.isProgram(state.original);
+    const rows=document.createDocumentFragment();
+    for(;renderedCount<end;renderedCount++){
+      const entry=trace.peek(renderedCount);
+      const li=document.createElement('li'),num=document.createElement('span'),body=document.createElement('div');
+      num.textContent=String(renderedCount).padStart(2,'0');
+      const nodes=entry?C.inspect(entry.term).nodes+(entry.change?C.inspect(entry.change.argument).nodes:0):Infinity;
+      if(interpreter||nodes>INLINE_HISTORY_NODES)body.append(historyButton(renderedCount));
+      else showHistoryEntry(body,entry);
+      li.append(num,body);rows.append(li);
+    }
+    if(rows.firstChild)history.append(rows);
+    $('history-pages').hidden=lastPage===0;
+    $('history-range').textContent=`第 ${start}–${end-1} 步`;
+    $('history-older').disabled=page===0;
+    $('history-newer').disabled=page===lastPage;
+    $('history-jump').max=Math.max(0,trace.length-1);
+  }
+  $('history-older').addEventListener('click',()=>{historyPage=shownStart/HISTORY_PAGE_SIZE-1;renderHistory();});
+  $('history-newer').addEventListener('click',()=>{historyPage=shownStart/HISTORY_PAGE_SIZE+1;renderHistory();});
+  $('history-jump').addEventListener('change',event=>{
+    const input=event.target;
+    if(input.validity.valid&&!Number.isNaN(input.valueAsNumber)){
+      historyPage=Math.floor(input.valueAsNumber/HISTORY_PAGE_SIZE);renderHistory();
+    }
+  });
   function render(duration=0,undone=null) {
     formatEditor?.render();
     $('number-encoding').value=state.numberEncoding;$('decimal-places').value=state.decimalPlaces;
@@ -228,9 +326,9 @@
     };
     $('number-note').textContent=builtinNotes[state.numberEncoding]??`当前编码：${state.numberEncoding.slice(7)}。直接写3即可转换，也可写3_${state.numberEncoding.slice(7)}；用3_church或3_丘奇数指定丘奇数。`;
     const ready=state.term&&!state.dirty, redex=state.term?C.findRedex(state.term,[],state.strategy,state.direction):null;
-    if(decimalSource&&(decimalSource!==state.term||!ready||state.running))clearDecimalValue();
-    decimalValue.hidden=!ready||!state.encodings?.includes('decimal');
-    decimalValue.disabled=!!state.running;
+    if(valueSource&&(valueSource!==state.term||!ready||state.running))clearValue();
+    valueButton.hidden=!ready;
+    valueButton.disabled=!!state.running||!!rewindJob;
     $('reduction-order').value=state.strategy;
     $('reduction-direction').value=state.direction;
     const side=state.direction==='right'?'右':'左';
@@ -239,10 +337,10 @@
     $('char-count').textContent=`${input.value.length} 字符`;
     $('step-count').textContent=count;updateValueButtons();
     $('run').firstElementChild.textContent=state.running?'Ⅱ':'▶';
-    $('run').disabled=!ready;
-    $('fast-run').disabled=!ready;$('fast-run').textContent=state.running&&state.fast?'暂停快速运行':'快速运行';
-    $('step').disabled=!ready||state.running;
-    $('back').disabled=!ready||count===0||state.running;
+    $('run').disabled=!ready||!!rewindJob;
+    $('fast-run').disabled=!ready||!!rewindJob;$('fast-run').textContent=state.running&&state.fast?'暂停快速运行':'快速运行';
+    $('step').disabled=!ready||state.running||!!rewindJob;
+    $('back').disabled=!ready||count===0||state.running||!!rewindJob;
     $('reset').disabled=!ready||state.running||count===0;
     $('export-svg').disabled=!ready; $('zoom-in').disabled=!state.term; $('zoom-out').disabled=!state.term; $('fit').disabled=!state.term;$('actual-size').disabled=!state.term;
     const badge=$('state-badge'); badge.className='state-badge';
@@ -253,8 +351,8 @@
     else if(state.halt) { badge.textContent='已暂停'; badge.classList.add('error'); }
     else if(!redex) badge.textContent='已到正规形';
     else badge.textContent='可以归约';
-    $('run-status').textContent=state.encodingBusy?'正在自动归约数字编码，完成后显示图示。':!state.term?'输入有效表达式后，就能开始运行。':state.dirty?'输入已改变。重新转换后开始新的归约。':
-      state.halt|| (state.running?'自动运行中；粉色线路标记下一次函数替换。':!redex?'已到 β 正规形；可点击单步或运行再次尝试，不能归约时保持当前式。':count?'可以继续单步，或回退查看上一帧。':'准备好了。点击单步，观察一次函数替换。');
+    $('run-status').textContent=rewindJob?'正在重算上一帧…':state.encodingBusy?'正在自动归约数字编码，完成后显示图示。':!state.term?'输入有效表达式后，就能开始运行。':state.dirty?'输入已改变。重新转换后开始新的归约。':
+      state.halt|| (state.running?'自动运行中。高亮线路标记下一次函数替换。':!redex?'已到 β 正规形；可点击单步或运行再次尝试，不能归约时保持当前式。':count?'可以继续单步，或回退查看上一帧。':'准备好了。点击单步，观察一次函数替换。');
     $('current-expression').textContent=state.term?C.format(state.term):'—';
     $('expression-encoding').textContent=!state.term?'':state.encodings===null?'编码：旧存档保留原表达式':state.encodings.length?`数字来源编码：${state.encodings.map(E.label).join('、')}`:'编码：纯 λ 表达式（无数字字面量）';
     const customNames=state.encodings?.filter(name=>!E.isBuiltin(name))??[];
@@ -266,42 +364,22 @@
     const builtInResult=ready&&!redex
       ?E.readBuiltin(state.term,selectedBuiltin)??(state.encodings?.includes('list')?E.readChurchList(state.term):null)
       :null;
-    $('decoded').textContent=ready?(matches.length?matches.map(match=>`${match.number}_${match.name}`).join(' / ')+(matches.length>1?'（多项匹配）':''):builtInResult??(hasCustomData?'自定义数据':decode(state.term))):'';
+    $('decoded').textContent=ready&&!(state.running&&redex)?(matches.length?matches.map(match=>`${match.number}_${match.name}`).join(' / ')+(matches.length>1?'（多项匹配）':''):builtInResult??(hasCustomData?'自定义数据':decode(state.term))):'';
     const next=$('next-explanation'); next.replaceChildren();
     if(ready&&redex) {
       next.append('下一步：用 ',code(C.format(redex.term.arg)),' 替换函数体中自由出现的 ',code(redex.term.fn.param),'。必要时自动改名，避免变量捕获。');
     } else if(ready) next.textContent='归约会检查函数、参数和 λ 函数体。整个表达式都不能归约时，当前式保持不变。';
     $('history-count').textContent=`${count} 次替换`;
-    const history=$('history-list');
-    const interpreter=state.original&&window.LambdaMeta.isProgram(state.original);
-    if(historySource!==state.history){history.replaceChildren();renderedCount=0;historySource=state.history;}
-    while(renderedCount>state.history.length){history.lastElementChild.remove();renderedCount--;}
-    if(renderedCount<state.history.length){
-      const rows=document.createDocumentFragment();
-      for(;renderedCount<state.history.length;renderedCount++){
-        const entry=state.history[renderedCount];
-        const li=document.createElement('li'),num=document.createElement('span'),body=document.createElement('div');
-        num.textContent=String(renderedCount).padStart(2,'0');
-        const nodes=C.inspect(entry.term).nodes+(entry.change?C.inspect(entry.change.argument).nodes:0);
-        if(interpreter||nodes>INLINE_HISTORY_NODES){
-          const button=document.createElement('button');button.type='button';button.textContent='查看此步';
-          button.addEventListener('click',()=>showHistoryEntry(body,entry));body.append(button);
-        }else showHistoryEntry(body,entry);
-        li.append(num,body);rows.append(li);
-      }
-      history.append(rows);
-    }
+    renderHistory();
     renderDiagram(redex,duration,undone);
     save();
   }
   function advance(path=null,display=true) {
-    if(!state.term||state.dirty) return false;
+    if(!state.term||state.dirty||rewindJob) return false;
     try {
       const selected=Array.isArray(path),result=selected?C.stepAt(state.term,path):C.step(state.term,state.strategy,state.direction); if(!result){stop();if(display)render();return false;}
-      const recordPath=selected||state.strategy==='applicative'||state.direction==='right';
-      if(recordPath&&!state.paths)state.paths=Array(state.history.length-1).fill(null);
-      if(state.paths)state.paths.push(recordPath?result.path:null);
-      state.term=result.term;state.history.push({term:result.term,change:result});state.halt='';
+      const choice=selected?result.path:state.strategy==='normal'&&state.direction==='left'?null:`${state.strategy}:${state.direction}`;
+      state.term=result.term;state.history.append(result,choice);state.halt='';
       // The preview is only a hint: confirm with an actual attempt before stopping.
       if(state.running&&!C.hasRedex(state.term)&&C.step(state.term,state.strategy,state.direction)===null)stop();
       if(display)render(180); return true;
@@ -336,8 +414,8 @@
   }
   async function run(fast=false) {
     if(state.running){stop();render(100);return;}
-    if(!state.term||state.dirty) return;
-    if(!fast&&runsShiftDirectly()){await evaluateDecimal();return;}
+    if(!state.term||state.dirty||rewindJob) return;
+    if(!fast&&runsShiftDirectly()){await evaluateValue();return;}
     if(window.LambdaMeta.needsRepair(state.original)&&!await convert())return;
     const interpreter=window.LambdaMeta.isProgram(state.original);
     if(interpreter){
@@ -394,10 +472,11 @@
   function checkAnswer() {
     const feedback=$('challenge-feedback');
     if(!state.term||state.dirty){feedback.textContent='先把当前输入转换成图示，再运行和验证。';return;}
-    if(state.running){feedback.textContent='正在运行，等归约完成后再验证。';return;}
-    if(C.findRedex(state.term,[],state.strategy,state.direction)){feedback.textContent='还有可归约的部分。先运行到正规形，再验证答案。';return;}
+    if(state.running||valueJob){feedback.textContent='正在运行，等归约完成后再验证。';return;}
+    const result=normalForm??state.term;
+    if(C.hasRedex(result)){feedback.textContent='还有可归约的部分。先运行到正规形，再验证答案。';return;}
     const l=P.levels[state.level];
-    if(!window.LambdaChallenges.matches(l,state.term)){feedback.textContent='这还不是目标结果。可以修改表达式，或显示提示再试一次。';return;}
+    if(!window.LambdaChallenges.matches(l,result)){feedback.textContent='这还不是目标结果。可以修改表达式，或显示提示再试一次。';return;}
     state.completed.add(l.id);save();renderLevels();
     const stage=P.stages.find(s=>s.levelIds.includes(l.id)),stageDone=stage.levelIds.every(id=>state.completed.has(id));
     feedback.textContent=state.completed.size===P.levels.length?`${P.levels.length} 关全部完成！现在可以自由实验，组合你自己的函数。`:`第 ${l.id} 关完成！${stageDone?`「${stage.name}」阶段全部完成。`:'结果与目标等价。'}`;
@@ -461,16 +540,25 @@
   $('fast-run').addEventListener('click',()=>run(true));
   $('number-encoding').addEventListener('change',()=>{const previous=state.numberEncoding;state.numberEncoding=$('number-encoding').value;dataEditor.select(state.numberEncoding);if(previous!==state.numberEncoding){changed();queueLiteralPreparation();}else{render();save();}});
   $('decimal-places').addEventListener('input',()=>{const n=$('decimal-places').valueAsNumber;if(!Number.isSafeInteger(n)||n<0){$('decimal-places').setCustomValidity('请输入非负整数');return;}$('decimal-places').setCustomValidity('');state.decimalPlaces=n;if(state.numberEncoding==='decimal')changed();else save();});
-  $('back').addEventListener('click',()=>{
-    if(state.history.length<=1)return;
+  $('back').addEventListener('click',async()=>{
+    const trace=state.history;
+    if(trace.length<=1||rewindJob)return;
     stop();
-    const {change}=state.history.pop();
-    state.paths?.pop();
-    state.term=state.history.at(-1).term;
+    historyJob?.abort();
+    const target=trace.length-2,{change}=trace.peek(target+1);
+    let frames;
+    if(!trace.peek(target)){
+      const controller=new AbortController();rewindJob=controller;render();
+      try{frames=await trace.replay(target,{signal:controller.signal,keepRecent:true});}
+      catch(error){if(!controller.signal.aborted){rewindJob=null;toast(error.message);render();}return;}
+      if(controller.signal.aborted)return;
+      rewindJob=null;
+    }
+    state.term=trace.rewind(frames).term;
     state.halt='';$('challenge-feedback').textContent='';$('next-level').hidden=true;
     render(180,change);
   });
-  $('reset').addEventListener('click',()=>{if(state.original){stop();state.term=state.original;state.history=[{term:state.original,change:null}];state.paths=null;state.halt='';$('challenge-feedback').textContent='';$('next-level').hidden=true;render(180);}});
+  $('reset').addEventListener('click',()=>{if(state.original){cancelRewind();stop();state.term=state.original;state.history=Trace.create(state.original);state.halt='';$('challenge-feedback').textContent='';$('next-level').hidden=true;render(180);}});
   $('speed').addEventListener('change',()=>{if($('speed').value==='custom'){$('speed-ms').focus();$('speed-ms').select();}else setSpeed(Number($('speed').value));});
   $('speed-ms').addEventListener('input',()=>setSpeed($('speed-ms').value===''?NaN:Number($('speed-ms').value)));
   function setReductionPreference(key,value,allowed){
@@ -490,7 +578,7 @@
   window.addEventListener('resize',applyScale);
   $('export-svg').addEventListener('click',()=>{
     if(!state.term||state.dirty)return;
-    const content=D.svg(state.term,null,{export:true}).markup;
+    const content=D.svg(state.term,null,{export:true,palette}).markup;
     window.LambdaDownload.save('lambda-diagram.svg',content,'image/svg+xml');toast('SVG 图示已导出');
   });
   $('mode-free').addEventListener('click',()=>{stop();state.mode='free';renderMode();render();save();});

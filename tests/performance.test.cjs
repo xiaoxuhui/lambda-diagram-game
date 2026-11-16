@@ -1,5 +1,7 @@
 const {test}=require('node:test'),assert=require('node:assert/strict');
 const C=require('../src/core.js'),before=require('./fixtures/core-before-performance.cjs');
+const Lazy=require('../src/lazy-eval.js');
+const Trace=require('../src/trace.js');
 test('engine nodes are immutable so cached structural facts cannot become stale',()=>{
   const term=C.parse('(λx.x) y');assert.ok(Object.isFrozen(term));assert.ok(Object.isFrozen(term.fn));assert.ok(Object.isFrozen(term.arg));
   assert.throws(()=>Object.defineProperty(term,'arg',{value:C.V('z')}),TypeError);assert.equal(C.format(C.step(term).term),'y');
@@ -22,6 +24,44 @@ test('unused branches are neither renamed nor rebuilt during substitution',()=>{
 test('mutable external ASTs are not served stale cached facts',()=>{
   const raw={type:'app',fn:{type:'var',name:'f'},arg:{type:'var',name:'x'}};assert.equal(C.findRedex(raw),null);
   raw.fn={type:'abs',param:'x',body:{type:'var',name:'x'}};assert.deepEqual(C.findRedex(raw).path,[]);assert.equal(C.format(C.step(raw).term),'x');
+});
+test('recomputed contractions retain capture avoidance without storing old results',()=>{
+  const fn=C.parse('λx.λy.x'),arg=C.V('y');
+  const first=C.step(C.A(fn,arg)),second=C.step(C.A(fn,arg));
+  assert.notEqual(first.replacement,second.replacement);
+  assert.deepEqual(first.replacement,second.replacement);
+  assert.equal(C.format(second.term),'λy1.y');
+  const raw={type:'var',name:'a'};
+  assert.equal(C.format(C.step(C.A(fn,raw)).term),'λy.a');
+  raw.name='y';
+  assert.equal(C.format(C.step(C.A(fn,raw)).term),'λy1.y');
+});
+test('fixed-order traces retain only recent frames and one rule for an arbitrarily long run',async()=>{
+  const original=C.parse('(λx.f (x x)) (λx.f (x x))'),trace=Trace.create(original);
+  let term=original,first;
+  for(let i=0;i<200;i++){
+    const change=C.step(term,'normal','right');term=change.term;
+    trace.append(change,'normal:right');if(i===0)first=term;
+  }
+  assert.equal(trace.length,201);
+  assert.deepEqual(trace.choices,[[0,'normal:right']]);
+  assert.equal(trace.peek(1),undefined);
+  assert.ok(C.equal((await trace.replay(1)).term,first));
+  assert.equal(trace.peek(197)!==undefined,true);
+  assert.equal(trace.peek(196),undefined);
+  for(let i=0;i<6;i++){
+    const target=trace.length-2,frames=trace.peek(target)?undefined:await trace.replay(target,{keepRecent:true});
+    const prior=trace.rewind(frames);
+    assert.equal(C.inspect(term).nodes-C.inspect(prior.term).nodes,2);term=prior.term;
+  }
+});
+test('shared normalization reuses a complete result under binders without capture',async()=>{
+  const input=C.parse('(λd.f d d) (λx.(λy.λx.y) x)');
+  const result=await Lazy.normalize(input);
+  assert.ok(C.equal(result,C.parse('f (λx z.x) (λx z.x)')));
+  assert.equal(result.fn.arg,result.arg);
+  assert.equal(C.hasRedex(result),false);
+  await assert.rejects(Lazy.normalize(C.parse('(λx.x x) (λx.x x)'),{signal:AbortSignal.timeout(30)}),/取消/);
 });
 test('seeded differential reductions and alpha equality match the previous engine',()=>{
   let seed=9173;const random=n=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed%n;},names=['x','y','z'];

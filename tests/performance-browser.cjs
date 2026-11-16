@@ -66,6 +66,26 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
       const offline=await context.newPage();offline.on('pageerror',e=>errors.push(e.message));await offline.goto(pathToFileURL(path.resolve(__dirname,'../dist/lambda-lab.html')).href);
       await offline.locator('#expression').fill('g 900 ((λx.x) y)');await offline.locator('#convert').click();await offline.locator('#step').click();assert.equal(await offline.locator('#diagram-mount line').count(),3611);await assertDiagram(offline);await offline.close();
     });
+    await check('shared evaluation normalizes a saved recursive user function',async()=>{
+      const fix='λf.(λx.f (x x)) (λx.f (x x))';
+      const pred='λn f x.n (λg h.h (g f)) (λu.x) (λu.u)';
+      const div=`(λsub zero succ.λm n.(${fix}) (λr a q.zero (sub n a) (r (sub a n) (succ q)) q) m 0)
+        (λa b.b (${pred}) a) (λn.n (λt.λa b.b) (λa b.a)) (λn f x.f (n f x))`;
+      await page.locator('#function-name').fill('MYDIV');
+      await page.locator('#function-source').fill(div);
+      await page.locator('#function-add').click();
+      await source('MYDIV 8 4');await page.locator('#reduction-order').selectOption('applicative');
+      await page.locator('#decimal-value').click();
+      await page.waitForFunction(()=>document.querySelector('#decimal-value-result').textContent==='Church 数 2');
+      await page.locator('#normal-form summary').click();
+      await page.waitForFunction(()=>document.querySelector('#normal-form-expression').textContent.length>0);
+      const result=await page.locator('#normal-form-expression').textContent();
+      assert.equal(await page.evaluate(result=>LambdaCore.churchNumber(LambdaCore.parse(result)),result),2);
+      assert.equal(await page.locator('#step-count').textContent(),'0');
+      assert.equal(await page.locator('#reduction-order').inputValue(),'applicative');
+      await source('(λx.x x) (λx.x x)');await page.locator('#decimal-value').click();await page.locator('#decimal-value').click();
+      assert.ok(await page.locator('#decimal-value-result').isHidden());
+    });
     await check('optimized flows have no browser errors',async()=>assert.deepEqual(errors,[]));
     console.log(`Performance browser checks: ${count} passed, 0 failed.`);
   }finally{await browser.close();server.close();}

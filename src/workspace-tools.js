@@ -2,6 +2,7 @@
   'use strict';
   const C=root.LambdaCore,L=root.LambdaLibrary,S=root.LambdaSnapshot;
   const AUTO='lambda-lab-v2',CHECKPOINT='lambda-lab-checkpoint-v2',LEGACY='lambda-lab-v1';
+  const decode=text=>S.decode(text,{compact:true});
   const $=id=>document.getElementById(id);
   function init(api) {
     const cancel=document.createElement('button');cancel.id='function-cancel';cancel.type='button';cancel.className='button';cancel.textContent='取消编辑';cancel.hidden=true;
@@ -57,9 +58,9 @@
       let restored=false;
       try {
         const text=localStorage.getItem(AUTO)||localStorage.getItem(LEGACY);
-        if(text){const snapshot=S.decode(text);apply(snapshot);restored=true;}
+        if(text){const snapshot=decode(text);apply(snapshot);restored=true;}
       }catch(e){feedback(`自动存档未能恢复：${e.message}。可以重新导入备份。`,true);}
-      try{const text=localStorage.getItem(CHECKPOINT);if(text){S.decode(text);checkpoint=text;}}catch{/* Keep a corrupt checkpoint untouched. */}
+      try{const text=localStorage.getItem(CHECKPOINT);if(text){decode(text);checkpoint=text;}}catch{/* Keep a corrupt checkpoint untouched. */}
       $('restore-state').disabled=!checkpoint;renderLibrary();return restored;
     }
     $('function-form').addEventListener('submit',async e=>{
@@ -86,7 +87,7 @@
     });
     $('restore-state').addEventListener('click',()=>{
       if(!checkpoint)return;
-      try{const snapshot=S.decode(checkpoint);apply(snapshot);persist();feedback('已恢复保存时的状态。自动运行保持暂停，可单步或继续运行。');api.toast('已恢复当前状态');}
+      try{const snapshot=decode(checkpoint);apply(snapshot);persist();feedback('已恢复保存时的状态。自动运行保持暂停，可单步或继续运行。');api.toast('已恢复当前状态');}
       catch(e){feedback(e.message,true);}
     });
     $('export-state').addEventListener('click',()=>{
@@ -106,7 +107,7 @@
     }
     $('clear-all').addEventListener('click',()=>{
       try {
-        const empty=S.decode(S.encode({version:2,draft:'',functions:[],functionDraft:{name:'',source:''},completed:[],mode:'free',level:0,
+        const empty=decode(S.encode({version:2,draft:'',functions:[],functionDraft:{name:'',source:''},completed:[],mode:'free',level:0,
           session:{original:null,steps:0,dirty:false,halt:''},view:{numberEncoding:'church',decimalPlaces:6,speed:600,scale:1,autoFit:true,panX:0,panY:0,historyOpen:false,helpOpen:false,hintOpen:false},
           selection:{start:0,end:0},error:''}));
         const result=replaceWithBackup(empty);
@@ -125,7 +126,7 @@
     $('import-state').addEventListener('click',()=>$('import-file').click());
     $('import-file').addEventListener('change',async()=>{
       const file=$('import-file').files[0];$('import-file').value='';if(!file)return;
-      try{if(file.size>S.MAX_BYTES)throw new C.LambdaError('存档文件超过 2 MiB 上限。');const snapshot=S.decode(await file.text());
+      try{if(file.size>S.MAX_BYTES)throw new C.LambdaError('存档文件超过 2 MiB 上限。');const snapshot=decode(await file.text());
         if(Object.prototype.hasOwnProperty.call(snapshot,'checkpointText')) {
           if(snapshot.checkpointText===null)localStorage.removeItem(CHECKPOINT);else localStorage.setItem(CHECKPOINT,snapshot.checkpointText);
           checkpoint=snapshot.checkpointText;$('restore-state').disabled=checkpoint===null;

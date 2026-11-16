@@ -16,7 +16,7 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
     for(const [s,want] of [['3','Church 数 3'],['3_decimal','小数 3'],['-0.125_decimal','小数 -0.125'],['9007199254740993.25_decimal','小数 9007199254740993.25']]){await source(s);assert.equal(await page.locator('#decoded').textContent(),want);}
    });
    await check(`${width}px exact addition preserves every beta step and backtracking`,async()=>{
-    await operation('ADD','0.1','0.2');await fast('小数 0.3');const n=Number(await page.locator('#step-count').textContent());assert.ok(n>100);assert.equal(await page.locator('#history-list li').count(),n+1);
+    await operation('ADD','0.1','0.2');await fast('小数 0.3');const n=Number(await page.locator('#step-count').textContent());assert.ok(n>100);assert.equal(await page.locator('#history-count').textContent(),`${n} 次替换`);
     await page.locator('#back').click();assert.equal(Number(await page.locator('#step-count').textContent()),n-1);await page.locator('#step').click();assert.equal(await page.locator('#decoded').textContent(),'小数 0.3');
    });
    await check(`${width}px subtraction gives negative values and decimal multiplication is exact`,async()=>{

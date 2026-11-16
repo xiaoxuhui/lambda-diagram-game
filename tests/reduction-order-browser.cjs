@@ -39,13 +39,13 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
       assert.equal(await page.locator('#reduction-order').inputValue(),'applicative');assert.equal(await current(page),'(λx.x) z');
       await order(page,'normal');await page.locator('#step').click();await page.locator('#save-state').click();
       const event=page.waitForEvent('download');await page.locator('#export-state').click();const file=await (await event).path(),saved=JSON.parse(fs.readFileSync(file,'utf8'));
-      assert.deepEqual(saved.session.paths,[['arg'],null]);assert.equal(saved.version,3);await source(page,'λq.q');await order(page,'applicative');await page.locator('#restore-state').click();assert.equal(await current(page),'z');assert.equal(await page.locator('#reduction-order').inputValue(),'normal');
+      assert.deepEqual(saved.session.choices,[[0,'applicative:left'],[1,null]]);assert.equal(saved.version,4);await source(page,'λq.q');await order(page,'applicative');await page.locator('#restore-state').click();assert.equal(await current(page),'z');assert.equal(await page.locator('#reduction-order').inputValue(),'normal');
       await source(page,'λq.q');await page.locator('#import-file').setInputFiles(file);await page.waitForFunction(()=>document.getElementById('current-expression').textContent==='z');await page.locator('#back').click();assert.equal(await current(page),'(λx.x) z');await page.locator('#back').click();assert.equal(await current(page),nested);
     });
     await check('clear resets order, backup restores it, and legacy saves default to normal',async()=>{
       await source(page,nested);await order(page,'applicative');await page.locator('#step').click();await page.locator('#save-state').click();const event=page.waitForEvent('download');await page.locator('#clear-all').click();const file=await (await event).path();
       assert.equal(await page.locator('#reduction-order').inputValue(),'normal');await page.locator('#import-file').setInputFiles(file);await page.waitForFunction(()=>document.getElementById('current-expression').textContent==='(λx.x) z');assert.equal(await page.locator('#reduction-order').inputValue(),'applicative');
-      const legacy=JSON.parse(fs.readFileSync(file,'utf8'));delete legacy.view.strategy;delete legacy.session.paths;legacy.version=2;legacy.session.steps=0;
+      const legacy=JSON.parse(fs.readFileSync(file,'utf8'));delete legacy.view.strategy;delete legacy.session.choices;legacy.version=2;legacy.session.steps=0;
       await page.locator('#import-file').setInputFiles({name:'old-order.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(legacy))});await page.waitForFunction(()=>document.getElementById('reduction-order').value==='normal');assert.equal(await current(page),nested);
     });
     await check('manual top-bar selection can override the automatic order',async()=>{
@@ -82,10 +82,10 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
       await direction(page,'left');await page.locator('#step').click();await page.locator('#save-state').click();await source(page,'λq.q');await direction(page,'right');await page.locator('#restore-state').click();
       assert.equal(await page.locator('#reduction-direction').inputValue(),'left');assert.equal(await current(page),'u v');await direction(page,'right');
       const event=page.waitForEvent('download');await page.locator('#clear-all').click();const file=await (await event).path(),saved=JSON.parse(fs.readFileSync(file,'utf8'));
-      assert.equal(saved.view.direction,'right');assert.deepEqual(saved.session.paths,[['arg'],null]);assert.equal(await page.locator('#reduction-direction').inputValue(),'left');
+      assert.equal(saved.view.direction,'right');assert.deepEqual(saved.session.choices,[[0,'normal:right'],[1,null]]);assert.equal(await page.locator('#reduction-direction').inputValue(),'left');
       await page.locator('#import-file').setInputFiles(file);await page.waitForFunction(()=>document.getElementById('current-expression').textContent==='u v');assert.equal(await page.locator('#reduction-direction').inputValue(),'right');
       await page.locator('#back').click();assert.equal(await current(page),'(λa.a) u v');await page.locator('#back').click();assert.equal(await current(page),siblings);
-      delete saved.view.direction;delete saved.session.paths;saved.version=2;saved.session.steps=1;
+      delete saved.view.direction;delete saved.session.choices;saved.version=2;saved.session.steps=1;
       await page.locator('#import-file').setInputFiles({name:'legacy-direction.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(saved))});
       await page.waitForFunction(()=>document.getElementById('reduction-direction').value==='left');assert.equal(await current(page),'u ((λb.b) v)');
     });

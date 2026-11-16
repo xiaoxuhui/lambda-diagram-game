@@ -89,7 +89,7 @@ const P=require('../src/presets.js');process.env.PORT='0';const server=require('
     await page.locator('#back').click();assert.equal(Number(await page.locator('#step-count').textContent()),Number(steps)-1);await page.locator('#step').click();assert.equal(await page.locator('#decoded').textContent(),'Church 数 6');
    });
    await check(`${width}px C(4,2) really runs to 6 and every step remains available`,async()=>{
-    await select('组合数');await run(6);const steps=Number(await page.locator('#step-count').textContent());assert.ok(steps>1);assert.equal(await page.locator('#history-list li').count(),steps+1);
+    await select('组合数');await run(6);const steps=Number(await page.locator('#step-count').textContent());assert.ok(steps>1);assert.equal(await page.locator('#history-count').textContent(),`${steps} 次替换`);
    });
    if(width===1280){
     await check('desktop explicit Y factorial runs to 6',async()=>{await select('Y 递归');await run(6);});

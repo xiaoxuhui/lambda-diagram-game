@@ -206,7 +206,7 @@ const C=require('../src/core.js'),P=require('../src/presets.js');
       assert.equal(await page.locator('#reduction-order').inputValue(),'normal');
       assert.equal(await page.locator('#reduction-direction').inputValue(),'left');
       const count=Number(await page.locator('#step-count').textContent());
-      assert.equal(await page.locator('#history-list li').count(),count+1);
+      assert.equal(await page.locator('#history-count').textContent(),`${count} 次替换`);
       await page.locator('#history-details').evaluate(details=>details.open=true);
       await page.locator('#history-list li').last().getByRole('button',{name:'查看此步'}).click();
       assert.ok(await page.locator('#history-list li').last().locator('code').textContent());

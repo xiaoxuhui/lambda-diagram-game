@@ -110,6 +110,32 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
       await page.waitForFunction(()=>document.querySelector('#step-count').textContent==='1');
       assert.equal(await page.locator('.diagram-wire-motion,.diagram-previous').count(),0);
     });
+    await check('RGB, HSV and CMYK update the live palette and persist with the scene',async()=>{
+      await page.setViewportSize({width:390,height:844});
+      await source('(λx.x) y z');
+      const summary=page.locator('#diagram-palette summary'),channels=page.locator('#palette-channels input');
+      const set=async(target,mode,values)=>{
+        await page.locator('#palette-target').selectOption(target);
+        await page.locator('#palette-mode').selectOption(mode);
+        for(let i=0;i<values.length;i++)await channels.nth(i).fill(String(values[i]));
+      };
+      const stroke=(selector,color)=>page.waitForFunction(([selector,color])=>document.querySelector(`#diagram-mount ${selector}`)?.getAttribute('stroke')===color,[selector,color]);
+      await summary.click();
+      await set('0','RGB',[250,20,30]);await stroke('[data-kind="variable"]:not([stroke-dasharray])','#fa141e');
+      await channels.first().fill('256');await stroke('[data-kind="variable"]:not([stroke-dasharray])','#fa141e');
+      await set('highlight','HSV',[120,100,100]);await stroke('[data-active]','#00ff00');
+      await set('free','CMYK',[100,0,0,0]);await stroke('[data-kind="variable"][stroke-dasharray]','#00ffff');
+      assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+      await page.evaluate(()=>{window.LambdaAndroid={saveFile(name,content){window.exported=content;}};});
+      await page.locator('#export-svg').click();
+      const svg=await page.evaluate(()=>window.exported);
+      assert.match(svg,/stroke="#fa141e"/);assert.match(svg,/stroke="#00ffff"/);
+      await page.locator('#save-state').click();await page.reload();
+      await stroke('[data-active]','#00ff00');await stroke('[data-kind="variable"][stroke-dasharray]','#00ffff');
+      await summary.click();await page.locator('#palette-reset').click();
+      await stroke('[data-active]','#ff91b7');await stroke('[data-kind="variable"][stroke-dasharray]','#aeb9ce');
+      await page.locator('#restore-state').click();await stroke('[data-active]','#00ff00');
+    });
     await check('viewport navigation has no script errors',async()=>assert.deepEqual(errors,[]));
     console.log(`Viewport browser checks: ${count} passed, 0 failed.`);
   }finally{await browser.close();server.close();}

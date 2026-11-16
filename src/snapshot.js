@@ -1,6 +1,8 @@
 (function(root) {
   'use strict';
   const C=root.LambdaCore||require('./core.js'),L=root.LambdaLibrary||require('./library.js'),P=root.LambdaPresets||require('./presets.js'),E=root.LambdaDataEncoding||require('./data-encoding.js');
+  const Palette=root.LambdaPalette||require('./palette.js');
+  const Trace=root.LambdaTrace||require('./trace.js');
   const LEVEL_IDS=new Set(P.levels.map(l=>l.id));
   const MAX_BYTES=2*1024*1024;
   const fail=message=>{throw new C.LambdaError(`存档无效：${message}`);};
@@ -19,7 +21,7 @@
     const term=walk(raw,1);C.inspect(term);return term;
   }
   function validate(raw) {
-    if(!object(raw)||![2,3].includes(raw.version))fail('不支持这个存档版本。');
+    if(!object(raw)||![2,3,4].includes(raw.version))fail('不支持这个存档版本。');
     if(typeof raw.draft!=='string')fail('草稿缺失或不是文本。');
     if(!Array.isArray(raw.functions))fail('函数库不合法。');
     const functions=raw.functions.map(f=>{
@@ -45,14 +47,26 @@
     const original=s.original===null?null:ast(s.original);if(!original&&s.steps!==0)fail('没有起始表达式，无法恢复归约。');
     const encodings=s.encodings??[];
     if(!Array.isArray(encodings)||encodings.some(name=>typeof name!=='string'||!(/^[\p{L}][\p{L}\p{N}_']*$/u.test(name))))fail('表达式编码标记不合法。');
-    let paths;
+    const getChoice=(choice,allowOrder)=>{
+      if(choice===null||allowOrder&&Trace.isOrder(choice))return choice;
+      if(!Array.isArray(choice)||choice.some(part=>!['body','fn','arg'].includes(part)))fail('归约路径不合法。');
+      return choice.slice();
+    };
+    let paths,choices,version=raw.version;
     if(s.paths!==undefined){
       if(!Array.isArray(s.paths)||s.paths.length!==s.steps)fail('归约路径数量与步数不一致。');
-      paths=s.paths.map(path=>{
-        if(path===null)return null;
-        if(!Array.isArray(path)||path.some(part=>!['body','fn','arg'].includes(part)))fail('归约路径不合法。');
-        return path.slice();
+      paths=s.paths.map(path=>getChoice(path,false));
+      if(version===2)version=3;
+    }
+    if(s.choices!==undefined){
+      if(paths||!Array.isArray(s.choices))fail('归约记录不合法。');
+      let last=-1;
+      choices=s.choices.map(entry=>{
+        if(!Array.isArray(entry)||entry.length!==2||!Number.isSafeInteger(entry[0])||entry[0]<=last||entry[0]>=s.steps)fail('归约记录步号不合法。');
+        last=entry[0];
+        return [last,getChoice(entry[1],true)];
       });
+      version=4;
     }
     if(typeof s.halt!=='string'||s.halt.length>500)fail('暂停信息不合法。');
     const v=raw.view;if(!object(v)||!Number.isInteger(v.speed)||v.speed<1||v.speed>60000||!Number.isFinite(v.scale)||v.scale<.02||v.scale>16)fail('视图设置不合法。');
@@ -64,6 +78,8 @@
     if(inputFormatDraft!==undefined&&(!object(inputFormatDraft)||typeof inputFormatDraft.encoding!=='string'||typeof inputFormatDraft.text!=='string'))fail('输入形式草稿不合法。');
     const decimalPlaces=v.decimalPlaces===undefined?6:v.decimalPlaces;if(!Number.isSafeInteger(decimalPlaces)||decimalPlaces<0)fail('小数位数不合法。');
     const panX=v.panX??0,panY=v.panY??0;
+    const palette=v.palette===undefined?undefined:Palette.validate(v.palette);
+    if(palette===null)fail('图示颜色不合法。');
     if(!Number.isFinite(panX)||!Number.isFinite(panY)||panX<0||panY<0||panX>5000000||panY>5000000)fail('图示位置不合法。');
     for(const field of ['autoFit','historyOpen','helpOpen','hintOpen'])if(typeof v[field]!=='boolean')fail('视图开关不合法。');
     const selection=raw.selection;if(!object(selection)||!Number.isInteger(selection.start)||!Number.isInteger(selection.end)||selection.start<0||selection.start>selection.end||selection.end>raw.draft.length)fail('光标位置不合法。');
@@ -72,18 +88,24 @@
     if(!object(functionDraft)||typeof functionDraft.name!=='string'||functionDraft.name.length>32||typeof functionDraft.source!=='string')fail('函数编辑草稿不合法。');
     const editing=functionDraft.editing??null;
     if(editing!==null&&(!L.validName(editing)||!functions.some(fn=>fn.name===editing)))fail('正在编辑的函数不存在或不合法。');
-    return {version:paths===undefined?raw.version:3,savedAt:typeof raw.savedAt==='string'&&Number.isFinite(Date.parse(raw.savedAt))?raw.savedAt:new Date().toISOString(),draft:raw.draft,
+    return {version,savedAt:typeof raw.savedAt==='string'&&Number.isFinite(Date.parse(raw.savedAt))?raw.savedAt:new Date().toISOString(),draft:raw.draft,
       functions,dataEncodings,encodingDraft:{name:encodingDraft.name,source:encodingDraft.source,...(encodingEditing===null?{}:{editing:encodingEditing})},completed:[...new Set(raw.completed)],mode:raw.mode,level:raw.level,
-      session:{original,steps:s.steps,dirty:s.dirty,halt:s.halt,...(s.encodings===undefined?{}:{encodings:[...new Set(encodings)]}),...(paths===undefined?{}:{paths})},view:{speed:v.speed,strategy,direction,numberEncoding,decimalPlaces,...(v.numberFormats===undefined?{}:{numberFormats:{...numberFormats}}),...(inputFormatDraft===undefined?{}:{inputFormatDraft:{encoding:inputFormatDraft.encoding,text:inputFormatDraft.text}}),scale:v.scale,autoFit:v.autoFit,panX,panY,historyOpen:v.historyOpen,helpOpen:v.helpOpen,hintOpen:v.hintOpen},
+      session:{original,steps:s.steps,dirty:s.dirty,halt:s.halt,...(s.encodings===undefined?{}:{encodings:[...new Set(encodings)]}),...(paths===undefined?{}:{paths}),...(choices===undefined?{}:{choices})},view:{speed:v.speed,strategy,direction,numberEncoding,decimalPlaces,...(v.numberFormats===undefined?{}:{numberFormats:{...numberFormats}}),...(inputFormatDraft===undefined?{}:{inputFormatDraft:{encoding:inputFormatDraft.encoding,text:inputFormatDraft.text}}),...(palette===undefined?{}:{palette}),scale:v.scale,autoFit:v.autoFit,panX,panY,historyOpen:v.historyOpen,helpOpen:v.helpOpen,hintOpen:v.hintOpen},
       selection:{start:selection.start,end:selection.end},error:raw.error,functionDraft:{name:functionDraft.name,source:functionDraft.source,...(editing===null?{}:{editing})}};
   }
-  function replay(s) {
-    const history=s.session.original?[{term:s.session.original,change:null}]:[];let term=s.session.original;
+  function replay(s,compact) {
+    let term=s.session.original,choice=null,next=0;
+    const trace=compact?Trace.create(term):null;
+    const history=!compact&&term?[{term,change:null}]:[];
     for(let i=0;i<s.session.steps;i++){
-      const path=s.session.paths?.[i];const result=path==null?C.step(term):C.stepAt(term,path);
-      if(!result)fail(path==null?'步数超过实际可归约次数。':'归约路径未指向可归约项。');term=result.term;history.push({term,change:result});
+      if(s.session.paths)choice=s.session.paths[i];
+      else if(s.session.choices?.[next]?.[0]===i)choice=s.session.choices[next++][1];
+      const result=Trace.step(term,choice);
+      if(!result)fail(Array.isArray(choice)?'归约路径未指向可归约项。':'步数超过实际可归约次数。');
+      term=result.term;
+      if(trace)trace.append(result,choice);else history.push({term,change:result});
     }
-    return {...s,term,history,hasSession:true};
+    return {...s,term,...(trace?{trace}:{history}),hasSession:true};
   }
   function encode(raw) {
     const text=JSON.stringify(validate(raw));
@@ -95,7 +117,7 @@
     if(new TextEncoder().encode(text).length>MAX_BYTES)fail('文件超过 2 MiB 上限。');
     return text;
   }
-  function decode(text) {
+  function decode(text,{compact=false}={}) {
     if(typeof text!=='string'||text.length>MAX_BYTES||new TextEncoder().encode(text).length>MAX_BYTES)fail('文件超过 2 MiB 上限。');
     let raw;try{raw=JSON.parse(text);}catch{fail('不是有效的 JSON 文件。');}
     if(object(raw)&&raw.version===1) {
@@ -105,9 +127,9 @@
         session:{original:null,steps:0,dirty:true,halt:''},view:{numberEncoding:'church',speed:600,scale:1,autoFit:true,historyOpen:false,helpOpen:false,hintOpen:false},selection:{start:0,end:0},error:''};
       return {...validate(migrated),history:[],term:null,hasSession:false};
     }
-    const snapshot=replay(validate(raw));
+    const snapshot=replay(validate(raw),compact);
     if(Object.prototype.hasOwnProperty.call(raw,'checkpoint')) {
-      snapshot.checkpointText=raw.checkpoint===null?null:encode(replay(validate(raw.checkpoint)));
+      snapshot.checkpointText=raw.checkpoint===null?null:encode(replay(validate(raw.checkpoint),true));
     }
     return snapshot;
   }

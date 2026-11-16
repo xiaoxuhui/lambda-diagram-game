@@ -2,7 +2,7 @@
   'use strict';
   const NS='http://www.w3.org/2000/svg',D=root.LambdaDiagram;
   const coordinates=['x1','x2','y1','y2'],dash=[5,5],solid=[];
-  const stroke=line=>line.active?'#ff91b7':line.color;
+  const stroke=D.lineStroke;
   function init(mount){
     let svg=null,model=null,hitLayer=null,motion=null,previous=null,frameRequest=null,enabled=true;const lines=[],labels=[],hits=[];
     let wireMotion=null;
@@ -154,7 +154,7 @@
         const line=next.lines[i],old=model?.lines[i];let node=lines[i];
         if(!node){node=element('line');node.append(element('title'));node.setAttribute('stroke-linecap','square');lines.push(node);newLines.append(node);}
         for(const key of coordinates)attribute(node,key,line[key],old?.[key]);
-        attribute(node,'stroke',line.active?'#ff91b7':line.color,old?(old.active?'#ff91b7':old.color):undefined);
+        attribute(node,'stroke',stroke(line),old?stroke(old):undefined);
         attribute(node,'stroke-width',line.active?5:3,old?(old.active?5:3):undefined);
         attribute(node,'stroke-dasharray',line.free?'5 5':null,old?(old.free?'5 5':null):undefined);
         attribute(node,'data-kind',line.kind,old?.kind);attribute(node,'data-active',line.active?'true':null,old?(old.active?'true':null):undefined);

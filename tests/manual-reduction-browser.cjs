@@ -27,7 +27,7 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
       await page.locator('#save-state').click();await page.reload();assert.equal(await current(page),'z');await page.locator('#back').click();assert.equal(await current(page),'(λx.x) z');
       await page.locator('#restore-state').click();assert.equal(await current(page),'z');
       const download=page.waitForEvent('download');await page.locator('#export-state').click();const file=await (await download).path();
-      const backup=JSON.parse(fs.readFileSync(file,'utf8'));assert.deepEqual(backup.session.paths,[['arg'],null]);
+      const backup=JSON.parse(fs.readFileSync(file,'utf8'));assert.deepEqual(backup.session.choices,[[0,['arg']],[1,null]]);
       await source(page,'λq.q');await page.locator('#import-file').setInputFiles(file);await page.waitForFunction(()=>document.getElementById('current-expression').textContent==='z');
       await page.locator('#back').click();assert.equal(await current(page),'(λx.x) z');await page.locator('#back').click();assert.equal(await current(page),'(λx.x) ((λy.y) z)');
     });

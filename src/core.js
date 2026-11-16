@@ -131,7 +131,7 @@
         else if(node.type==='abs'){parts.push(`λ${node.param}.`);stack.push([node.body,0]);}
         else stack.push([node.arg,2],' ',[node.fn,1]);
       }
-      text=parts.join('');if(analyze(t).stable)formatted.set(t,text);
+      text=parts.join('');if(text.length<=512&&analyze(t).stable)formatted.set(t,text);
     }
     return (t.type==='abs'&&context>0)||(t.type==='app'&&context>1)?`(${text})`:text;
   }
@@ -222,11 +222,12 @@
     if(!STRATEGIES.includes(strategy))throw new LambdaError('归约顺序不合法。');
     if(!DIRECTIONS.includes(direction))throw new LambdaError('归约方向不合法。');
     const first=direction==='right'?'arg':'fn',second=direction==='right'?'fn':'arg';
+    const normal=strategy==='normal';
+    if(!(normal&&t.type==='app'&&t.fn.type==='abs')&&!hasRedex(t))return null;
     while(true){
-      if(strategy==='normal'&&t.type==='app'&&t.fn.type==='abs')return t;
-      if(!hasRedex(t))return null;
       let part;
       if(t.type==='abs')part='body';
+      else if(normal&&t.fn.type==='abs')return t;
       else if(hasRedex(t[first]))part=first;
       else if(hasRedex(t[second]))part=second;
       else return t;

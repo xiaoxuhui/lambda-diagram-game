@@ -2,37 +2,42 @@
   'use strict';
   const C=root.LambdaCore||require('./core.js');
 
-  // A suspended argument shares its value with every reference to its binder.
   function normalize(term,{signal,onProgress}={}){
-    const thunk=(term,environment)=>({term,environment,value:null});
-    const stack=[],names=C.freeVars(term);
-    let job={kind:'normalize',thunk:thunk(term,null)},value,nextName=0,steps=0;
+    const stack=[{kind:'quote'}],names=C.freeVars(term),normalForms=new WeakMap();
+    let job={term,environment:null},value,nextName=0,steps=0;
     function fresh(){
       let name;
       do{name='v'+nextName++;}while(names.has(name));
       return name;
     }
-    function force(source){
-      job={kind:'force',thunk:source};
-    }
     function deliver(result){
       value=result;job=null;
     }
+    function bound(name,environment){
+      for(let binding=environment;binding;binding=binding.parent){
+        if(binding.name===name)return binding.argument;
+      }
+      return null;
+    }
+    function suspend(term,environment){
+      // Passing an existing variable forward shares its suspended computation.
+      return (term.type==='var'&&bound(term.name,environment))||{term,environment,value:null};
+    }
+    function force(source){
+      if(source.value){deliver(source.value);return;}
+      stack.push({kind:'remember',source});
+      job={term:source.term,environment:source.environment};
+    }
     function visit(){
       if(job){
-        const source=job.thunk;
-        if(job.kind==='normalize'){stack.push({kind:'quote'});force(source);return;}
-        if(source.value){deliver(source.value);return;}
-        const {term,environment}=source;
-        stack.push({kind:'remember',source});
+        const {term,environment}=job;
         if(term.type==='abs'){deliver({term,environment});return;}
         if(term.type==='app'){
-          stack.push({kind:'apply',argument:thunk(term.arg,environment)});
-          force(thunk(term.fn,environment));return;
+          stack.push({kind:'apply',argument:suspend(term.arg,environment)});
+          job={term:term.fn,environment};return;
         }
-        let binding=environment;
-        while(binding&&binding.name!==term.name)binding=binding.parent;
-        if(binding)force(binding.argument);else deliver({name:term.name});
+        const argument=bound(term.name,environment);
+        if(argument)force(argument);else deliver({name:term.name});
         return;
       }
       const frame=stack.pop();
@@ -41,22 +46,28 @@
         case 'apply':
           if(value.term){
             steps++;
-            force(thunk(value.term.body,{name:value.term.param,argument:frame.argument,parent:value.environment}));
+            // A tail call proceeds directly, without retaining a thunk for its result.
+            job={term:value.term.body,environment:{name:value.term.param,argument:frame.argument,parent:value.environment}};
           }else deliver({fn:value,arg:frame.argument});
           break;
-        case 'quote':
+        case 'quote': {
+          const normal=normalForms.get(value);
+          if(normal){deliver(normal);break;}
+          stack.push({kind:'rememberForm',source:value});
           if(value.term){
             const name=fresh(),argument={value:{name}};
-            stack.push({kind:'abstract',name});
-            job={kind:'normalize',thunk:thunk(value.term.body,{name:value.term.param,argument,parent:value.environment})};
+            stack.push({kind:'abstract',name},{kind:'quote'});
+            job={term:value.term.body,environment:{name:value.term.param,argument,parent:value.environment}};
           }else if(value.fn){
             stack.push({kind:'quoteArg',arg:value.arg},{kind:'quote'});
             deliver(value.fn);
           }else deliver(C.V(value.name));
           break;
+        }
+        case 'rememberForm':normalForms.set(frame.source,value);break;
         case 'quoteArg':
-          stack.push({kind:'buildApp',fn:value});
-          job={kind:'normalize',thunk:frame.arg};
+          stack.push({kind:'buildApp',fn:value},{kind:'quote'});
+          force(frame.arg);
           break;
         case 'abstract':deliver(C.L(frame.name,value));break;
         case 'buildApp':deliver(C.A(frame.fn,value));break;
