@@ -58,7 +58,7 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
         assert.equal(await page.locator('#decoded').textContent(),'0_Constant / 1_Constant / 7_Constant（多项匹配）');
       });
       await check(`${width}px endless generators remain cancelable`,async()=>{
-        await define('Loop','λn.(λx.x x) (λx.x x)');if(!await page.locator('#encoding-table').evaluate(panel=>panel.open))await page.locator('#encoding-table-title').click();await page.locator('#encoding-table-number').fill('0');await page.locator('#encoding-table-generate').click();
+        await define('Loop','λn f.(λx.f ((λt.t) (x x))) (λx.f ((λt.t) (x x)))');if(!await page.locator('#encoding-table').evaluate(panel=>panel.open))await page.locator('#encoding-table-title').click();await page.locator('#encoding-table-number').fill('0');await page.locator('#encoding-table-generate').click();
         await page.waitForFunction(()=>document.getElementById('encoding-table-status').textContent.startsWith('正在归约'));
         await page.locator('#encoding-table-cancel').click();assert.match(await page.locator('#encoding-table-status').textContent(),/取消/);assert.equal(await page.locator('#encoding-table-body tr').count(),0);assert.ok(await page.locator('#encoding-table-generate').isEnabled());
       });await context.close();

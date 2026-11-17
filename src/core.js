@@ -215,6 +215,28 @@
     }
     return true;
   }
+  // Brent's cycle check keeps one older term. Limits here bound comparison work, not reduction.
+  function cycleCheck(initial){
+    let checkpoint=initial,power=1,length=0;
+    const same=(left,right)=>{
+      if(left===right)return true;
+      if(left.type!==right.type)return false;
+      const a=analyze(left),b=analyze(right);
+      return a.nodes<=8192&&a.nodes===b.nodes&&a.depth===b.depth&&equal(left,right);
+    };
+    return (term,change)=>{
+      if(change){
+        const {before,replacement}=change;
+        if(same(before,replacement))return true;
+        // A neutral head leaves the same reducible application in its argument.
+        if(replacement.type==='app'&&replacement.fn.type==='var'&&same(before,replacement.arg))return true;
+      }
+      length++;
+      if(same(checkpoint,term))return true;
+      if(length===power){checkpoint=term;power*=2;length=0;}
+      return false;
+    };
+  }
   const STRATEGIES=Object.freeze(['normal','applicative']);
   const DIRECTIONS=Object.freeze(['left','right']);
   const hasRedex=t=>analyze(t).redex;
@@ -269,12 +291,11 @@
   function normalize(t, max = LIMITS.steps,strategy='normal',direction='left') {
     if(!STRATEGIES.includes(strategy))throw new LambdaError('归约顺序不合法。');
     if(!DIRECTIONS.includes(direction))throw new LambdaError('归约方向不合法。');
-    const seen = new Set([key(t)]); let steps = 0;
+    const repeated=cycleCheck(t);let steps=0;
     while (steps < max) {
       const s = step(t,strategy,direction); if (!s) return { term: t, steps, status: 'normal' };
-      t = s.term; steps++; const k = key(t);
-      if (seen.has(k)) return { term: t, steps, status: 'cycle' };
-      seen.add(k);
+      t=s.term;steps++;
+      if(repeated(t,s))return {term:t,steps,status:'cycle'};
     }
     return { term: t, steps, status: findRedex(t,[],strategy,direction) ? 'limit' : 'normal' };
   }
@@ -285,7 +306,7 @@
     return body.type === 'var' && body.name === x ? n : null;
   }
   function parseInput(source,maxChars=LIMITS.chars){if(!root.LambdaDecimal)throw new LambdaError('列表小数模块尚未加载。');return parse(source,maxChars,root.LambdaDecimal.encodeLiteral);}
-  const API = { LIMITS, STRATEGIES, DIRECTIONS, LambdaError, V, L, A, churchList, parse, parseInput, format, inspect, freeVars, substitute, alphaKey, key, equal, hasRedex, findRedex, step, stepAt, normalize, churchNumber };
+  const API = { LIMITS, STRATEGIES, DIRECTIONS, LambdaError, V, L, A, churchList, parse, parseInput, format, inspect, freeVars, substitute, alphaKey, key, equal, hasRedex, findRedex, step, stepAt, normalize, churchNumber, cycleCheck };
   root.LambdaCore = API;
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
 })(typeof globalThis !== 'undefined' ? globalThis : window);

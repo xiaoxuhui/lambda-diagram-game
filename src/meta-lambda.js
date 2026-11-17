@@ -3,7 +3,8 @@
   const C=root.LambdaCore||require('./core.js');
   const {V,L,A}=C;
   const alphabet="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_'";
-  const marker=C.parse('λx.x x x x x x x');
+  const legacyMarker=C.parse('λx.x x x x x x x');
+  const marker=C.parse('λa b c d e f g.g f e d c b a');
   const successor=C.parse('λn f x.f (n f x)');
   const oldSuccessorExample=C.parse('succ 2 ((λn f x.n f (f x)) 2)');
   const numeral=n=>C.parse(String(n));
@@ -28,13 +29,13 @@
     ['head','fix (λwhnf t.t bound freeTerm abs (λp q.(λh.h (λi.app h q) (λname.app h q) (λbody.whnf (subst q 0 body)) (λf a.app h q)) (whnf p)))'],
     ['normalize','fix (λnf t.(head t) bound freeTerm (λbody.abs (nf body)) (λp q.app (nf p) (nf q)))']
   ];
-  function makeProgram(functions){
+  function makeProgram(functions,tag=marker){
     let term=C.parse('λinput result.result tag (normalize input)');
     for(const [name,source] of [...functions].reverse())term=A(L(name,term),C.parse(source));
-    return A(L('tag',term),marker);
+    return A(L('tag',term),tag);
   }
-  const legacyProgram=makeProgram(definitions);
-  const program=makeProgram([
+  const legacyProgram=makeProgram(definitions,legacyMarker);
+  const environmentDefinitions=[
     ...definitions.filter(([name])=>['succ','pred','fix','bound','freeTerm','abs','app'].includes(name)),
     ['nil','λnext end.end'],
     ['cons','λvalue rest next end.next value rest'],
@@ -45,7 +46,15 @@
     ['reify','fix (λquote value depth.value (λbody.abs (quote (body (neutral (λd.bound (pred (depth pred d))))) (succ depth))) (λterm.term depth))'],
     ['evalTerm','fix (λeval env term.term (λi.get i env) (λname.neutral (λdepth.freeTerm name)) (λbody.closure (λvalue.eval (cons value env) body)) (λp q.(eval env p) (λbody.body (eval env q)) (λterm.neutral (λdepth.app (term depth) (reify (eval env q) depth)))))'],
     ['normalize','λterm.reify (evalTerm nil term) 0']
-  ]);
+  ];
+  const previousProgram=makeProgram(environmentDefinitions,legacyMarker);
+  // Select a branch before supplying its environment or evaluated argument.
+  // The unselected branch then disappears before it can duplicate either value.
+  const factoredDefinitions={
+    reify:'fix (λquote value depth.value (λbody depth.abs (quote (body (neutral (λd.bound (pred (depth pred d))))) (succ depth))) (λterm.term) depth)',
+    evalTerm:'fix (λeval env term.term get (λname env.neutral (λdepth.freeTerm name)) (λbody env.closure (λvalue.eval (cons value env) body)) (λp q env.(eval env p) (λbody.body) (λterm argument.neutral (λdepth.app (term depth) (reify argument depth))) (eval env q)) env)'
+  };
+  const program=makeProgram(environmentDefinitions.map(([name,source])=>[name,factoredDefinitions[name]??source]));
 
   function variant(index,fields){
     const params=['boundCase','freeCase','absCase','appCase'];
@@ -72,19 +81,20 @@
     }
     return quoted[0];
   }
-  function compile(source,expand=term=>term){
-    const term=C.parse(source);
+  function compileTerm(term,expand=term=>term){
     const restored=unwrap(term);
-    return C.format(A(program,quote(restored?expandInput(restored,expand):expand(term))));
+    return A(program,quote(restored?expandInput(restored,expand):expand(term)));
   }
 
   function unwrap(term){
     const {head,args}=application(term);
-    if(args.length>=2&&C.equal(args[0],marker)){
-      const legacy=C.equal(head,legacyProgram.fn);
-      if(!legacy&&!C.equal(head,program.fn))return null;
+    if(args.length>=2){
+      const oldTag=C.equal(args[0],legacyMarker);
+      const legacy=oldTag&&C.equal(head,legacyProgram.fn);
+      const previous=oldTag&&C.equal(head,previousProgram.fn);
+      if(!legacy&&!previous&&!(C.equal(args[0],marker)&&C.equal(head,program.fn)))return null;
       const original=unquote(args[1]);
-      if(original)return {term:args.slice(2).reduce(A,original),legacy,trailing:args.length>2};
+      if(original)return {term:args.slice(2).reduce(A,original),legacy,previous,trailing:args.length>2};
     }
     return null;
   }
@@ -111,12 +121,11 @@
     }
     return body.type==='var'&&body.name===nil&&/^[A-Za-z][A-Za-z0-9_']*$/.test(name)?name:null;
   }
-  function read(term){
+  function readTerm(term){
     if(term.type!=='abs')return null;
     const {head,args}=application(term.body);
-    if(head.type!=='var'||head.name!==term.param||args.length!==2||!C.equal(args[0],marker))return null;
-    const decoded=unquote(args[1]);
-    return decoded?C.format(decoded):null;
+    if(head.type!=='var'||head.name!==term.param||args.length!==2||!C.equal(args[0],marker)&&!C.equal(args[0],legacyMarker))return null;
+    return unquote(args[1]);
   }
   function unquote(term){
     const pending=[{term,depth:0}],nodes=[],free=new Set();
@@ -163,16 +172,17 @@
     }
     return result[0];
   }
-  const API={compile,read,
+  const API={compile:(source,expand)=>C.format(compileTerm(C.parse(source),expand)),compileTerm,readTerm,
+    read:term=>{const decoded=readTerm(term);return decoded?C.format(decoded):null;},
     sourceOf:source=>{const restored=unwrap(C.parse(source));return restored?C.format(restored.term):source;},
     isProgram:term=>{
       const {head,args}=application(term);
       return args.length===2&&C.equal(args[0],marker)&&C.equal(head,program.fn);
     },
-    needsRepair:term=>{const restored=unwrap(term);return !!(restored&&(restored.legacy||restored.trailing));},
+    needsRepair:term=>{const restored=unwrap(term);return !!(restored&&(restored.legacy||restored.previous||restored.trailing));},
     repair:(term,expand=term=>term)=>{
       const restored=unwrap(term);
-      return restored&&(restored.legacy||restored.trailing)?A(program,quote(expandInput(restored,expand))):term;
+      return restored&&(restored.legacy||restored.previous||restored.trailing)?A(program,quote(expandInput(restored,expand))):term;
     }
   };
   root.LambdaMeta=API;

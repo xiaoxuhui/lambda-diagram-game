@@ -54,7 +54,9 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
         fs.mkdirSync(path.join(__dirname,'artifacts'),{recursive:true});await page.locator('.editor-card').screenshot({path:path.join(__dirname,'artifacts',`auto-encoding-${width}.png`)});
       });
       await check(`${width}px endless automatic encoding is cancellable and cannot overwrite a newly typed value`,async()=>{
-        await define('Loop','λn.(λx.x x) (λx.x x)');await page.locator('#expression').fill('0');await page.locator('#convert').click();await page.locator('#cancel-encoding').waitFor({state:'visible'});
+        await define('Cycle','λn.(λx.x x) (λx.x x)');await page.locator('#expression').fill('0_Cycle');await page.locator('#convert').click();
+        await page.waitForFunction(()=>document.getElementById('error-message').textContent.includes('重复归约循环'));
+        await define('Loop','λn f.(λx.f ((λt.t) (x x))) (λx.f ((λt.t) (x x)))');await page.locator('#expression').fill('0');await page.locator('#convert').click();await page.locator('#cancel-encoding').waitFor({state:'visible'});
         await typed('2_church','Church 数 2');assert.equal(await page.locator('#cancel-encoding').isHidden(),true);
         await page.locator('#expression').fill('0_Loop');await page.locator('#convert').click();await page.locator('#cancel-encoding').waitFor({state:'visible'});await page.locator('#cancel-encoding').click();assert.ok(await page.locator('#cancel-encoding').isHidden());
         await typed('3_church','Church 数 3');assert.equal(await page.locator('#expression').inputValue(),'3_church');

@@ -47,6 +47,23 @@
 .history-pages{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-top:9px;font-size:11px;color:#62746a}
 .history-pages button,.history-pages input{background:#fafbf8;border:1px solid #dfe4dd;border-radius:5px;color:inherit;padding:3px 6px}
 .history-pages input{width:70px}
+#restore-progress{max-width:calc(100vw - 36px);padding:20px;border:1px solid var(--border);border-radius:10px;color:var(--ink);background:var(--paper)}
+#restore-progress::backdrop{background:#18223855}
+#restore-progress p{margin:0 0 12px}
+.guide-panel{padding:22px 24px;margin-bottom:22px;min-width:0}
+.guide-controls{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:12px}
+.guide-controls label,.guide-picker{display:flex;align-items:center;gap:9px;font-size:12px;color:#526c5d;min-width:0}
+.guide-controls input{min-width:0;max-width:100%;padding:7px 9px;border:1px solid #dfe4dd;border-radius:5px;background:#fafbf8;color:#354e40}
+.guide-picker select{flex:1;min-width:0}
+.guide-panel article{max-width:920px}
+.guide-panel h2{font-size:20px;line-height:1.5;margin:20px 0 10px;overflow-wrap:anywhere}
+.guide-panel h3{font-size:13px;color:#355f48;margin:20px 0 8px}
+.guide-panel p{font-size:13px;line-height:1.95;color:#53665c;overflow-wrap:anywhere}
+.guide-panel pre{margin:8px 0;padding:14px 16px;background:#f5f7f1;border:1px solid #e1e7db;border-radius:7px;white-space:pre-wrap;overflow-wrap:anywhere;max-height:260px;overflow:auto;font-size:12px;line-height:1.85;color:#31583f}
+.guide-panel details summary{font-size:13px;color:#355f48;cursor:pointer;padding:6px 0}
+.guide-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:20px}
+.guide-actions .primary{margin-left:auto}
+@media(max-width:640px){.mode-row{flex-wrap:wrap}.mode-tabs{gap:15px}.progress-label{font-size:10px;margin-bottom:5px}.guide-panel{padding:16px}.guide-controls{flex-direction:column;align-items:stretch}.guide-controls input,.guide-controls select{flex:1}.guide-panel h2{font-size:17px}.guide-panel p{font-size:12px}.guide-actions .button{font-size:11px;padding:8px}.guide-panel pre{padding:11px;font-size:11px}}
 .symbol-toolbar{display:flex}.symbol-toolbar button.lambda-key{width:44px;height:37px;font-size:23px}.function-keys [data-function-insert="λ"]{width:40px;font-size:21px;color:var(--mint);background:var(--mint-light)}
 .save-bar{display:flex;align-items:center;justify-content:space-between;gap:15px;flex-wrap:wrap;background:#edf2e8;border:1px solid #dce5d6;border-radius:10px;padding:14px 18px;margin-bottom:22px}.save-info{display:grid;grid-template-columns:auto auto;gap:1px 12px;align-items:center}.save-info strong{font-size:12px;color:#4b7055}.save-info>span{font-size:10px;color:#809274}.save-info small{grid-column:1/-1;font-size:9px;color:#9ca894}.save-info>span.storage-error{color:#aa5353}.save-actions{display:flex;gap:7px;flex-wrap:wrap}.save-actions .button{padding:7px 10px;font-size:10px}.save-feedback{flex-basis:100%;margin:0;font-size:11px;color:#55784d;overflow-wrap:anywhere}.save-feedback.error{color:#ab4f52}.function-card{padding:21px 23px}.function-note{font-size:10px;color:#8a9882;margin:11px 0 14px}.function-note code{color:#59816b}.function-card form>label{display:block;font-size:10px;color:#7a8b73;margin:11px 0 5px}.function-card input{width:100%;border:1px solid #dce2d6;background:#f9faf6;padding:9px 11px;border-radius:6px;font-size:12px;font-family:var(--mono);color:#43604a;min-width:0}.function-card textarea{border:1px solid #dce2d6;border-radius:6px;background:#f9faf6;padding:10px 11px;min-height:85px;font-size:14px}.function-card input:focus,.function-card textarea:focus{outline:2px solid #b5d3b4!important;outline-offset:1px}.function-actions{display:flex;justify-content:space-between;gap:7px;margin-top:12px}.function-actions .button{font-size:10px;padding:7px 9px}.function-keys{display:flex;gap:5px;margin-top:5px}.function-keys button{background:#f6f8f1;border:1px solid #e0e7da;border-radius:4px;font-family:var(--mono);font-size:13px;min-width:27px;height:28px;padding:0 6px;color:#607956}.function-list{display:flex;flex-direction:column;gap:8px;margin-top:17px;max-height:340px;overflow:auto}.function-empty{font-size:10px;text-align:center;color:#a6b09c;padding:12px 0;margin:0;border-top:1px dashed #e1e8d9}.function-item{border:1px solid #e1e8d9;background:#f7f9f3;border-radius:6px;padding:10px;min-width:0}.function-item-head{display:flex;align-items:center;justify-content:space-between;gap:8px}.function-item strong{font-size:12px;font-family:var(--mono);color:#3d7053;overflow-wrap:anywhere;min-width:0}.function-item-buttons{display:flex;gap:5px;flex-shrink:0}.function-item button{background:white;border:1px solid #dce5d7;border-radius:4px;font-size:9px;padding:3px 7px;color:#739166}.function-item .delete-function{color:#b36565;border-color:#e7d6d2}.function-item>code{display:block;font-size:10px;margin-top:7px;color:#7f9273;overflow-wrap:anywhere;max-height:72px;overflow:auto}.function-foot{font-size:9px;line-height:1.8;color:#a0ac93;margin:13px 0 0}.function-card .error-message{margin-top:10px;margin-bottom:0}
 @media(max-width:1100px){.save-info{width:100%}.save-bar{gap:10px}.function-card{padding:20px}}
@@ -76,7 +93,7 @@
       <div><h2>三个积木，就能计算</h2><p><code>x</code> 是变量；<code>λx.x</code> 是函数；<code>f x</code> 把 x 交给 f。<code>(λx.x) y → y</code> 是一次 β 归约。</p></div>
       <div><h2>怎么写、怎么看</h2><p>用快捷栏插入 λ；也可用 <code>\</code>。<code>λx y.x</code> 等同 <code>λx.λy.x</code>。变量之间用空格：<code>xy</code> 是一个名字。λ 的作用域延伸到右侧，作为参数时需加括号。</p><p>同色竖线连接绑定横线；应用横线连接子式最左变量。高亮的粗线标记下一步归约，自由变量以虚线显示。可选择正规序（外层优先）或应用序（内部优先），都包含函数内部归约。<a href="https://tromp.github.io/cl/diagrams.html" target="_blank" rel="noopener">John Tromp 原始说明 ↗</a></p></div>
     </section>
-    <nav class="mode-row" aria-label="游戏模式"><div class="mode-tabs"><button id="mode-free" class="mode-tab active" aria-pressed="true">自由实验</button><button id="mode-challenge" class="mode-tab" aria-pressed="false">闯关模式 <span id="challenge-count">30</span></button></div><span id="progress-text" class="progress-label">探索 · 输入 · 归约</span></nav>
+    <nav class="mode-row" aria-label="游戏模式"><div class="mode-tabs"><button id="mode-free" class="mode-tab active" aria-pressed="true">自由实验</button><button id="mode-challenge" class="mode-tab" aria-pressed="false">闯关模式 <span id="challenge-count">30</span></button><button id="mode-guide" class="mode-tab" aria-pressed="false" aria-controls="guide-panel">原理讲解</button></div><span id="progress-text" class="progress-label">探索 · 输入 · 归约</span></nav>
     <section class="save-bar" aria-label="状态与进度存档"><div class="save-info"><strong>状态与进度</strong><span id="storage-status" role="status">自动保存准备中</span><small>包含函数库、归约轨迹与关卡进度</small></div><div class="save-actions"><button id="save-state" class="button primary">保存当前状态</button><button id="restore-state" class="button" disabled>恢复已保存状态</button><button id="export-state" class="button">导出存档 ↓</button><button id="import-state" class="button">导入存档 ↑</button><button id="load-default-state" type="button" class="button" aria-describedby="default-note">载入默认存档</button><button id="clear-all" type="button" class="button danger" aria-describedby="clear-note">导出存档并清空</button><input id="import-file" type="file" accept=".json,application/json" hidden></div><p id="clear-note" class="clear-note">清空会删除表达式、函数库、运行记录、关卡进度及保存点，并自动导出备份。</p><p id="default-note" class="clear-note">默认存档包含集合列表数字和示例函数；每次载入前自动导出现有完整备份，再清空载入。0 = []，后继把当前列表本身追加到末尾。</p><p id="save-feedback" class="save-feedback" role="status" hidden></p></section>
     <section id="challenge-panel" class="challenge-panel" hidden>
       <div class="stage-row"><label for="stage-select">选择阶段 <select id="stage-select" aria-label="选择挑战阶段"></select></label><span id="stage-progress" role="status"></span></div>
@@ -84,6 +101,13 @@
       <div class="challenge-body"><div><p id="level-topic" class="eyebrow"></p><h2 id="level-title"></h2><p id="level-description"></p></div><div id="challenge-target" class="challenge-target" hidden><span id="target-kind">目标正规形</span><strong id="target-label"></strong><code id="target-expression"></code></div></div>
       <div class="challenge-footer"><button id="hint-toggle" class="text-button" aria-expanded="false" aria-controls="hint">显示提示</button><p id="hint" hidden></p><button id="answer-toggle" class="text-button" aria-expanded="false" aria-controls="challenge-target">查看答案</button><button id="check-answer" class="button primary">验证答案 <span>↗</span></button><button id="next-level" class="button" hidden>下一关 →</button></div>
       <p id="challenge-feedback" class="challenge-feedback" role="status"></p>
+    </section>
+    <section id="guide-panel" class="card guide-panel" aria-label="示例原理讲解" hidden>
+      <div class="guide-controls"><label>分类<select id="guide-category"><option value="">全部分类</option></select></label><label>查找示例<input id="guide-search" type="search" placeholder="例如 前驱、积分、sin"></label></div>
+      <label class="guide-picker">选择示例<select id="guide-example"></select></label>
+      <p id="guide-count" class="syntax-note" role="status"></p>
+      <article id="guide-article"><h2 id="guide-title"></h2><p id="guide-purpose"></p><p id="guide-encoding"></p><h3>关键表达式</h3><pre><code id="guide-core"></code></pre><h3>计算原理</h3><div id="guide-principle"></div><h3>计算过程</h3><pre><code id="guide-walkthrough"></code></pre><p id="guide-parameters"></p><details><summary>完整可运行表达式</summary><pre><code id="guide-expression"></code></pre></details></article>
+      <div class="guide-actions"><button id="guide-previous" class="button" type="button">上一个示例</button><button id="guide-next" class="button" type="button">下一个示例</button><button id="guide-load" class="button primary" type="button">载入自由实验</button></div>
     </section>
     <div class="workspace">
       <aside class="editor-column">
@@ -103,7 +127,7 @@
           <p class="key-hint">Ctrl / ⌘ + Enter 快速转换</p>
           <details class="input-format-panel">
             <summary>用 λ 解释 λ</summary>
-            <p>先写完整算式，例如 <code>(λx.λy.x) y</code>，再生成。生成后点击「转换成图示」，再点击「运行」，解释器会用正规序批量执行。也可以点击「单步」观察。</p>
+            <p>先写完整算式，例如 <code>(λx.λy.x) y</code>。生成时按当前数字编码，把变量、抽象和应用表示成 λ 数据。点击「转换成图示」后运行，解释器会用正规序执行。</p>
             <button type="button" id="compile-meta-lambda" class="button">生成解释器表达式</button>
             <button type="button" id="edit-meta-source" class="button">还原待解释表达式</button>
           </details>
@@ -145,6 +169,7 @@
           <details id="normal-form" class="current-term example-info" hidden><summary>查看正规形</summary><code id="normal-form-expression"></code></details>
           <p id="run-status" class="run-status" role="status" aria-live="polite">准备好了。点击单步，观察一次函数替换。</p>
           <div class="current-term"><div><span>当前表达式</span><span id="decoded" class="decoded"></span></div><p id="expression-encoding" class="expression-encoding"></p><code id="current-expression"></code></div>
+          <details id="interpreted-result" class="current-term example-info" hidden><summary>查看解释后的 λ 表达式</summary><code id="interpreted-expression"></code></details>
           <div id="next-explanation" class="next-explanation"></div>
           <details class="history-details" id="history-details"><summary>归约轨迹 <span id="history-count">0 次替换</span></summary><div id="history-pages" class="history-pages" hidden><button type="button" id="history-older">更早</button><button type="button" id="history-newer">更新</button><label>跳到第几步 <input id="history-jump" type="number" min="0" step="1" inputmode="numeric"></label><span id="history-range"></span></div><ol id="history-list" class="history-list"></ol></details>
         </section>
@@ -152,6 +177,7 @@
     </div>
     <footer class="page-footer"><span><b>λ</b> 只有变量、函数和应用。其余，交给计算。</span><span>β 归约 · 本地保存</span></footer>
   </main>
+  <dialog id="restore-progress" aria-label="正在恢复归约进度"><p id="restore-progress-text" role="status">正在重放存档…</p><button class="button" type="button" id="cancel-restore">取消重放</button></dialog>
   <div id="toast" class="toast" role="status" hidden></div>
   <script>
 (function (root) {
@@ -371,6 +397,28 @@
     }
     return true;
   }
+  // Brent's cycle check keeps one older term. Limits here bound comparison work, not reduction.
+  function cycleCheck(initial){
+    let checkpoint=initial,power=1,length=0;
+    const same=(left,right)=>{
+      if(left===right)return true;
+      if(left.type!==right.type)return false;
+      const a=analyze(left),b=analyze(right);
+      return a.nodes<=8192&&a.nodes===b.nodes&&a.depth===b.depth&&equal(left,right);
+    };
+    return (term,change)=>{
+      if(change){
+        const {before,replacement}=change;
+        if(same(before,replacement))return true;
+        // A neutral head leaves the same reducible application in its argument.
+        if(replacement.type==='app'&&replacement.fn.type==='var'&&same(before,replacement.arg))return true;
+      }
+      length++;
+      if(same(checkpoint,term))return true;
+      if(length===power){checkpoint=term;power*=2;length=0;}
+      return false;
+    };
+  }
   const STRATEGIES=Object.freeze(['normal','applicative']);
   const DIRECTIONS=Object.freeze(['left','right']);
   const hasRedex=t=>analyze(t).redex;
@@ -425,12 +473,11 @@
   function normalize(t, max = LIMITS.steps,strategy='normal',direction='left') {
     if(!STRATEGIES.includes(strategy))throw new LambdaError('归约顺序不合法。');
     if(!DIRECTIONS.includes(direction))throw new LambdaError('归约方向不合法。');
-    const seen = new Set([key(t)]); let steps = 0;
+    const repeated=cycleCheck(t);let steps=0;
     while (steps < max) {
       const s = step(t,strategy,direction); if (!s) return { term: t, steps, status: 'normal' };
-      t = s.term; steps++; const k = key(t);
-      if (seen.has(k)) return { term: t, steps, status: 'cycle' };
-      seen.add(k);
+      t=s.term;steps++;
+      if(repeated(t,s))return {term:t,steps,status:'cycle'};
     }
     return { term: t, steps, status: findRedex(t,[],strategy,direction) ? 'limit' : 'normal' };
   }
@@ -441,7 +488,7 @@
     return body.type === 'var' && body.name === x ? n : null;
   }
   function parseInput(source,maxChars=LIMITS.chars){if(!root.LambdaDecimal)throw new LambdaError('列表小数模块尚未加载。');return parse(source,maxChars,root.LambdaDecimal.encodeLiteral);}
-  const API = { LIMITS, STRATEGIES, DIRECTIONS, LambdaError, V, L, A, churchList, parse, parseInput, format, inspect, freeVars, substitute, alphaKey, key, equal, hasRedex, findRedex, step, stepAt, normalize, churchNumber };
+  const API = { LIMITS, STRATEGIES, DIRECTIONS, LambdaError, V, L, A, churchList, parse, parseInput, format, inspect, freeVars, substitute, alphaKey, key, equal, hasRedex, findRedex, step, stepAt, normalize, churchNumber, cycleCheck };
   root.LambdaCore = API;
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
 })(typeof globalThis !== 'undefined' ? globalThis : window);
@@ -517,6 +564,7 @@
   function normalize(term,{signal,onProgress}={}){
     const stack=[{kind:'quote'}],names=C.freeVars(term),normalForms=new WeakMap();
     let job={term,environment:null},value,nextName=0,steps=0;
+    let lastCall=null;
     function fresh(){
       let name;
       do{name='v'+nextName++;}while(names.has(name));
@@ -557,6 +605,10 @@
         case 'remember':frame.source.value=value;frame.source.term=null;frame.source.environment=null;break;
         case 'apply':
           if(value.term){
+            const continuation=stack.at(-1);
+            if(lastCall?.closure===value&&lastCall.argument===frame.argument&&lastCall.continuation===continuation)
+              throw new C.LambdaError('检测到重复求值循环，求值已停止。');
+            lastCall={closure:value,argument:frame.argument,continuation};
             steps++;
             // A tail call proceeds directly, without retaining a thunk for its result.
             job={term:value.term.body,environment:{name:value.term.param,argument:frame.argument,parent:value.environment}};
@@ -595,7 +647,7 @@
             if(!job&&!stack.length){resolve(value);return;}
           }while(performance.now()-start<8);
           onProgress?.(steps);
-          setTimeout(batch,0);
+          setTimeout(batch,12);
         }catch(error){reject(error);}
       }
       batch();
@@ -612,7 +664,8 @@
   const C=root.LambdaCore||require('./core.js');
   const {V,L,A}=C;
   const alphabet="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_'";
-  const marker=C.parse('λx.x x x x x x x');
+  const legacyMarker=C.parse('λx.x x x x x x x');
+  const marker=C.parse('λa b c d e f g.g f e d c b a');
   const successor=C.parse('λn f x.f (n f x)');
   const oldSuccessorExample=C.parse('succ 2 ((λn f x.n f (f x)) 2)');
   const numeral=n=>C.parse(String(n));
@@ -637,13 +690,13 @@
     ['head','fix (λwhnf t.t bound freeTerm abs (λp q.(λh.h (λi.app h q) (λname.app h q) (λbody.whnf (subst q 0 body)) (λf a.app h q)) (whnf p)))'],
     ['normalize','fix (λnf t.(head t) bound freeTerm (λbody.abs (nf body)) (λp q.app (nf p) (nf q)))']
   ];
-  function makeProgram(functions){
+  function makeProgram(functions,tag=marker){
     let term=C.parse('λinput result.result tag (normalize input)');
     for(const [name,source] of [...functions].reverse())term=A(L(name,term),C.parse(source));
-    return A(L('tag',term),marker);
+    return A(L('tag',term),tag);
   }
-  const legacyProgram=makeProgram(definitions);
-  const program=makeProgram([
+  const legacyProgram=makeProgram(definitions,legacyMarker);
+  const environmentDefinitions=[
     ...definitions.filter(([name])=>['succ','pred','fix','bound','freeTerm','abs','app'].includes(name)),
     ['nil','λnext end.end'],
     ['cons','λvalue rest next end.next value rest'],
@@ -654,7 +707,15 @@
     ['reify','fix (λquote value depth.value (λbody.abs (quote (body (neutral (λd.bound (pred (depth pred d))))) (succ depth))) (λterm.term depth))'],
     ['evalTerm','fix (λeval env term.term (λi.get i env) (λname.neutral (λdepth.freeTerm name)) (λbody.closure (λvalue.eval (cons value env) body)) (λp q.(eval env p) (λbody.body (eval env q)) (λterm.neutral (λdepth.app (term depth) (reify (eval env q) depth)))))'],
     ['normalize','λterm.reify (evalTerm nil term) 0']
-  ]);
+  ];
+  const previousProgram=makeProgram(environmentDefinitions,legacyMarker);
+  // Select a branch before supplying its environment or evaluated argument.
+  // The unselected branch then disappears before it can duplicate either value.
+  const factoredDefinitions={
+    reify:'fix (λquote value depth.value (λbody depth.abs (quote (body (neutral (λd.bound (pred (depth pred d))))) (succ depth))) (λterm.term) depth)',
+    evalTerm:'fix (λeval env term.term get (λname env.neutral (λdepth.freeTerm name)) (λbody env.closure (λvalue.eval (cons value env) body)) (λp q env.(eval env p) (λbody.body) (λterm argument.neutral (λdepth.app (term depth) (reify argument depth))) (eval env q)) env)'
+  };
+  const program=makeProgram(environmentDefinitions.map(([name,source])=>[name,factoredDefinitions[name]??source]));
 
   function variant(index,fields){
     const params=['boundCase','freeCase','absCase','appCase'];
@@ -681,19 +742,20 @@
     }
     return quoted[0];
   }
-  function compile(source,expand=term=>term){
-    const term=C.parse(source);
+  function compileTerm(term,expand=term=>term){
     const restored=unwrap(term);
-    return C.format(A(program,quote(restored?expandInput(restored,expand):expand(term))));
+    return A(program,quote(restored?expandInput(restored,expand):expand(term)));
   }
 
   function unwrap(term){
     const {head,args}=application(term);
-    if(args.length>=2&&C.equal(args[0],marker)){
-      const legacy=C.equal(head,legacyProgram.fn);
-      if(!legacy&&!C.equal(head,program.fn))return null;
+    if(args.length>=2){
+      const oldTag=C.equal(args[0],legacyMarker);
+      const legacy=oldTag&&C.equal(head,legacyProgram.fn);
+      const previous=oldTag&&C.equal(head,previousProgram.fn);
+      if(!legacy&&!previous&&!(C.equal(args[0],marker)&&C.equal(head,program.fn)))return null;
       const original=unquote(args[1]);
-      if(original)return {term:args.slice(2).reduce(A,original),legacy,trailing:args.length>2};
+      if(original)return {term:args.slice(2).reduce(A,original),legacy,previous,trailing:args.length>2};
     }
     return null;
   }
@@ -720,12 +782,11 @@
     }
     return body.type==='var'&&body.name===nil&&/^[A-Za-z][A-Za-z0-9_']*$/.test(name)?name:null;
   }
-  function read(term){
+  function readTerm(term){
     if(term.type!=='abs')return null;
     const {head,args}=application(term.body);
-    if(head.type!=='var'||head.name!==term.param||args.length!==2||!C.equal(args[0],marker))return null;
-    const decoded=unquote(args[1]);
-    return decoded?C.format(decoded):null;
+    if(head.type!=='var'||head.name!==term.param||args.length!==2||!C.equal(args[0],marker)&&!C.equal(args[0],legacyMarker))return null;
+    return unquote(args[1]);
   }
   function unquote(term){
     const pending=[{term,depth:0}],nodes=[],free=new Set();
@@ -772,16 +833,17 @@
     }
     return result[0];
   }
-  const API={compile,read,
+  const API={compile:(source,expand)=>C.format(compileTerm(C.parse(source),expand)),compileTerm,readTerm,
+    read:term=>{const decoded=readTerm(term);return decoded?C.format(decoded):null;},
     sourceOf:source=>{const restored=unwrap(C.parse(source));return restored?C.format(restored.term):source;},
     isProgram:term=>{
       const {head,args}=application(term);
       return args.length===2&&C.equal(args[0],marker)&&C.equal(head,program.fn);
     },
-    needsRepair:term=>{const restored=unwrap(term);return !!(restored&&(restored.legacy||restored.trailing));},
+    needsRepair:term=>{const restored=unwrap(term);return !!(restored&&(restored.legacy||restored.previous||restored.trailing));},
     repair:(term,expand=term=>term)=>{
       const restored=unwrap(term);
-      return restored&&(restored.legacy||restored.trailing)?A(program,quote(expandInput(restored,expand))):term;
+      return restored&&(restored.legacy||restored.previous||restored.trailing)?A(program,quote(expandInput(restored,expand))):term;
     }
   };
   root.LambdaMeta=API;
@@ -1070,10 +1132,11 @@
       canceled();let cache=literalCache.get(literal.definition);if(!cache){cache=new Map();literalCache.set(literal.definition,cache);}
       let term=cache.get(literal.number),steps=0;
       if(!term){
-        term=literal.term;let started=performance.now();
+        term=literal.term;const repeated=C.cycleCheck(term);let started=performance.now();
         while(true){
           canceled();const next=C.step(term);if(!next)break;term=next.term;steps++;
-          if(performance.now()-started>=8){options.onProgress?.({...literal,steps});await new Promise(resolve=>setTimeout(resolve,0));started=performance.now();}
+          if(repeated(term,next))throw new C.LambdaError(`数字编码「${literal.name}」进入重复归约循环。`);
+          if(performance.now()-started>=8){options.onProgress?.({...literal,steps});await new Promise(resolve=>setTimeout(resolve,12));started=performance.now();}
         }
         canceled();cache.set(literal.number,term);
       }
@@ -1563,7 +1626,23 @@
   ['diff','λp.(p (λa s.(λi r.pair (succ i) (zero i r (cons (rmul a i) r))) (s t) (s f)) (pair 0 nil)) f'],
   ['integ','λp.(p (λa s.(λi r.pair (succ i) (cons (rdiv a (succ i)) r)) (s t) (s f)) (pair 0 (cons (pair 0 1) nil))) f'],
   ['fold','λg z p.p (λa h s.h (g s a)) (λs.s) z'],
-  ['evalpoly','λp x.fold (λr a.radd (rmul r x) a) (pair 0 1) p']
+  ['evalpoly','λp x.fold (λr a.radd (rmul r x) a) (pair 0 1) p'],
+  ['divmod',`λm base emit.
+    (λreset.m (λstate.state (λleft remainder quotient.left
+      (λtail k.k tail (succ remainder) quotient)
+      (λk.k reset 0 (succ quotient))))
+      (λk.k reset 0 0) (λleft remainder quotient.emit quotient remainder))
+    ((pred base) (λtail next done.next tail) (λnext done.done))`],
+  // For natural coefficients, f(1) bounds every coefficient. The base-(f(1)+1)
+  // digits of f(f(1)+1) therefore recover the coefficient list exactly.
+  ['encodepoly',`λfunction.
+    (λsum.zero sum (cons (pair 0 1) nil)
+      ((λbase.(λvalue.value
+        (λnext remaining digits.zero remaining digits
+          (divmod remaining base (λquotient digit.next quotient (cons (pair digit 1) digits))))
+        (λremaining digits.digits) value nil)
+        (function base)) (succ sum)))
+    (function 1)`]
  ].map(([name,source])=>({name,source,free:C.freeVars(C.parse(source))}));
  function compile(body){
   const needed=new Set(C.freeVars(C.parse(body,Infinity)));
@@ -1582,10 +1661,45 @@
   }
   return `λc n.${body}`;
  }
- const differentiate=coefficients=>compile(`diff (${polynomial(coefficients)})`);
- const integrate=coefficients=>compile(`integ (${polynomial(coefficients)})`);
- const derivativeAt=coefficients=>compile(`λx.evalpoly (diff (${polynomial(coefficients)})) x`);
- const integralFunction=coefficients=>compile(`λa b.(λp.rsub (evalpoly p b) (evalpoly p a)) (integ (${polynomial(coefficients)}))`);
+ const programs={
+  EVAL:compile('λp x.evalpoly p x'),
+  DIFF:compile('λp.diff p'),
+  INTEGRATE:compile('λp.integ p'),
+  DERIVATIVE:compile('λp x.evalpoly (diff p) x'),
+  DEFINITE:compile('λp a b.(λprimitive.rsub (evalpoly primitive b) (evalpoly primitive a)) (integ p)')
+ };
+ function program(operation){
+  if(!Object.hasOwn(programs,operation))throw new C.LambdaError('未知多项式运算。');
+  return programs[operation];
+ }
+ function expression(operation,source,...args){
+  return `(${program(operation)}) (${source})`+args.map(arg=>` (${arg})`).join('');
+ }
+ const churchPrograms={
+  ENCODE:compile('λfunction.encodepoly function'),
+  EVAL:compile('λfunction x.evalpoly (encodepoly function) x'),
+  DIFF:compile('λfunction.diff (encodepoly function)'),
+  INTEGRATE:compile('λfunction.integ (encodepoly function)'),
+  DERIVATIVE:compile('λfunction x.evalpoly (diff (encodepoly function)) x'),
+  DEFINITE:compile('λfunction a b.(λprimitive.rsub (evalpoly primitive b) (evalpoly primitive a)) (integ (encodepoly function))')
+ };
+ function churchProgram(operation){
+  if(!Object.hasOwn(churchPrograms,operation))throw new C.LambdaError('未知多项式运算。');
+  return churchPrograms[operation];
+ }
+ function churchExpression(operation,source,...args){
+  return `(${churchProgram(operation)}) (${source})`+args.map(arg=>` (${arg})`).join('');
+ }
+ function churchFunction(coefficients){
+  if(!coefficients.length||coefficients.some(n=>!Number.isSafeInteger(n)||n<0))throw new C.LambdaError('丘奇多项式需要自然数系数。');
+  let body=String(coefficients.at(-1));
+  for(let i=coefficients.length-2;i>=0;i--)body=`add (mul (${body}) x) ${coefficients[i]}`;
+  return `λx.(λadd mul.${body}) (λm n f z.m f (n f z)) (λm n f.m (n f))`;
+ }
+ const differentiate=coefficients=>expression('DIFF',polynomial(coefficients));
+ const integrate=coefficients=>expression('INTEGRATE',polynomial(coefficients));
+ const derivativeAt=coefficients=>expression('DERIVATIVE',polynomial(coefficients));
+ const integralFunction=coefficients=>expression('DEFINITE',polynomial(coefficients));
  function definite(coefficients,a,b){
   if(!Number.isSafeInteger(a)||!Number.isSafeInteger(b)||a<0||b<a)throw new Error('端点需为自然数且下限不大于上限。');
   return `(${integralFunction(coefficients)}) ${a} ${b}`;
@@ -1622,7 +1736,7 @@
   }
   return terms.join(' + ')||'0';
  }
- const API={polynomial,differentiate,integrate,derivativeAt,integralFunction,definite,readRational,readPolynomial,formatRational,formatPolynomial};
+ const API={polynomial,program,expression,churchProgram,churchExpression,churchFunction,differentiate,integrate,derivativeAt,integralFunction,definite,readRational,readPolynomial,formatRational,formatPolynomial};
  root.LambdaPolynomial=API;if(typeof module!=='undefined'&&module.exports)module.exports=API;
 })(typeof globalThis!=='undefined'?globalThis:window);
 
@@ -1714,11 +1828,11 @@
     { name:'等比求和 · 1 + 2 + 4 + 8 → 15', category:'高等数学', term:`(${GEOMETRIC_SUM}) 2 4`, expected:'15', description:'参数 2 是公比，4 是项数。从首项 1 开始，一边乘公比一边累加，得到 15；项数为 0 时结果为 0。' },
     { name:'二项式系数和 · C(3,0) + … + C(3,3) → 8', category:'高等数学', term:`(${BINOMIAL}) 1 1 3`, expected:'8', description:`把二项式展开中的 a、b 都设为 1，实际计算第 3 行系数和 1 + 3 + 3 + 1 = 8。${recursiveHint}` },
     { name:'二项式展开 · (1 + 2)³ → 27', category:'高等数学', term:`(${BINOMIAL}) 1 2 3`, expected:'27', description:`逐项计算 Σ C(n,k) a^(n−k) b^k。这里 a=1、b=2、n=3，四项为 1、6、12、8，总和 27。${recursiveHint}` },
-    { name:'多项式 · 2x² + 3x + 1，x=2 → 15', category:'高等数学', term:`(${POLYNOMIAL}) 2`, expected:'15', description:'使用 Horner 形式 (2x + 3)x + 1 计算多项式。把 x=2 代入，得到 (4 + 3) × 2 + 1 = 15。' },
-    { name:'符号求导并求值 · (x² + 3x)′，x=2 → 7', category:'高等数学', term:`(${DERIVATIVE}) 2`, expected:'7', expectedType:'rational', description:'原多项式 x² + 3x 按次数降序以系数 [1,3,0] 编码。Lambda程序先遍历原系数生成导函数 2x + 3，再代入 x=2；结果是有理数 7。可选「生成导函数」单独观察符号转换。' },
-    { name:'定积分 · ∫₀³ 2x dx → 9', category:'高等数学', term:`(${INTEGRAL}) 0 3`, expected:'9', expectedType:'rational', description:'输入的是原多项式 2x（降序系数 [2,0]）。Lambda程序先按次数生成原函数系数，再分别代入上下限并相减，得到 9；没有预先把 x² 当成输入。系数限非负有理数，端点限自然数 a≤b。' },
-    { name:'生成导函数 · x² + 3x → 2x + 3', category:'高等数学', term:M.differentiate([0,3,1]), expected:'2x + 3', expectedType:'polynomial', description:'原式：x² + 3x。输入列表按次数降序存储 [1,3,0]，每项是有理数。Lambda程序按次数乘系数、去掉原常数项，实际生成新多项式；运行后结果区显示导函数 2x + 3。' },
-    { name:'生成原函数 · 2x → x²（C=0）', category:'高等数学', term:M.integrate([0,2]), expected:'x²', expectedType:'polynomial', description:'原式：2x。输入列表只含原系数 [2,0]；Lambda程序按次数+1除系数，并追加积分常数0，实际生成原函数。这里取 C=0；同一算法输入 x 会生成 1/2x²，不是预置答案。' },
+    { name:'多项式 · 2x² + 3x + 1，x=2 → 15', category:'高等数学',term:M.churchExpression('EVAL',M.churchFunction([1,3,2]),'2'),expected:'15',expectedType:'rational',parameters:['原丘奇函数 f(x)=2x² + 3x + 1','代入值 2'],description:'把原函数作为第一个参数传入，程序内部完成丘奇多项式编码和求值。可以将末尾的 λx.… 换成已保存的多项式函数名。' },
+    { name:'符号求导并求值 · (x² + 3x)′，x=2 → 7', category:'高等数学',term:M.churchExpression('DERIVATIVE',M.churchFunction([0,3,1]),'2'),expected:'7',expectedType:'rational',parameters:['原丘奇函数 f(x)=x² + 3x','代入值 2'],description:'原式：x² + 3x。程序直接接收普通丘奇多项式函数，在内部编码、生成导函数，再代入求值。参数中的数字按丘奇自然数解释。' },
+    { name:'定积分 · ∫₀³ 2x dx → 9', category:'高等数学',term:M.churchExpression('DEFINITE',M.churchFunction([0,2]),'0','3'),expected:'9',expectedType:'rational',parameters:['原丘奇函数 f(x)=2x','积分下限 0','积分上限 3'],description:'原式：2x。积分函数内部包含编码程序，直接接收原丘奇函数、下限和上限，生成原函数后计算端点差。输入函数需为自然数系数多项式，端点需为自然数且下限≤上限。' },
+    { name:'生成导函数 · x² + 3x → 2x + 3', category:'高等数学',term:M.churchExpression('DIFF',M.churchFunction([0,3,1])),expected:'2x + 3',expectedType:'polynomial',parameters:['原丘奇函数 f(x)=x² + 3x'],description:'原式：x² + 3x。把普通丘奇函数 λx.… 作为末尾参数传入，求导函数内部完成编码和求导，生成导函数 2x + 3。输入函数需为自然数系数多项式。' },
+    { name:'生成原函数 · 2x → x²（C=0）', category:'高等数学',term:M.churchExpression('INTEGRATE',M.churchFunction([0,2])),expected:'x²',expectedType:'polynomial',parameters:['原丘奇函数 f(x)=2x'],description:'原式：2x。把普通丘奇函数 λx.… 作为末尾参数传入，积分函数内部完成编码和积分，生成原函数 x²，积分常数取 0。输入函数需为自然数系数多项式。' },
     { name:'列表小数加法 · 0.1 + 0.2 → 0.3', category:'列表小数四则', encoding:'decimal',term:D.expression('ADD',["0.1","0.2"]),decimalOperation:'ADD',operands:["0.1","0.2"],expected:'0.3',expectedType:'decimal',description:'组合子 B 把「取较大的小数位数」和「补零对齐」接起来。例如 1.2 和 0.03 对齐为 1.20 和 0.03。对齐后同号逐位加，异号用大绝对值减小绝对值。结果保留全部有效位数。' },
     { name:'列表小数减法 · 1 − 2 → −1', category:'列表小数四则', encoding:'decimal',term:D.expression('SUB',["1","2"]),decimalOperation:'SUB',operands:["1","2"],expected:'-1',expectedType:'decimal',description:'默认整数也采用列表编码。先比较绝对值，再逐位借位并确定符号，结果为负数−1。' },
     { name:'列表小数乘法 · 0.2 × 0.3 → 0.06', category:'列表小数四则', encoding:'decimal',term:D.expression('MUL',["0.2","0.3"]),decimalOperation:'MUL',operands:["0.2","0.3"],expected:'0.06',expectedType:'decimal',description:'逐位竖式相乘，小数位数相加，结果为精确0.06。' },
@@ -1811,9 +1925,9 @@
     { id:25, name:'正负相遇', topic:'带符号加法', encoding:'decimal', description:'计算 −1.2 + 0.5，保留正确符号和小数位置。', start:D.expression('ADD',["-1.2","0.5"]),decimalOperation:'ADD',operands:["-1.2","0.5"], target:'-0.7', targetType:'decimal', targetLabel:'精确小数 −0.7', hint:'符号不同的加法等价于绝对值相减；较大的绝对值来自负数。' },
     { id:26, name:'从三个里选两个', topic:'组合数', strategy:'normal', direction:'left', description:'用帕斯卡递推计算 C(3,2)，不计选择顺序。本关预设从左到右正规序。', start:`(${CHOOSE}) 3 2`, target:'3', targetLabel:'Church 数字 3', hint:`C(n,0)=1，C(0,k)=0，其余拆成两个较小的组合数。${recursiveHint}` },
     { id:27, name:'三个数的连乘', topic:'迭代阶乘', description:'用有序对保存当前数字与累积乘积，真正算出 3!。', start:`(${FACTORIAL}) 3`, target:'6', targetLabel:'Church 数字 6', hint:'从 (0,1) 开始：当前数字加一，再让累计乘积乘以这个新数字。重复更新三次，最后取出乘积。' },
-    { id:28, name:'生成导函数', topic:'符号求导', description:'输入原多项式 x² + 3x 的系数，归约生成导函数，而不是只代入某个点。', start:M.differentiate([0,3,1]), target:'2x + 3', targetType:'polynomial', targetLabel:'导函数 2x + 3', hint:'遍历降序系数 [1,3,0]，按原次数乘系数并去掉常数项，生成新的系数列表。' },
-    { id:29, name:'生成原函数', topic:'符号积分', description:'从原多项式 x 的系数开始，归约生成原函数，积分常数取 0。', start:M.integrate([0,1]), target:'1/2x²', targetType:'polynomial', targetLabel:'原函数 ½x²（C=0）', hint:'逐项让次数加一、系数除以新次数，最后追加积分常数 0。分数系数使用有理数编码。' },
-    { id:30, name:'最后一关：曲线下面积', topic:'定积分', description:'从原多项式 2x 出发，先生成原函数，再计算从 0 到 3 的定积分。', start:M.definite([0,2],0,3), target:'9', targetType:'rational', targetLabel:'有理数 9', hint:'先按次数生成原函数系数，分别代入上下限，再相减。检查这三个步骤的顺序；所有转换都经过 β 归约。' }
+    { id:28, name:'生成导函数', topic:'符号求导', description:'输入原丘奇函数 x² + 3x，在求导程序内部编码并生成导函数。',start:M.churchExpression('DIFF',M.churchFunction([0,3,1])), target:'2x + 3', targetType:'polynomial', targetLabel:'导函数 2x + 3', hint:'原函数是末尾的独立参数。编码得到降序系数 [1,3,0] 后，按原次数乘系数并去掉常数项。' },
+    { id:29, name:'生成原函数', topic:'符号积分', description:'输入原丘奇函数 λx.x，在积分程序内部编码并生成原函数，积分常数取 0。',start:M.churchExpression('INTEGRATE','λx.x'), target:'1/2x²', targetType:'polynomial', targetLabel:'原函数 ½x²（C=0）', hint:'逐项让次数加一、系数除以新次数，最后追加积分常数 0。分数系数使用有理数编码。' },
+    { id:30, name:'最后一关：曲线下面积', topic:'定积分', description:'输入原丘奇函数 2x 和积分上下限，程序内部编码、积分，再计算端点差。',start:M.churchExpression('DEFINITE',M.churchFunction([0,2]),'0','3'), target:'9', targetType:'rational', targetLabel:'有理数 9', hint:'三个末尾参数依次是原函数、下限、上限。先生成原函数系数，再代入端点相减。' }
   ];
   const stages=['入门五关','函数与绑定','逻辑与数据','自然数进阶','列表小数','高等数学'].map((name,index)=>({id:index+1,name,levelIds:levels.slice(index*5,index*5+5).map(l=>l.id)}));
   function sourceFor(item,precision=item.decimalPlaces??6){return item.decimalOperation?D.expression(item.decimalOperation,item.operands.map((value,index)=>item.operandEncodings?.[index]==='church'?`${value}_church`:value),precision):item.term??item.start;}
@@ -1827,6 +1941,385 @@
   root.LambdaPresets=API;
   if(typeof module !== 'undefined' && module.exports) module.exports=API;
 })(typeof globalThis !== 'undefined' ? globalThis : window);
+
+</script><script>
+(function(root){
+  'use strict';
+  const P=root.LambdaPresets||require('./presets.js');
+  const lessons={
+    '恒等函数 I':[
+      'I = λx.x',
+      ['函数体只有参数本身。接收一个参数后，β 归约把函数体中的 x 换成这个参数。参数可以是数字、自由变量或另一个函数。','λx.x 与 λa.a 只改变了绑定变量的名字，含义相同。'],
+      '(λx.x) y → y\n(λx.x) (λa.a) → λa.a'
+    ],
+    'TRUE · 选择第一个':[
+      'TRUE = λa.λb.a',
+      ['丘奇布尔通过选择参数表示真假。TRUE 接收两个候选值，返回第一个，第二个参数没有出现在函数体里。','在正规序下，被丢弃的分支可以直接消失，因此 TRUE 也能用来写条件分支。'],
+      '(λa.λb.a) p q → (λb.p) q → p'
+    ],
+    'FALSE / 数字 0':[
+      'FALSE = λa.λb.b\n0 = λf.λx.x',
+      ['FALSE 接收两个候选值并返回第二个。丘奇数 0 接收迭代函数和初值，返回未经迭代的初值。','二者经过绑定变量改名后具有相同结构。页面根据选中的数据编码解释这个结构。'],
+      'FALSE p q → q\n0 f x → x'
+    ],
+    'Church 数字 2':[
+      '2 = λf.λx.f (f x)',
+      ['丘奇数 n 表示把函数 f 作用 n 次。数字本身保存的是重复执行的方式。','两个 f 的应用嵌套在一起。把 f 换成后继函数、初值设为 0，就得到普通意义上的 2。'],
+      '2 f x → f (f x)\n2 SUCC 0 → SUCC (SUCC 0) → 2'
+    ],
+    'S K K → I':[
+      'S = λf g x.(f x) (g x)\nK = λa b.a',
+      ['S 把同一个参数 x 分别传给 f 和 g，再把两个结果应用起来。K 总是返回它接收的第一个参数。','S 的两个参数都取 K 时，左侧 K x 最终选择 x，右侧的 K x 被丢弃，因此组合的行为与恒等函数相同。'],
+      'S K K x → (K x) (K x) → x\nS K K → λx.x'
+    ],
+    '加法 · 2 + 3':[
+      'ADD = λm n f x.m f (n f x)',
+      ['先用 n 把 f 作用在初值上，再让 m 对这个结果继续作用 f。两段重复次数相加。','表达式中的 m、n 是丘奇函数。把它们代入后，函数体中会出现 m+n 个 f。'],
+      'ADD 2 3 f x → 2 f (3 f x)\n→ f (f (f (f (f x))))\n→ 5 f x'
+    ],
+    'Ω · 无限循环':[
+      'Ω = (λx.x x) (λx.x x)',
+      ['左侧函数把参数同时放在函数位置和参数位置。参数恰好也是同一个自应用函数。','执行一次 β 归约会得到与原式相同的表达式，因此没有 β 正规形。游戏确认这个重复循环后会停止自动运行，仍可手动单步查看。'],
+      '(λx.x x) (λx.x x)\n→ (λx.x x) (λx.x x)\n→ …'
+    ],
+    '防止变量捕获':[
+      '(λx.λy.x) y',
+      ['实参 y 是自由变量。直接把它替换进 λy 的作用域，会把自由变量错误地变成绑定变量。','归约先把内部的绑定变量 y 改成一个没有冲突的新名字，再替换 x。结果仍然返回原来的自由变量 y。'],
+      '(λx.λy.x) y\n≡ (λx.λy1.x) y\n→ λy1.y'
+    ],
+    '组合子 B · 连续加一 → 5':[
+      'B = λf g x.f (g x)\nSUCC = λn f x.f (n f x)',
+      ['B 表示函数复合，先执行 g，再把结果交给 f。x 在函数体里出现一次，沿着这两个函数依次传递。','这里的 f 和 g 都是丘奇后继。每次后继在数字的迭代体外再加一层函数应用。'],
+      'B SUCC SUCC 3\n→ SUCC (SUCC 3)\n→ SUCC 4 → 5'
+    ],
+    '组合子 C · 交换参数 → 3':[
+      'C = λf x y.f y x',
+      ['C 交换函数接收到的两个参数，函数 f 的内部实现无需改变。','TRUE 选择传给它的第一个参数。交换后的第一个参数是 3，因此结果为 3。'],
+      'C TRUE 2 3 → TRUE 3 2 → 3'
+    ],
+    '组合子 W · 复制参数 → 9':[
+      'W = λf x.f x x',
+      ['W 让同一个参数出现在两个位置。这里把丘奇乘法作为 f，于是两个因子都来自同一个输入。','参数复制是这个组合子的计算含义。大参数反复复制可能使逐步归约的中间表达式变大。'],
+      'W MUL 3 → MUL 3 3 → 9'
+    ],
+    '乘法 · 2 × 3 → 6':[
+      'MUL = λm n f.m (n f)',
+      ['n f 表示一个会连续执行 n 次 f 的函数。m 再重复调用这个函数 m 次，总次数就是 m×n。','乘法产生的结果仍是一个丘奇数，可以继续作为加法或其他迭代的参数。'],
+      'MUL 2 3 f x → 2 (3 f) x\n→ (3 f) ((3 f) x)\n→ f (f (f (f (f (f x)))))'
+    ],
+    '乘方 · 2⁴ → 16':[
+      'POW = λbase exponent.exponent base',
+      ['指数是一个迭代器。让指数迭代底数这个丘奇函数，会把函数重复次数逐层相乘。','参数顺序是底数、指数。此例的 4 在程序内部作用于 2，形成 2 的四次方。'],
+      'POW 2 4 → 4 2\n2⁴ = 2 × 2 × 2 × 2 = 16'
+    ],
+    '前驱 · 3 − 1 → 2':[
+      'PRED = λn f x.n (λg h.h (g f)) (λu.x) (λu.u)',
+      ['前驱用延迟应用保存上一次计算。初始函数 λu.x 忽略第一次收到的 f，因此第一次迭代只建立状态，没有增加结果。','后续迭代才逐次补上 f。最后传入恒等函数取出结果，总共留下 n−1 次应用。输入 0 时也返回 0。'],
+      'PRED 3 f x → f (f x)\nPRED 1 f x → x\nPRED 0 f x → x'
+    ],
+    '减法 · 5 − 2 → 3':[
+      'SUB = λm n.n PRED m',
+      ['第二个丘奇数决定对第一个数执行多少次前驱。每执行一次，数字减一。','丘奇自然数没有负数。由于 0 的前驱仍为 0，减法在结果小于 0 时截断为 0。'],
+      'SUB 5 2 → 2 PRED 5\n→ PRED (PRED 5) → 3\nSUB 2 5 → 0'
+    ],
+    '零判断 · 0 = 0 → TRUE':[
+      'ISZERO = λn.n (λx.FALSE) TRUE',
+      ['先把初值设为 TRUE。输入 0 不执行迭代，因此保留 TRUE。','正数至少执行一次 λx.FALSE，第一次就把结果改成 FALSE，后续迭代继续返回 FALSE。'],
+      'ISZERO 0 → TRUE\nISZERO 3 → (λx.FALSE) (…) → FALSE'
+    ],
+    '比较 · 2 ≤ 3 → TRUE':[
+      'LE = λm n.ISZERO (SUB m n)',
+      ['自然数减法在 m≤n 时返回 0，在 m>n 时留下正数。对差做零判断，就得到“小于等于”。','顺序不能交换。LE 2 3 检查 2−3，LE 3 2 检查 3−2。'],
+      'LE 2 3 → ISZERO (SUB 2 3) → ISZERO 0 → TRUE\nLE 3 2 → ISZERO 1 → FALSE'
+    ],
+    '有序对 · 读取 (3, 5) 的第二项 → 5':[
+      'PAIR = λa b selector.selector a b\nFIRST = λp.p TRUE\nSECOND = λp.p FALSE',
+      ['有序对保存两个参数，等待调用者提供选择器。把 TRUE 传给它会选择第一项，把 FALSE 传给它会选择第二项。','这让多项状态也能装在一个 λ 值中，供阶乘、前驱和除法等迭代函数使用。'],
+      'PAIR 3 5 FALSE\n→ FALSE 3 5 → 5'
+    ],
+    '阶乘 · 迭代计算 3! → 6':[
+      'state = PAIR 当前数字 累计乘积\nstep (k, product) = (k+1, (k+1)×product)',
+      ['从当前数字 0、乘积 1 开始，让丘奇输入 n 重复执行一次状态更新。一次更新同时增加当前数字并更新乘积。','每一轮都使用新数字乘旧乘积，因此依次乘上 1、2、…、n。最后取出有序对的第二项。'],
+      '(0,1) → (1,1) → (2,2) → (3,6)\n取第二项 → 6\n0! 保留初值 1'
+    ],
+    '阶乘 · Y 递归计算 3! → 6':[
+      'Y = λf.(λx.f (x x)) (λx.f (x x))\nFAC = Y (λrecur n.ISZERO n 1 (MUL n (recur (PRED n))))',
+      ['递归体把自身作为参数 recur 接收。Y 满足 Y F → F (Y F)，因此函数体可以通过 recur 再调用自己。','正规序先做零判断。输入到 0 时选择 1，丢弃继续递归的分支。应用序可能先展开递归分支，无法到达终止判断。'],
+      'FAC 3 → 3 × FAC 2\n→ 3 × 2 × FAC 1\n→ 3 × 2 × 1 × FAC 0\n→ 6'
+    ],
+    '组合数 · C(4, 2) → 6':[
+      'C(n,k) = C(n−1,k−1) + C(n−1,k)\nC(n,0)=1，C(0,k>0)=0',
+      ['把选择方案按是否选中某个指定元素分成两类。选中它后，还需要从剩余元素选 k−1 个；未选中它时，仍需选 k 个。','λ 程序用 Y 实现这两个递归分支，再用丘奇加法相加。k 为 0 的终止条件先判断，保证 C(0,0)=1。'],
+      'C(4,2) = C(3,1) + C(3,2)\n= 3 + 3 = 6'
+    ],
+    '斐波那契 · F(5) → 5':[
+      'F(0)=0，F(1)=1\nF(n)=F(n−1)+F(n−2)',
+      ['函数先判断 n 是否为 0，再判断 n 的前驱是否为 0，从而识别两个起始值。其他情况递归计算前两项并相加。','这个示例直接使用递归定义，同一子问题可能被多次计算。较大输入可以使用快速求值复用被共享的参数。'],
+      'F(5)=F(4)+F(3)\nF(4)=2+1=3，F(3)=1+1=2\nF(5)=3+2=5'
+    ],
+    '排列数 · A(4, 2) → 12':[
+      'state=(剩余可选数, 累计乘积)\nstep (n,p)=(n−1,n×p)',
+      ['每选一次，当前可选数量减少一。k 次选择对应 n×(n−1)×…×(n−k+1)。','丘奇 k 控制状态更新次数。累计乘积从 1 开始，所以选择 0 个元素时结果是 1；超过 n 次后会乘上 0。'],
+      '(4,1) → (3,4) → (2,12)\n取累计乘积 → 12'
+    ],
+    '自然数求和 · 1 + … + 5 → 15':[
+      'state=(当前下标, 累计和)\nstep (k,s)=(k+1,s+(k+1))',
+      ['用一个有序对同时保存下标与总和。每次先增加下标，再把新下标加入累计和。','丘奇输入决定更新次数。输入 0 时没有更新，返回空和 0。'],
+      '(0,0) → (1,1) → (2,3) → (3,6)\n→ (4,10) → (5,15)'
+    ],
+    '平方和 · 1² + 2² + 3² → 14':[
+      'step (k,s)=(k+1,s+(k+1)²)',
+      ['与自然数求和使用相同的下标和累计值状态，但加入总和前先对新下标求平方。','程序用丘奇乘方计算每一项，再使用丘奇加法累计。末尾参数指定求和上界。'],
+      '(0,0) → (1,1) → (2,5) → (3,14)\n1²+2²+3²=1+4+9=14'
+    ],
+    '立方和 · 1³ + 2³ + 3³ → 36':[
+      'step (k,s)=(k+1,s+(k+1)³)',
+      ['迭代状态保存当前下标和立方和。每次更新先求下一个数字的三次方，再加到总和。','这里逐项执行乘方和相加。输入为 0 时保留累计值 0。'],
+      '(0,0) → (1,1) → (2,9) → (3,36)\n1³+2³+3³=1+8+27=36'
+    ],
+    '等比求和 · 1 + 2 + 4 + 8 → 15':[
+      'state=(当前项, 累计和)\nstep (term,sum)=(base×term,sum+term)',
+      ['当前项从 1 开始。每轮先把旧的当前项加入总和，同时把当前项乘以公比，准备下一轮。','第二个输入是项数，因此求和包含 b⁰ 到 bⁿ⁻¹。项数为 0 时返回 0。'],
+      '(1,0) → (2,1) → (4,3) → (8,7) → (16,15)\n返回累计和 15'
+    ],
+    '二项式系数和 · C(3,0) + … + C(3,3) → 8':[
+      'Σ C(n,k)·1^(n−k)·1^k，k=0…n',
+      ['这是二项式展开程序把两个底数都设为 1 的情形。每个幂都等于 1，只留下组合数。','程序仍逐项计算 C(n,k) 并累加。下标从 0 到 n，包括两个端点。'],
+      'C(3,0)+C(3,1)+C(3,2)+C(3,3)\n=1+3+3+1=8'
+    ],
+    '二项式展开 · (1 + 2)³ → 27':[
+      '(a+b)^n = Σ C(n,k)·a^(n−k)·b^k',
+      ['有序对保存下标 k 和累计结果。每一步用递归组合数、两个丘奇乘方和乘法求出一项。','程序执行 n+1 轮，覆盖 k=0 到 k=n。三个末尾参数分别是 a、b、n。'],
+      '(1+2)³\n=1×1³×2⁰ + 3×1²×2¹ + 3×1¹×2² + 1×1⁰×2³\n=1+6+12+8=27'
+    ],
+    '多项式 · 2x² + 3x + 1，x=2 → 15':[
+      'λfunction x.evalpoly (encodepoly function) x\np(x)=(2x+3)x+1',
+      ['原函数使用普通丘奇数加法和乘法。内部编码器先算 s=f(1)，选择 b=s+1，再把 f(b) 按 b 进制拆位，恢复降序系数。自然数系数都小于 b，因此不会互相进位。','求值使用 Horner 方法，从最高次系数开始反复执行“累计值乘 x，再加下一项系数”。系数用有理数对表示，输入函数是末尾的独立参数。'],
+      'f(1)=6，b=7\nf(7)=120=2×7²+3×7+1 → [2,3,1]\nx=2 时，(2×2+3)×2+1=15'
+    ],
+    '符号求导并求值 · (x² + 3x)′，x=2 → 7':[
+      'λfunction x.evalpoly (diff (encodepoly function)) x\n(a·xⁿ)′=(n·a)·xⁿ⁻¹',
+      ['程序先在内部将原丘奇函数转换成降序系数，再把每项系数乘以原次数，并去掉常数项。得到的仍是一个多项式列表。','随后把新列表交给 Horner 求值。这样输入参数同时决定原函数和代入点。输入函数需为自然数系数多项式。'],
+      'x²+3x → 系数 [1,3,0]\n求导 → [2,3] → 2x+3\n代入 2 → 2×2+3=7'
+    ],
+    '定积分 · ∫₀³ 2x dx → 9':[
+      '∫ₐᵇ f(x)dx = F(b)−F(a)\n∫ a·xⁿ dx = a/(n+1)·xⁿ⁺¹',
+      ['积分函数内部先编码原丘奇函数，再按幂规则把每项次数加一、系数除以新次数。追加的积分常数取 0。','用有理数对保存除法后的系数，再分别计算上限和下限。当前端点使用自然数，要求下限不大于上限。'],
+      '原函数输入 f(x)=2x → 系数 [2,0]\n生成 F(x)=x²\nF(3)−F(0)=9−0=9'
+    ],
+    '生成导函数 · x² + 3x → 2x + 3':[
+      'λfunction.diff (encodepoly function)',
+      ['输入是普通丘奇多项式函数。编码在求导程序内部完成，结果表示原函数的降序系数。','右折叠从常数项开始，状态保存当前次数和新系数列表。次数为 0 时跳过常数，其他项把系数乘次数并加入结果。'],
+      '原函数 x²+3x → [1,3,0]\n常数 0 去掉，3×1=3，1×2=2\n新系数 [2,3] → 2x+3'
+    ],
+    '生成原函数 · 2x → x²（C=0）':[
+      'λfunction.integ (encodepoly function)',
+      ['输入原丘奇函数后，程序内部编码并遍历每个系数。原次数为 n 的项，系数除以 n+1，次数升为 n+1。','结果系数用分子、分母有序对保存，可以精确保留 1/2 等分数。最后追加 0 作为积分常数。'],
+      '2x → [2,0] → [2/2,0/1,0] → x²\nx → [1,0] → [1/2,0,0] → 1/2x²'
+    ],
+    '丘奇列表 · 空表 []':[
+      'NIL = λc n.n',
+      ['丘奇列表接收组合函数 c 和末尾初值 n。空表没有任何元素，因此直接返回初值。','这个结构与 FALSE、丘奇数 0 相同。选择列表编码后，页面会把它显示为空列表。'],
+      '[] c n → n\n[] ADD 0 → 0'
+    ],
+    '丘奇列表 · 头部插入 1 → [1, 2, 3]':[
+      'CONS = λhead tail c n.c head (tail c n)',
+      ['旧列表先折叠成 tail c n，新的元素在外面多执行一次 c。列表的顺序由这些 c 的嵌套次序保存。','元素本身也是 λ 数据，既可以是丘奇数，也可以是函数或另一个列表。'],
+      'CONS 1 [2,3] c n\n→ c 1 (c 2 (c 3 n))\n→ [1,2,3] c n'
+    ],
+    '丘奇列表 · 首项 HEAD → 1':[
+      'HEAD = λlist default.list (λhead rest.head) default',
+      ['折叠函数忽略后缀，只返回当前位置的元素。最外层调用对应第一个元素，因此它成为最终结果。','空表不会调用折叠函数，直接返回第二个参数 default。'],
+      'HEAD [1,2,3] 0\n→ (λhead rest.head) 1 (…) → 1\nHEAD [] 0 → 0'
+    ],
+    '丘奇列表 · 尾部 TAIL → [2, 3]':[
+      'state=(当前完整后缀, 去掉首项的后缀)',
+      ['从右边折叠列表，用有序对保存两份相邻后缀。处理新元素时，第一项在旧完整后缀前插入该元素，第二项保存旧完整后缀。','遍历结束后取第二项，就得到整个列表去掉首元素的结果。初始状态的两项都是空表。'],
+      '([],[]) → ([3],[])\n→ ([2,3],[3]) → ([1,2,3],[2,3])\n取第二项 → [2,3]'
+    ],
+    '丘奇列表 · 判空 [] → TRUE':[
+      'EMPTY = λlist.list (λhead rest.FALSE) TRUE',
+      ['初值设为 TRUE，每遇到一个元素就返回 FALSE。空列表没有元素，初值可以直接成为结果。','判断过程只关心有没有元素，不需要分析每个元素的内容。'],
+      'EMPTY [] → [] (λhead rest.FALSE) TRUE → TRUE'
+    ],
+    '丘奇列表 · 判空 [1, 2, 3] → FALSE':[
+      'EMPTY = λlist.list (λhead rest.FALSE) TRUE',
+      ['非空列表至少执行一次组合函数。这个函数忽略元素和后缀，并选择 FALSE。','正规序中只要外层确认存在首元素，就可以丢弃后面的计算。'],
+      'EMPTY [1,2,3]\n→ (λhead rest.FALSE) 1 (…) → FALSE'
+    ],
+    '丘奇列表 · 长度 LENGTH → 3':[
+      'LENGTH = λlist.list (λhead count.SUCC count) 0',
+      ['从丘奇数 0 开始折叠。每个元素都让累计长度增加一次，元素自身由忽略它的参数 head 接收。','结果是丘奇自然数，可以直接参与后续加法或作为迭代次数。'],
+      'LENGTH [1,2,3]\n→ SUCC (SUCC (SUCC 0)) → 3'
+    ],
+    '丘奇列表 · 映射 MAP 加一 → [2, 3, 4]':[
+      'MAP = λf list c n.list (λhead rest.c (f head) rest) n',
+      ['映射在重建列表时，对每个元素调用传入的函数 f。尾部 rest 保留原来的相对顺序。','这里传入丘奇后继，所以每一项都增加一次函数应用。空列表经过映射仍为空列表。'],
+      'MAP SUCC [1,2,3]\n→ [SUCC 1,SUCC 2,SUCC 3]\n→ [2,3,4]'
+    ],
+    '丘奇列表 · 拼接 APPEND → [1, 2, 3]':[
+      'APPEND = λa b c n.a c (b c n)',
+      ['先把第二个列表折叠到末尾初值上，再把这个结果作为第一个列表的新末尾。','第一个列表中元素的顺序保持原样，它们的尾部最终接上第二个列表。'],
+      'APPEND [1,2] [3] c n\n→ c 1 (c 2 (c 3 n))'
+    ],
+    '丘奇列表 · 反转 REVERSE → [3, 2, 1]':[
+      'REVERSE = λlist.list (λhead rest accumulator.rest (CONS head accumulator)) I NIL',
+      ['每个折叠步骤产生一个接收累计列表的函数。它把当前元素插到累计列表前面，再交给下一段函数。','从空列表开始执行这些函数时，先前出现的元素逐次被后来的元素挤到后面，因而完成反转。'],
+      '累计值 [] → [1] → [2,1] → [3,2,1]'
+    ],
+    '丘奇列表 · 折叠求和 → 6':[
+      '[1,2,3] ADD 0',
+      ['丘奇列表本身就是右折叠，列表的第一个参数决定如何把一个元素与后缀结果组合，第二个参数是空表的结果。','这里用 ADD 作为组合函数，用 0 作为末尾初值，所以所有元素逐项相加。'],
+      'ADD 1 (ADD 2 (ADD 3 0))\n→ ADD 1 (ADD 2 3) → 6'
+    ],
+    '丘奇列表 · 折叠乘积 → 6':[
+      '[1,2,3] MUL 1',
+      ['把右折叠的组合函数换成 MUL，就能计算乘积。末尾初值需要是乘法单位元 1。','因此空列表的乘积为 1；只要列表中出现 0，最终乘积就是 0。'],
+      'MUL 1 (MUL 2 (MUL 3 1))\n→ 1×2×3×1 → 6'
+    ],
+    '丘奇列表 · 过滤 FILTER 去零 → [2, 3]':[
+      'FILTER = λpredicate list c n.list (λhead rest.predicate head (c head rest) rest) n',
+      ['对每个元素执行布尔谓词。返回 TRUE 时把元素加入结果，返回 FALSE 时直接使用后缀结果。','示例谓词对零返回 FALSE、对正数返回 TRUE。每个被保留元素都保持原来的次序。'],
+      '[0,2,0,3]\n→ 丢弃 0，保留 2，丢弃 0，保留 3\n→ [2,3]'
+    ],
+    '超幂 · 2 ↑↑ 3 → 16':[
+      'TETRATION = λbase height.height (POW base) 1',
+      ['超幂把幂运算继续迭代。从 1 开始，每一步把上一轮结果作为指数，计算以 base 为底的新幂。','幂塔按右结合解释。丘奇高度控制迭代次数，高度为 0 时返回 1。'],
+      '高度 0 → 1\n高度 1 → 2¹=2\n高度 2 → 2²=4\n高度 3 → 2⁴=16'
+    ],
+    '超超幂 · 2 ↑↑↑ 2 → 4':[
+      'PENTATION = λbase count.count (TETRATION base) 1',
+      ['把上一层的超幂当作更新函数反复调用。每次使用上一轮结果作为新幂塔的高度。','输入次数为 0 时返回初值 1；次数增加时，中间数字和表达式都可能迅速变大。'],
+      '初值 1 → 2 ↑↑ 1=2\n→ 2 ↑↑ 2=4'
+    ],
+    '开根号 · √10 向下取整 → 3':[
+      '寻找最大的 k，使 k^degree ≤ target',
+      ['从正整数底数开始递增搜索。每次用丘奇乘方求候选幂值，并与目标比较。','候选值超过目标后返回前一个底数，所以结果是向下取整的根。比较用 Scott 列表作为有限消耗的标记，目标被超过时可以提早返回。根指数 0 返回 I。'],
+      '1²=1≤10，2²=4≤10，3²=9≤10\n4²=16>10 → 返回 3'
+    ],
+    '整数除法 · 7 ÷ 2 → 3':[
+      '寻找最大的 q，使 divisor×q ≤ dividend',
+      ['这个示例用单调搜索求自然数商。商从 0 开始，每次把候选商乘以除数，与被除数比较。','第一次超过被除数时返回上一个商。除数 0 在搜索前由零判断返回错误。小数商需要使用列表小数的长除法。'],
+      '2×0=0，2×1=2，2×2=4，2×3=6\n2×4=8>7 → 商为 3'
+    ],
+    '对数 · log₂ 9 向下取整 → 3':[
+      '寻找最大的 e，使 base^e ≤ target',
+      ['固定底数，递增搜索指数。每个候选指数通过丘奇乘方得到幂，再与目标比较。','返回最后一个没有超过目标的指数。这里需要底数至少为 2、目标至少为 1，使搜索对应递增序列；无效输入返回 I。'],
+      '2⁰=1，2¹=2，2²=4，2³=8≤9\n2⁴=16>9 → 返回 3'
+    ],
+    '超对数 · 2 ↑↑ h = 16 → h = 3':[
+      '寻找最大的 h，使 base ↑↑ h ≤ target',
+      ['固定底数，递增搜索幂塔高度。每次调用超幂程序，然后比较幂塔值与目标。','结果是高度的向下取整逆运算。底数至少为 2、目标至少为 1；无效输入返回 I。'],
+      '2 ↑↑ 0=1，2 ↑↑ 1=2\n2 ↑↑ 2=4，2 ↑↑ 3=16\n下一高度超过 16 → 返回 3'
+    ],
+    '超根号 · b ↑↑ 2 = 4 → b = 2':[
+      '寻找最大的 b，使 b ↑↑ height ≤ target',
+      ['高度作为固定参数，搜索的变量是正整数底数。每次以候选底数构造指定高度的幂塔。','返回最后一个没有超过目标的底数。高度为 0 时所有底数都得到 1，因此这个示例把它作为无效输入并返回 I。'],
+      '高度固定为 2\n1 ↑↑ 2=1，2 ↑↑ 2=4\n3 ↑↑ 2=27>4 → 返回 2'
+    ],
+    '超超根号 · b ↑↑↑ 2 = 4 → b = 2':[
+      '寻找最大的 b，使 b ↑↑↑ count ≤ target',
+      ['固定超超幂的迭代次数，通过递增底数进行单调搜索。候选值由超超幂程序实际计算。','每次比较超过目标就结束搜索并返回前一个底数。次数为 0 时返回 I。'],
+      '次数固定为 2\n1 ↑↑↑ 2=1，2 ↑↑↑ 2=4\n3 ↑↑↑ 2 超过 4 → 返回 2'
+    ],
+    '超超对数 · 2 ↑↑↑ h = 4 → h = 2':[
+      '寻找最大的 h，使 base ↑↑↑ h ≤ target',
+      ['固定底数，搜索超超幂需要重复多少次才能到达目标附近。每次候选值都由内层超幂迭代产生。','输入目标不一定恰好落在这个序列上，程序返回最后一个不超过它的次数。无效底数或零目标返回 I。'],
+      '2 ↑↑↑ 0=1，2 ↑↑↑ 1=2\n2 ↑↑↑ 2=4，下一项超过 4\n返回 2'
+    ],
+    '序对除法 · 7 ÷ 2 → 商 3，余数 1':[
+      'state=(剩余量, 商)\n剩余量≥除数时，更新为 (剩余量−除数, 商+1)',
+      ['有序对从被除数和商 0 开始。每轮先判断是否还能减去一个除数，再同时更新剩余量和商。','丘奇被除数提供足够的迭代次数。剩余量不足时状态保持不变，最后输出余数和商，并附加供页面识别的 TRUE 标记。除数 0 提前返回错误。'],
+      '(7,0) → (5,1) → (3,2) → (1,3)\n1<2，后续保持 (1,3)\n余数 1，商 3'
+    ]
+  };
+  const decimalLessons={
+    ADD:['先按较大的小数位数补零对齐。符号相同就逐位相加并传递进位；符号不同则比较绝对值，用较大者减较小者并选择结果符号。','0.1+0.2\n→ 对齐为 1/10 和 2/10\n→ 数字相加为 3，位数仍为 1\n→ 0.3'],
+    SUB:['先翻转第二个参数的符号，再复用带符号加法。减去负数等价于加正数；结果为零时符号归为正。','1−2 → 1+(−2)\n→ 比较绝对值并计算 2−1\n→ −1'],
+    MUL:['逐个数位计算部分乘积，并按数位位置补零后相加。结果的小数位数等于两个输入的小数位数之和，负号由两个符号的异或决定。','0.2×0.3\n→ 整数数字 2×3=6\n→ 小数位数 1+1=2\n→ 0.06'],
+    DIV:['先对齐输入的小数位数，把除数和被除数变成同一单位的整数数位。长除法每次带下一位进入余数，用重复减法求商位；需要小数位时继续带入零。','1÷8\n整数商为 0，余数 1\n10÷8 → 商位 1，余数 2\n20÷8 → 商位 2，余数 4\n40÷8 → 商位 5，余数 0\n→ 0.125'],
+    NEG:['保留绝对值、位数和近似标记，只翻转符号位。构造函数会检查零值并清除零的负号。','1.25 → 符号由正变负 → −1.25\n0 → 0'],
+    ABS:['保留数位列表、小数位数与近似标记，把符号位设为正。它既能接收正数，也能接收负数和零。','−2.75 → 清除负号 → 2.75'],
+    POW:['指数使用丘奇自然数，决定重复多少次带符号小数乘法。累计值从 1 开始，每轮把底数乘入；中间结果先归约成小数数据再继续。','(−0.5)³\n累计值 1 → −0.5 → 0.25 → −0.125\n指数为 0 时返回 1'],
+    SHL:['把原数位列表与自身相加，小数位数保持不变，等于乘以 2。操作只接收一个小数，可以用丘奇数在外面重复调用。','−1.25 → −2.5\n3_church SHIFT_LEFT 1.25_decimal\n表示连续左移三位，得到 10'],
+    SHR:['有限十进制数除以 2，可以把数位整数乘以 5，同时把小数位数增加 1。这里每次只移动一位，所有数位都会保留。','1.25 = 125/100\n→ 625/1000 = 0.625\n连续右移三次等于除以 8'],
+    SQRT:['从输入值和 1 中较大者开始，用牛顿迭代更新估计值。每轮计算“原数除以当前估计”，再与当前估计求平均，工作值截断到 4 位小数；估计不再下降时结束。','求 √2\n2 → (2+2/2)/2=1.5\n→ (1.5+2/1.5)/2≈1.4166\n→ … → 页面显示 ≈1.414'],
+    SIN:['先利用奇对称性记录输入符号，再按 2π 周期缩小绝对角度，并把角度折回适合近似的小区间。使用 sin 的奇次泰勒多项式，必要时借用余弦多项式。','sin(0.5)\n≈ 0.5−0.5³/6+0.5⁵/120−0.5⁷/5040\n→ ≈0.479'],
+    COS:['利用 cos(x)=sin(x+π/2)，先把输入平移半个 π，再进入与正弦相同的周期缩减和多项式近似流程。','cos(0.5)=sin(0.5+π/2)\n→ 周期与对称性缩减\n→ ≈0.877'],
+    TAN:['分别计算正弦和余弦，再对二者做带符号小数除法。分母按工作位数截断；截断后为零时返回除零错误。','tan(0.5)=sin(0.5)/cos(0.5)\n≈0.4794/0.8775\n→ ≈0.546'],
+    SINH:['双曲正弦使用奇次泰勒多项式，各项系数为正，因此与正弦交替正负的系数不同。负输入通过奇次项保留负号。','sinh(−0.5)\n≈ −0.5+(−0.5)³/6+(−0.5)⁵/120+…\n→ ≈−0.521'],
+    COSH:['双曲余弦使用偶次泰勒多项式，从常数项 1 开始，各项相加。因为只有偶次幂，正负输入的结果相同。','cosh(0.5)\n≈1+0.5²/2+0.5⁴/24+0.5⁶/720+…\n→ ≈1.127'],
+    TANH:['先计算双曲正弦和双曲余弦，再做小数除法。这里继承双曲多项式的输入范围和工作精度。','tanh(0.5)=sinh(0.5)/cosh(0.5)\n≈0.521/1.127\n→ ≈0.462']
+  };
+  function lesson(example){
+    if(example.decimalOperation){
+      const [method,walk]=decimalLessons[example.decimalOperation];
+      const notes=example.category==='高等小数'&&['SIN','COS','TAN'].includes(example.decimalOperation)
+        ?'角度单位为弧度，当前示例输入范围为 −1000 到 1000。π 和多项式系数也采用有限小数近似。'
+        :['SINH','COSH','TANH'].includes(example.decimalOperation)
+          ?'当前双曲函数示例输入范围为 −1 到 1。运算使用有限泰勒多项式和截断工作精度，结果带近似标记。'
+          :example.decimalOperation==='SQRT'?'输入需为非负数，负输入会返回实数平方根定义域错误。结果采用有限小数近似。'
+            :example.decimalOperation==='DIV'?'小数位数由设置决定。截断后余数非零会显示“≈”，除数为零会返回错误。':'数位采用有限列表保存，精确四则与移位不会依赖 JavaScript 浮点数。';
+      let walkthrough=walk;
+      if(example.name.startsWith('带符号除法'))walkthrough='−7.5÷2 → 对齐整数单位 75÷20\n→ 长除法得到 3.75\n→ 两个输入符号不同，结果 −3.75';
+      if(example.name.startsWith('倒数'))walkthrough='1÷0.4 → 同比例变成 10÷4\n→ 商为 2.5';
+      return {core:`${example.decimalOperation} (${example.operands.join(') (')})`,principle:[method,notes],walkthrough};
+    }
+    const entry=lessons[example.name];
+    if(!entry)throw new Error(`Missing explanation for ${example.name}`);
+    return {core:entry[0],principle:entry[1],walkthrough:entry[2]};
+  }
+  function init(api){
+    const $=id=>document.getElementById(id),category=$('guide-category'),search=$('guide-search'),select=$('guide-example');
+    let selected=0,filtered=[];
+    for(const name of new Set(P.examples.map(example=>example.category||'入门'))){
+      const option=document.createElement('option');option.value=name;option.textContent=name;category.append(option);
+    }
+    function render(){
+      const example=P.examples[selected],doc=lesson(example);
+      $('guide-title').textContent=example.name;
+      $('guide-purpose').textContent=example.description??'从下面的关键表达式开始，跟随参数替换理解计算。';
+      $('guide-encoding').textContent=example.encoding==='decimal'
+        ?'数据表示使用符号、低位在前的十进制数位列表、小数位数和近似标记。公式与过程使用数值及辅助函数名作简写。'
+        :'数字按丘奇自然数表示；列表、有序对与布尔值也由 λ 函数编码。公式与过程使用辅助函数名作简写。';
+      $('guide-core').textContent=doc.core;
+      const paragraphs=doc.principle.map(text=>{const p=document.createElement('p');p.textContent=text;return p;});
+      $('guide-principle').replaceChildren(...paragraphs);
+      $('guide-walkthrough').textContent=doc.walkthrough;
+      const parameters=P.parametersFor(example);
+      $('guide-parameters').textContent=parameters.length?`完整表达式末尾的参数依次为${parameters.join('、')}。`:'函数的参数顺序见关键表达式，完整表达式包含示例的输入数据。';
+      $('guide-expression').textContent=P.inputSourceFor(example,api.precision());
+      const index=filtered.indexOf(selected);
+      $('guide-previous').disabled=index<=0;$('guide-next').disabled=index>=filtered.length-1;
+    }
+    function filter(){
+      const query=search.value.trim().toLowerCase();
+      filtered=P.examples.flatMap((example,index)=>{
+        const doc=lesson(example),name=example.category||'入门';
+        return (!category.value||category.value===name)&&`${name} ${example.name} ${example.description??''} ${doc.core} ${doc.principle.join(' ')}`.toLowerCase().includes(query)?[index]:[];
+      });
+      if(!filtered.includes(selected))selected=filtered[0]??selected;
+      const options=filtered.map(index=>{const option=document.createElement('option');option.value=index;option.textContent=P.examples[index].name;return option;});
+      select.replaceChildren(...options);select.value=selected;
+      $('guide-count').textContent=`找到 ${filtered.length} / ${P.examples.length} 个示例`;
+      const empty=!filtered.length;
+      $('guide-article').hidden=empty;$('guide-load').disabled=empty;select.disabled=empty;
+      if(empty){$('guide-previous').disabled=true;$('guide-next').disabled=true;}else render();
+    }
+    select.addEventListener('change',()=>{selected=Number(select.value);render();api.save();});
+    category.addEventListener('change',filter);search.addEventListener('input',filter);
+    for(const [id,delta] of [['guide-previous',-1],['guide-next',1]])$(id).addEventListener('click',()=>{
+      selected=filtered[filtered.indexOf(selected)+delta];select.value=selected;render();api.save();
+    });
+    $('guide-load').addEventListener('click',()=>api.load(P.examples[selected]));
+    filter();
+    return {refresh:render,capture:()=>P.examples[selected].name,restore:name=>{
+      selected=Math.max(0,P.examples.findIndex(example=>example.name===name));category.value='';search.value='';filter();
+    }};
+  }
+  const API={lesson,init};root.LambdaGuide=API;
+  if(typeof module!=='undefined'&&module.exports)module.exports=API;
+})(typeof globalThis!=='undefined'?globalThis:window);
 
 </script><script>
 (function(root){
@@ -1962,7 +2455,7 @@
     const encodingEditing=encodingDraft.editing??null;
     if(encodingEditing!==null&&!dataEncodings.some(entry=>entry.name===encodingEditing))fail('正在编辑的数据编码不存在。');
     if(!Array.isArray(raw.completed)||raw.completed.length>P.levels.length||raw.completed.some(i=>!LEVEL_IDS.has(i)))fail('通关进度不合法。');
-    if(raw.mode!=='free'&&raw.mode!=='challenge')fail('游戏模式不合法。');
+    if(!['free','challenge','guide'].includes(raw.mode))fail('游戏模式不合法。');
     if(!Number.isInteger(raw.level)||raw.level<0||raw.level>=P.levels.length)fail('关卡编号不合法。');
     const s=raw.session;if(!object(s)||!Number.isSafeInteger(s.steps)||s.steps<0||typeof s.dirty!=='boolean')fail('归约状态不合法。');
     const original=s.original===null?null:ast(s.original);if(!original&&s.steps!==0)fail('没有起始表达式，无法恢复归约。');
@@ -1996,6 +2489,7 @@
     const numberEncoding=v.numberEncoding===undefined?'decimal':v.numberEncoding;if(!E.isBuiltin(numberEncoding)&&!dataEncodings.some(entry=>numberEncoding===`custom:${entry.name}`))fail('数字编码不合法。');
     const numberFormats=v.numberFormats??{};E.validateFormats(dataEncodings,numberFormats);
     const inputFormatDraft=v.inputFormatDraft;
+    if(v.guideExample!==undefined&&typeof v.guideExample!=='string')fail('讲解示例不合法。');
     if(inputFormatDraft!==undefined&&(!object(inputFormatDraft)||typeof inputFormatDraft.encoding!=='string'||typeof inputFormatDraft.text!=='string'))fail('输入形式草稿不合法。');
     const decimalPlaces=v.decimalPlaces===undefined?6:v.decimalPlaces;if(!Number.isSafeInteger(decimalPlaces)||decimalPlaces<0)fail('小数位数不合法。');
     const panX=v.panX??0,panY=v.panY??0;
@@ -2011,10 +2505,10 @@
     if(editing!==null&&(!L.validName(editing)||!functions.some(fn=>fn.name===editing)))fail('正在编辑的函数不存在或不合法。');
     return {version,savedAt:typeof raw.savedAt==='string'&&Number.isFinite(Date.parse(raw.savedAt))?raw.savedAt:new Date().toISOString(),draft:raw.draft,
       functions,dataEncodings,encodingDraft:{name:encodingDraft.name,source:encodingDraft.source,...(encodingEditing===null?{}:{editing:encodingEditing})},completed:[...new Set(raw.completed)],mode:raw.mode,level:raw.level,
-      session:{original,steps:s.steps,dirty:s.dirty,halt:s.halt,...(s.encodings===undefined?{}:{encodings:[...new Set(encodings)]}),...(paths===undefined?{}:{paths}),...(choices===undefined?{}:{choices})},view:{speed:v.speed,strategy,direction,numberEncoding,decimalPlaces,...(v.numberFormats===undefined?{}:{numberFormats:{...numberFormats}}),...(inputFormatDraft===undefined?{}:{inputFormatDraft:{encoding:inputFormatDraft.encoding,text:inputFormatDraft.text}}),...(palette===undefined?{}:{palette}),scale:v.scale,autoFit:v.autoFit,panX,panY,historyOpen:v.historyOpen,helpOpen:v.helpOpen,hintOpen:v.hintOpen},
+      session:{original,steps:s.steps,dirty:s.dirty,halt:s.halt,...(s.encodings===undefined?{}:{encodings:[...new Set(encodings)]}),...(paths===undefined?{}:{paths}),...(choices===undefined?{}:{choices})},view:{speed:v.speed,strategy,direction,numberEncoding,decimalPlaces,...(v.guideExample===undefined?{}:{guideExample:v.guideExample}),...(v.numberFormats===undefined?{}:{numberFormats:{...numberFormats}}),...(inputFormatDraft===undefined?{}:{inputFormatDraft:{encoding:inputFormatDraft.encoding,text:inputFormatDraft.text}}),...(palette===undefined?{}:{palette}),scale:v.scale,autoFit:v.autoFit,panX,panY,historyOpen:v.historyOpen,helpOpen:v.helpOpen,hintOpen:v.hintOpen},
       selection:{start:selection.start,end:selection.end},error:raw.error,functionDraft:{name:functionDraft.name,source:functionDraft.source,...(editing===null?{}:{editing})}};
   }
-  function replay(s,compact) {
+  function* replay(s,compact) {
     let term=s.session.original,choice=null,next=0;
     const trace=compact?Trace.create(term):null;
     const history=!compact&&term?[{term,change:null}]:[];
@@ -2025,6 +2519,7 @@
       if(!result)fail(Array.isArray(choice)?'归约路径未指向可归约项。':'步数超过实际可归约次数。');
       term=result.term;
       if(trace)trace.append(result,choice);else history.push({term,change:result});
+      yield i+1;
     }
     return {...s,term,...(trace?{trace}:{history}),hasSession:true};
   }
@@ -2038,7 +2533,7 @@
     if(new TextEncoder().encode(text).length>MAX_BYTES)fail('文件超过 2 MiB 上限。');
     return text;
   }
-  function decode(text,{compact=false}={}) {
+  function parseArchive(text) {
     if(typeof text!=='string'||text.length>MAX_BYTES||new TextEncoder().encode(text).length>MAX_BYTES)fail('文件超过 2 MiB 上限。');
     let raw;try{raw=JSON.parse(text);}catch{fail('不是有效的 JSON 文件。');}
     if(object(raw)&&raw.version===1) {
@@ -2046,15 +2541,57 @@
       const migrated={version:2,savedAt:new Date().toISOString(),draft,functions:[],completed:Array.isArray(raw.completed)?[...new Set(raw.completed.filter(i=>Number.isInteger(i)&&i>0&&i<6))]:[],
         mode:raw.mode==='challenge'?'challenge':'free',level:Number.isInteger(raw.level)&&raw.level>=0&&raw.level<5?raw.level:0,
         session:{original:null,steps:0,dirty:true,halt:''},view:{numberEncoding:'church',speed:600,scale:1,autoFit:true,historyOpen:false,helpOpen:false,hintOpen:false},selection:{start:0,end:0},error:''};
-      return {...validate(migrated),history:[],term:null,hasSession:false};
+      return {snapshot:validate(migrated),legacy:true};
     }
-    const snapshot=replay(validate(raw),compact);
+    const snapshot=validate(raw),archive={snapshot,legacy:false};
     if(Object.prototype.hasOwnProperty.call(raw,'checkpoint')) {
-      snapshot.checkpointText=raw.checkpoint===null?null:encode(replay(validate(raw.checkpoint),true));
+      archive.checkpoint=raw.checkpoint===null?null:validate(raw.checkpoint);
     }
-    return snapshot;
+    return archive;
   }
-  const API={MAX_BYTES,ast,validate,encode,encodeBackup,decode};root.LambdaSnapshot=API;
+  function finish(iterator){
+    let next=iterator.next();while(!next.done)next=iterator.next();return next.value;
+  }
+  function decode(text,{compact=false}={}) {
+    const {snapshot,legacy,checkpoint}=parseArchive(text);
+    if(legacy)return {...snapshot,history:[],term:null,hasSession:false};
+    const result=finish(replay(snapshot,compact));
+    if(checkpoint!==undefined)result.checkpointText=checkpoint===null?null:encode(finish(replay(checkpoint,true)));
+    return result;
+  }
+  async function decodeAsync(text,{signal,onProgress}={}){
+    const {snapshot,legacy,checkpoint}=parseArchive(text);
+    if(legacy)return {...snapshot,history:[],term:null,hasSession:false};
+    const total=snapshot.session.steps+(checkpoint?.session.steps??0);
+    const result=await replayAsync(replay(snapshot,true),signal,step=>onProgress?.(step,total));
+    if(checkpoint!==undefined){
+      result.checkpointText=checkpoint===null?null:encode(await replayAsync(replay(checkpoint,true),signal,
+        step=>onProgress?.(snapshot.session.steps+step,total)));
+    }
+    return result;
+  }
+  async function replayAsync(iterator,signal,onProgress){
+    let started=performance.now();
+    try{
+      for(;;){
+        signal?.throwIfAborted();
+        const next=iterator.next();
+        if(next.done)return next.value;
+        if(performance.now()-started>=8){
+          onProgress(next.value);
+          await new Promise(resolve=>setTimeout(resolve,12));
+          started=performance.now();
+        }
+      }
+    }finally{iterator.return();}
+  }
+  function decodeStartingState(text,{draftOnly=false}={}){
+    const {snapshot,legacy}=parseArchive(text),{original,encodings}=snapshot.session;
+    const term=draftOnly?null:original;
+    return {...snapshot,session:{original:term,encodings,steps:0,dirty:draftOnly||snapshot.session.dirty,halt:''},
+      term,trace:Trace.create(term),hasSession:draftOnly||!legacy};
+  }
+  const API={MAX_BYTES,ast,validate,encode,encodeBackup,decode,decodeAsync,decodeStartingState};root.LambdaSnapshot=API;
   if(typeof module!=='undefined'&&module.exports)module.exports=API;
 })(typeof globalThis!=='undefined'?globalThis:window);
 
@@ -2132,6 +2669,21 @@
     const cancel=document.createElement('button');cancel.id='function-cancel';cancel.type='button';cancel.className='button';cancel.textContent='取消编辑';cancel.hidden=true;
     $('function-add').before(cancel);
     let functions=[],checkpoint=null,saveTimer=null,restoring=false,editing=null,functionController=null;
+    let replayController=null,recoveredDraft=null;
+    const restoreDialog=$('restore-progress');
+    function cancelReplay(){replayController?.abort();}
+    $('cancel-restore').addEventListener('click',cancelReplay);
+    restoreDialog.addEventListener('cancel',event=>{event.preventDefault();cancelReplay();});
+    async function replaySave(text){
+      cancelReplay();
+      const controller=new AbortController();replayController=controller;
+      try{return await S.decodeAsync(text,{signal:controller.signal,onProgress:(step,total)=>{
+        $('restore-progress-text').textContent=`正在重放存档 ${step} / ${total} 步…`;
+        if(!restoreDialog.open)restoreDialog.showModal();
+      }});}finally{
+        if(replayController===controller){replayController=null;restoreDialog.close();}
+      }
+    }
     function abortFunctionCompile(){functionController?.abort();functionController=null;}
     const feedback=(message,error=false)=>{$('save-feedback').hidden=false;$('save-feedback').textContent=message;$('save-feedback').classList.toggle('error',error);};
     function captured() {return {...api.capture(),version:2,savedAt:new Date().toISOString(),functions,functionDraft:{name:$('function-name').value,source:$('function-source').value,...(editing===null?{}:{editing})}};}
@@ -2147,9 +2699,13 @@
     function storageStatus(ok) {
       $('storage-status').textContent=ok?'当前状态已自动保存':'自动保存不可用，请导出存档备份';$('storage-status').classList.toggle('storage-error',!ok);
     }
-    function persist() {
-      clearTimeout(saveTimer);if(restoring)return;
-      try{localStorage.setItem(AUTO,S.encode(captured()));storageStatus(true);}catch{storageStatus(false);}
+    function persist(force=false) {
+      clearTimeout(saveTimer);if(restoring||replayController)return;
+      try{
+        const snapshot=captured();
+        if(!force&&recoveredDraft!==null&&snapshot.draft===recoveredDraft&&snapshot.session.steps===0)return;
+        localStorage.setItem(AUTO,S.encode(snapshot));recoveredDraft=null;storageStatus(true);
+      }catch{storageStatus(false);}
     }
     function queueSave(){if(!restoring){clearTimeout(saveTimer);saveTimer=setTimeout(persist,180);}}
     function renderLibrary() {
@@ -2178,14 +2734,32 @@
       try {functions=snapshot.functions;renderLibrary();api.apply(snapshot);$('function-name').value=snapshot.functionDraft.name;$('function-source').value=snapshot.functionDraft.source;editing=snapshot.functionDraft.editing??null;renderEditMode();$('function-error').hidden=true;}
       finally{restoring=false;}
     }
-    function restoreInitial() {
-      let restored=false;
+    function recoverDraft(text,message,draftOnly=false){
+      const snapshot=S.decodeStartingState(text,{draftOnly});
+      apply(snapshot);recoveredDraft=snapshot.draft;checkpoint=text;
+      $('storage-status').textContent='已保留原自动存档';
+      feedback(message);
+    }
+    async function restoreInitial() {
+      let restored=false,text;
       try {
-        const text=localStorage.getItem(AUTO)||localStorage.getItem(LEGACY);
-        if(text){const snapshot=decode(text);apply(snapshot);restored=true;}
-      }catch(e){feedback(`自动存档未能恢复：${e.message}。可以重新导入备份。`,true);}
-      try{const text=localStorage.getItem(CHECKPOINT);if(text){decode(text);checkpoint=text;}}catch{/* Keep a corrupt checkpoint untouched. */}
-      $('restore-state').disabled=!checkpoint;renderLibrary();return restored;
+        text=localStorage.getItem(AUTO)||localStorage.getItem(LEGACY);
+        if(text){
+          if(new URLSearchParams(location.search).get('recover')==='1'){
+            recoverDraft(text,'已打开草稿，原存档保留。可点击「恢复已保存状态」重放。',true);
+          }else{
+            const snapshot=await replaySave(text);apply(snapshot);storageStatus(true);
+          }
+          restored=true;
+        }
+      }catch(e){
+        if(e.name==='AbortError'&&text){
+          recoverDraft(text,'已取消重放。原存档保留，可点击「恢复已保存状态」重新重放。');
+          restored=true;
+        }else feedback(`自动存档未能恢复：${e.message}。可以重新导入备份。`,true);
+      }
+      try{const saved=localStorage.getItem(CHECKPOINT);if(saved&&!checkpoint){S.decodeStartingState(saved);checkpoint=saved;}}catch{/* Keep a corrupt checkpoint untouched. */}
+      $('restore-state').disabled=!checkpoint;renderLibrary();if(restored)persist();return restored;
     }
     $('function-form').addEventListener('submit',async e=>{
       e.preventDefault();$('function-error').hidden=true;
@@ -2206,13 +2780,14 @@
     for(const id of ['function-name','function-source'])$(id).addEventListener('input',()=>{abortFunctionCompile();renderEditMode();queueSave();});
     document.querySelectorAll('[data-function-insert]').forEach(b=>{b.addEventListener('mousedown',e=>e.preventDefault());b.addEventListener('click',()=>{abortFunctionCompile();renderEditMode();const field=$('function-source');field.setRangeText(b.dataset.functionInsert,field.selectionStart,field.selectionEnd,'end');field.focus();queueSave();});});
     $('save-state').addEventListener('click',()=>{
-      try{const text=S.encode(captured());localStorage.setItem(CHECKPOINT,text);checkpoint=text;$('restore-state').disabled=false;persist();feedback('当前状态和关卡进度已保存。可随时恢复到这个位置。');api.toast('当前状态已保存');}
+      try{const text=S.encode(captured());localStorage.setItem(CHECKPOINT,text);checkpoint=text;$('restore-state').disabled=false;persist(true);feedback('当前状态和关卡进度已保存。可随时恢复到这个位置。');api.toast('当前状态已保存');}
       catch(e){feedback(`未能保存到浏览器：${e.message}。请使用「导出存档」备份当前状态。`,true);}
     });
-    $('restore-state').addEventListener('click',()=>{
+    $('restore-state').addEventListener('click',async()=>{
       if(!checkpoint)return;
-      try{const snapshot=decode(checkpoint);apply(snapshot);persist();feedback('已恢复保存时的状态。自动运行保持暂停，可单步或继续运行。');api.toast('已恢复当前状态');}
-      catch(e){feedback(e.message,true);}
+      api.pauseForRestore();
+      try{const snapshot=await replaySave(checkpoint);apply(snapshot);persist(true);feedback('已恢复保存时的状态。自动运行保持暂停，可单步或继续运行。');api.toast('已恢复当前状态');}
+      catch(e){feedback(e.name==='AbortError'?'已取消重放，当前状态保留。':e.message,e.name!=='AbortError');}
     });
     $('export-state').addEventListener('click',()=>{
       try{const text=S.encode(captured());root.LambdaDownload.save(`lambda-lab-save-${new Date().toISOString().replace(/[-:]/g,'').slice(0,15)}.json`,text,'application/json');feedback('完整存档已导出。可以在另一台设备导入继续。');}
@@ -2227,7 +2802,7 @@
         for(const [key,text] of previous){try{if(text===null)localStorage.removeItem(key);else localStorage.setItem(key,text);}catch{/* Keep the live scene and exported backup if storage itself is unavailable. */}}
         throw error;
       }
-      clearTimeout(saveTimer);apply(snapshot);clearEditor();checkpoint=null;$('restore-state').disabled=true;persist();return result;
+      clearTimeout(saveTimer);apply(snapshot);clearEditor();checkpoint=null;$('restore-state').disabled=true;persist(true);return result;
     }
     $('clear-all').addEventListener('click',()=>{
       try {
@@ -2250,15 +2825,16 @@
     $('import-state').addEventListener('click',()=>$('import-file').click());
     $('import-file').addEventListener('change',async()=>{
       const file=$('import-file').files[0];$('import-file').value='';if(!file)return;
-      try{if(file.size>S.MAX_BYTES)throw new C.LambdaError('存档文件超过 2 MiB 上限。');const snapshot=decode(await file.text());
+      api.pauseForRestore();
+      try{if(file.size>S.MAX_BYTES)throw new C.LambdaError('存档文件超过 2 MiB 上限。');const snapshot=await replaySave(await file.text());
         if(Object.prototype.hasOwnProperty.call(snapshot,'checkpointText')) {
           if(snapshot.checkpointText===null)localStorage.removeItem(CHECKPOINT);else localStorage.setItem(CHECKPOINT,snapshot.checkpointText);
           checkpoint=snapshot.checkpointText;$('restore-state').disabled=checkpoint===null;
         }
-        apply(snapshot);persist();feedback('存档已导入，函数库、计算状态和进度均已恢复。');api.toast('存档导入成功');}
-      catch(e){feedback(`导入失败：${e.message}。当前现场未改变。`,true);}
+        apply(snapshot);persist(true);feedback('存档已导入，函数库、计算状态和进度均已恢复。');api.toast('存档导入成功');}
+      catch(e){if(e.name==='AbortError')feedback('已取消重放，当前状态保留。');else feedback(`导入失败：${e.message}。当前现场未改变。`,true);}
     });
-    window.addEventListener('pagehide',persist);
+    window.addEventListener('pagehide',()=>persist());
     return {expand:t=>L.expand(t,functions),encodingsFor:t=>L.encodingsFor(t,functions),persist,queueSave,restoreInitial};
   }
   root.LambdaWorkspace={init};
@@ -2401,7 +2977,7 @@
       try{
         cancel();const entry=api.getEntry();if(!entry)throw new C.LambdaError('请先保存数据编码。');
         const number=E.naturalNumber($('encoding-table-number').value),term=C.A(entry.term,C.parse(number));
-        const task={name:entry.name,number,definition:entry.term,term,steps:0};generation=task;
+        const task={name:entry.name,number,definition:entry.term,term,steps:0},repeated=C.cycleCheck(term);generation=task;
         $('encoding-table-generate').disabled=true;$('encoding-table-cancel').hidden=false;
         function tick(){
           if(generation!==task)return;
@@ -2415,8 +2991,9 @@
                 store(task.name,task.number,task.term);status(`已加入 ${task.number}_${task.name}，生成过程执行 ${task.steps} 次归约。`);return;
               }
               task.term=result.term;task.steps++;
+              if(repeated(task.term,result))throw new C.LambdaError('数字编码进入重复归约循环。');
             }while(performance.now()-start<8);
-            status(`正在归约 ${task.number}_${task.name}：${task.steps} 步，可随时取消。`);timer=setTimeout(tick,0);
+            status(`正在归约 ${task.number}_${task.name}：${task.steps} 步，可随时取消。`);timer=setTimeout(tick,12);
           }catch(error){cancel();status(error.message,true);}
         }
         timer=setTimeout(tick,0);
@@ -2566,10 +3143,13 @@
   const $=id=>document.getElementById(id);
   const input=$('expression');
   const valueButton=$('decimal-value'),valueResult=$('decimal-value-result'),valueDetails=$('normal-form');
+  const interpretedDetails=$('interpreted-result'),interpretedExpression=$('interpreted-expression');
   let valueJob=null,valueSource=null,normalForm=null;
+  let interpretedSource=null,interpretedTerm=null;
+  let repeatedTerm=null;
   const state={ term:null, original:null, history:Trace.create(), dirty:false, running:false, timer:null,
     mode:'free', level:0, completed:new Set(), halt:'', scale:1, autoFit:true, model:null, speed:600, strategy:'normal', direction:'left',numberEncoding:'church',numberFormats:{},decimalPlaces:6,fast:false,encodings:null,encodingBusy:false };
-  let toastTimer,workspace,viewer,dataEditor,formatEditor,conversionController=null,compilingDefinitions=null,preparationTimer=null,historySource=null,renderedCount=0,diagramTerm=null,diagramRoute=null;
+  let toastTimer,workspace,viewer,dataEditor,formatEditor,guide,conversionController=null,compilingDefinitions=null,preparationTimer=null,historySource=null,renderedCount=0,diagramTerm=null,diagramRoute=null;
   const RUN_PAINT_INTERVAL=120;
   const INLINE_HISTORY_NODES=256;
   const HISTORY_PAGE_SIZE=32;
@@ -2611,7 +3191,7 @@
   function capture() {
     return {...dataEditor.capture(),draft:input.value,completed:[...state.completed],mode:state.mode,level:state.level,
       session:{original:state.original,steps:Math.max(0,state.history.length-1),dirty:state.dirty,halt:state.halt,...(state.encodings===null?{}:{encodings:state.encodings}),...(state.history.choices.length?{choices:state.history.choices}:{})},
-      view:{speed:state.speed,strategy:state.strategy,direction:state.direction,numberEncoding:state.numberEncoding,numberFormats:state.numberFormats,inputFormatDraft:formatEditor.capture(),decimalPlaces:state.decimalPlaces,...(palette===Palette.defaults?{}:{palette}),scale:state.scale,autoFit:state.autoFit,panX:$('diagram-viewport').scrollLeft,panY:$('diagram-viewport').scrollTop,historyOpen:$('history-details').open,helpOpen:!$('help-panel').hidden,hintOpen:!$('hint').hidden},
+      view:{speed:state.speed,strategy:state.strategy,direction:state.direction,numberEncoding:state.numberEncoding,numberFormats:state.numberFormats,inputFormatDraft:formatEditor.capture(),guideExample:guide.capture(),decimalPlaces:state.decimalPlaces,...(palette===Palette.defaults?{}:{palette}),scale:state.scale,autoFit:state.autoFit,panX:$('diagram-viewport').scrollLeft,panY:$('diagram-viewport').scrollTop,historyOpen:$('history-details').open,helpOpen:!$('help-panel').hidden,hintOpen:!$('hint').hidden},
       selection:{start:input.selectionStart,end:input.selectionEnd},error:$('error-message').hidden?'':$('error-message').textContent};
   }
   function applySnapshot(s) {
@@ -2626,6 +3206,7 @@
     state.scale=s.view.scale;state.autoFit=s.view.autoFit;state.speed=s.view.speed;state.strategy=s.view.strategy??'normal';state.direction=s.view.direction??'left';renderSpeed();
     state.numberEncoding=s.view.numberEncoding??'church';state.numberFormats=s.view.numberFormats??{};state.decimalPlaces=s.view.decimalPlaces??6;
     state.encodings=s.session.encodings??null;dataEditor.restore(s);formatEditor.restore(s.view.inputFormatDraft);
+    guide.restore(s.view.guideExample);
     applyPalette(s.view.palette??Palette.defaults);paletteEditor.restore(palette);
     $('history-details').open=s.view.historyOpen;$('help-panel').hidden=!s.view.helpOpen;$('help-toggle').setAttribute('aria-expanded',String(s.view.helpOpen));
     $('hint').hidden=!s.view.hintOpen;$('hint-toggle').textContent=s.view.hintOpen?'收起提示':'显示提示';$('hint-toggle').setAttribute('aria-expanded',String(s.view.hintOpen));
@@ -2638,7 +3219,7 @@
     clearTimeout(toastTimer); $('toast').textContent=message; $('toast').hidden=false;
     toastTimer=setTimeout(()=>$('toast').hidden=true,2400);
   }
-  function stop() { clearTimeout(state.timer); state.timer=null; state.running=false;state.fast=false; }
+  function stop() { clearTimeout(state.timer); state.timer=null; state.running=false;state.fast=false;repeatedTerm=null; }
   function cancelRewind(){rewindJob?.abort();rewindJob=null;}
   function changed() {
     cancelRewind();
@@ -2671,7 +3252,7 @@
       const parsed=window.LambdaMeta.repair(compiled.term,expanded);
       if(parsed!==compiled.term){
         input.value=C.format(parsed);
-        toast('已整理待解释表达式，末尾参数会在解释器内部执行。');
+        toast('解释器表达式已更新，待计算表达式会在解释器内部执行。');
       }
       dataEditor.remember(compiled.mappings);
       const term=parsed===compiled.term?expanded(parsed):parsed;
@@ -2729,14 +3310,29 @@
     $('zoom-label').textContent=`${Math.round(state.scale*100)}%`;
     $('fit').setAttribute('aria-pressed',String(state.autoFit));
   }
+  function describeInterpretation(term){
+    const decimal=window.LambdaDecimal.read(term);
+    if(decimal)return decimal.error?`错误：${decimal.error}`:`小数 ${window.LambdaDecimal.format(decimal)}`;
+    const integer=E.readBuiltin(term,'int');
+    if(integer!==null)return integer;
+    const number=C.churchNumber(term);
+    return number===null?E.readChurchList(term)??C.format(term):`丘奇数 ${number}`;
+  }
+  function renderInterpretation(source){
+    if(source===interpretedSource)return;
+    interpretedSource=source;
+    interpretedTerm=source?window.LambdaMeta.readTerm(source):null;
+    interpretedDetails.hidden=!interpretedTerm;
+    if(!interpretedTerm)interpretedDetails.open=false;
+    interpretedExpression.textContent=interpretedTerm&&interpretedDetails.open?C.format(interpretedTerm):'';
+  }
+  interpretedDetails.addEventListener('toggle',()=>{
+    interpretedExpression.textContent=interpretedTerm&&interpretedDetails.open?C.format(interpretedTerm):'';
+  });
   function decode(t, showFreeVariables=true) {
+    const interpreted=window.LambdaMeta.readTerm(t);
+    if(interpreted)return `解释器结果：${describeInterpretation(interpreted)}`;
     if(decodedTerms.has(t))return decodedTerms.get(t);
-    const interpreted=window.LambdaMeta.read(t);
-    if(interpreted!==null){
-      const number=C.churchNumber(C.parse(interpreted));
-      const text=number===null?`解释器结果：${interpreted}`:`解释器结果：丘奇数 ${number}`;
-      decodedTerms.set(t,text);return text;
-    }
     const decimal=window.LambdaDecimal.read(t);if(decimal){const text=decimal.error?`错误：${decimal.error}`:`小数 ${window.LambdaDecimal.format(decimal)}`;decodedTerms.set(t,text);return text;}
     const integer=E.readBuiltin(t,'int');
     if(integer!==null){decodedTerms.set(t,integer);return integer;}
@@ -2802,7 +3398,7 @@
   valueButton.addEventListener('click',evaluateValue);
   valueDetails.addEventListener('toggle',()=>{
     const expression=$('normal-form-expression');
-    if(normalForm&&valueDetails.open&&!expression.textContent)expression.textContent=C.format(normalForm);
+    if(normalForm&&valueDetails.open&&!expression.textContent)expression.textContent=C.format(window.LambdaMeta.readTerm(normalForm)??normalForm);
   });
   function showHistoryEntry(body,entry) {
     body.replaceChildren(code(C.format(entry.term)));
@@ -2925,7 +3521,8 @@
     const builtInResult=ready&&!redex
       ?E.readBuiltin(state.term,selectedBuiltin)??(state.encodings?.includes('list')?E.readChurchList(state.term):null)
       :null;
-    $('decoded').textContent=ready&&!(state.running&&redex)?(matches.length?matches.map(match=>`${match.number}_${match.name}`).join(' / ')+(matches.length>1?'（多项匹配）':''):builtInResult??(hasCustomData?'自定义数据':decode(state.term))):'';
+    renderInterpretation(ready&&!redex?state.term:null);
+    $('decoded').textContent=interpretedTerm?`解释器结果：${describeInterpretation(interpretedTerm)}`:ready&&!(state.running&&redex)?(matches.length?matches.map(match=>`${match.number}_${match.name}`).join(' / ')+(matches.length>1?'（多项匹配）':''):builtInResult??(hasCustomData?'自定义数据':decode(state.term))):'';
     const next=$('next-explanation'); next.replaceChildren();
     if(ready&&redex) {
       next.append('下一步：用 ',code(C.format(redex.term.arg)),' 替换函数体中自由出现的 ',code(redex.term.fn.param),'。必要时自动改名，避免变量捕获。');
@@ -2943,12 +3540,15 @@
       state.term=result.term;state.history.append(result,choice);state.halt='';
       // The preview is only a hint: confirm with an actual attempt before stopping.
       if(state.running&&!C.hasRedex(state.term)&&C.step(state.term,state.strategy,state.direction)===null)stop();
+      else if(repeatedTerm?.(state.term,result)){
+        stop();state.halt='检测到重复归约循环，自动运行已停止。可以回退、单步或调整归约顺序。';
+      }
       if(display)render(180); return true;
     } catch(e) {stop();state.halt=e.message;if(display)render();return false;}
   }
   function captureTap(target){const selection=diagramView.selection(target);return !state.dirty&&selection?{...selection,term:diagramTerm}:null;}
   function manualStep(selection){if(!selection||state.dirty||selection.term!==state.term)return;stop();advance(selection.path);}
-  function schedule() {
+  function schedule(delay=0) {
     state.timer=setTimeout(()=>{if(!state.running)return;
       const started=performance.now();
       const interval=state.fast?RUN_PAINT_INTERVAL:Math.max(state.speed,RUN_PAINT_INTERVAL);
@@ -2962,8 +3562,8 @@
         }else render(Math.min(180,interval*.8));
         lastRunPaint=performance.now();
       }
-      if(state.running)schedule();
-    },state.fast?0:state.speed);
+      if(state.running)schedule((performance.now()-started)*1.5);
+    },Math.max(delay,state.fast?12:state.speed));
   }
   function renderSpeed() {
     $('speed').value=[1200,600,180,10].includes(state.speed)?String(state.speed):'custom';
@@ -2983,7 +3583,7 @@
       if(state.strategy!=='normal'||state.direction!=='left')toast('解释器已切换到从左到右的正规序。');
       state.strategy='normal';state.direction='left';
     }
-    state.halt='';state.running=true;state.fast=fast||interpreter;lastRunPaint=performance.now();render();
+    state.halt='';state.running=true;state.fast=fast||interpreter;repeatedTerm=C.cycleCheck(state.term);lastRunPaint=performance.now();render();
     if(!C.findRedex(state.term,[],state.strategy,state.direction)){advance();if(!state.running)return;}
     schedule();
   }
@@ -3014,12 +3614,15 @@
     $('level-title').textContent=l.name; $('level-description').textContent=l.description;
     revealAnswer(!$('challenge-target').hidden);$('hint').textContent=l.hint;
     $('target-kind').textContent=l.targetType?'目标结果（归约至正规形）':'目标正规形';
-    $('progress-text').textContent=state.mode==='challenge'?`${state.completed.size} / ${P.levels.length} 关已完成`:'探索 · 输入 · 归约';
+    $('progress-text').textContent=state.mode==='challenge'?`${state.completed.size} / ${P.levels.length} 关已完成`:state.mode==='guide'?`${P.examples.length} 个示例原理`:'探索 · 输入 · 归约';
   }
   function renderMode() {
     const challenge=state.mode==='challenge';$('challenge-panel').hidden=!challenge;
-    $('mode-free').classList.toggle('active',!challenge);$('mode-challenge').classList.toggle('active',challenge);
-    $('mode-free').setAttribute('aria-pressed',String(!challenge));$('mode-challenge').setAttribute('aria-pressed',String(challenge));
+    $('guide-panel').hidden=state.mode!=='guide';
+    for(const [id,mode] of [['mode-free','free'],['mode-challenge','challenge'],['mode-guide','guide']]){
+      const active=state.mode===mode;$(id).classList.toggle('active',active);$(id).setAttribute('aria-pressed',String(active));
+    }
+    if(state.mode==='guide')guide.refresh();
     renderLevels();
   }
   function selectLevel(index) {
@@ -3047,17 +3650,30 @@
   }
   input.addEventListener('input',event=>{changed();if(!event.isComposing)queueLiteralPreparation();});
   input.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();convert();}});
-  $('compile-meta-lambda').addEventListener('click',()=>{
+  $('compile-meta-lambda').addEventListener('click',async()=>{
+    cancelConversion();
+    const controller=new AbortController(),entries=dataEditor.entries();
+    conversionController=controller;compilingDefinitions=new Map(entries.map(entry=>[entry.name,entry.term]));
     try{
-      const compiled=window.LambdaMeta.compile(input.value,term=>workspace.expand(term));
-      state.numberEncoding='church';dataEditor.select('church');
-      input.value=compiled;changed();
+      const compiled=await E.compile(input.value,entries,state.numberEncoding,{
+        numberFormats:state.numberFormats,signal:controller.signal,onProgress:literal=>{
+          encodingProgress.hidden=false;cancelEncoding.hidden=false;
+          encodingProgress.textContent=`正在准备解释器输入 ${literal.number}_${literal.name} · ${literal.steps} 步`;
+        }
+      });
+      if(controller.signal.aborted||conversionController!==controller)return;
+      const program=window.LambdaMeta.compileTerm(compiled.term,term=>workspace.expand(term));
+      dataEditor.remember(compiled.mappings);
+      input.value=C.format(program);changed();
       toast('解释器表达式已生成，请点击「转换成图示」。');
     }catch(error){
+      if(controller.signal.aborted)return;
       $('error-message').textContent=error.message;
       $('error-message').hidden=false;
       input.focus();
       if(error.position!=null)input.setSelectionRange(error.position,error.position+1);
+    }finally{
+      if(conversionController===controller)cancelConversion();
     }
   });
   $('edit-meta-source').addEventListener('click',()=>{
@@ -3128,7 +3744,7 @@
       $(key==='strategy'?'reduction-order':'reduction-direction').value=state[key];
       return;
     }
-    state[key]=value;state.halt='';if(state.running){clearTimeout(state.timer);state.timer=null;}
+    state[key]=value;state.halt='';if(state.running){clearTimeout(state.timer);state.timer=null;repeatedTerm=C.cycleCheck(state.term);}
     render();if(state.running)schedule();
   }
   $('reduction-order').addEventListener('change',()=>setReductionPreference('strategy',$('reduction-order').value,C.STRATEGIES));
@@ -3144,6 +3760,10 @@
   });
   $('mode-free').addEventListener('click',()=>{stop();state.mode='free';renderMode();render();save();});
   $('mode-challenge').addEventListener('click',()=>selectLevel(state.level));
+  $('mode-guide').addEventListener('click',()=>{
+    stop();cancelRewind();cancelConversion();if(valueJob)clearValue();
+    state.mode='guide';renderMode();render();save();
+  });
   $('stage-select').addEventListener('change',()=>{
     const stage=P.stages.find(s=>String(s.id)===$('stage-select').value);
     selectLevel(P.levels.findIndex(l=>l.id===stage.levelIds[0]));
@@ -3157,7 +3777,16 @@
   $('speed').addEventListener('change',save);
   dataEditor=window.LambdaDataEncodingEditor.init({getSelection:()=>state.numberEncoding,setSelection:value=>{state.numberEncoding=value;},getNumberFormats:()=>state.numberFormats,expand:term=>workspace?workspace.expand(term):term,queueSave:save,onChange:()=>{if(compilingDefinitions&&(compilingDefinitions.size!==dataEditor.entries().length||dataEditor.entries().some(entry=>compilingDefinitions.get(entry.name)!==entry.term))){changed();queueLiteralPreparation();}else{render();save();}},currentTerm:()=>state.term&&!state.dirty?state.term:null,loadTerm:(term,name)=>{state.numberEncoding=`custom:${name}`;setSource(C.format(term));},toast});
   formatEditor=window.LambdaInputFormatEditor.init({getSelection:()=>state.numberEncoding,getEntries:()=>dataEditor.entries(),getNumberFormats:()=>state.numberFormats,setNumberFormats:formats=>{state.numberFormats=formats;},setCustomFormat:(name,template)=>dataEditor.setInputFormat(name,template),onChange:()=>{changed();queueLiteralPreparation();},queueSave:save,toast});
+  guide=window.LambdaGuide.init({precision:()=>state.decimalPlaces,save,load:example=>{
+    stop();state.mode='free';state.numberEncoding=example.encoding??'church';
+    renderMode();setSource(P.inputSourceFor(example,state.decimalPlaces));save();
+    input.focus();input.scrollIntoView({block:'center'});
+  }});
   workspace=window.LambdaWorkspace.init({capture,apply:applySnapshot,toast,
+    pauseForRestore:()=>{
+      const busy=state.running||rewindJob||valueJob||conversionController;
+      if(busy){stop();cancelRewind();cancelConversion();if(valueJob)clearValue();render();}
+    },
     getNumberEncoding:()=>state.numberEncoding,getDecimalPlaces:()=>state.decimalPlaces,getDataEncodings:()=>dataEditor.entries(),
     compileSource:async(source,signal)=>{const compiled=await E.compile(source,dataEditor.entries(),state.numberEncoding,{signal,numberFormats:state.numberFormats});dataEditor.remember(compiled.mappings);return compiled;},
     currentExpression:()=>state.term&&!state.dirty?C.format(state.term):input.value,
@@ -3166,8 +3795,9 @@
       const after=end<input.value.length&&/[A-Za-z0-9_']/.test(input.value[end])?' ':'';
       insert(before+name+after);
     }});
-  if(!workspace.restoreInitial()){renderMode();convert();}
-  workspace.persist();
+  workspace.restoreInitial().then(restored=>{
+    if(!restored){renderMode();convert();workspace.persist();}
+  });
 })();
 
 </script>

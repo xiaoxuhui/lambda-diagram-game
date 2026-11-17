@@ -13,7 +13,23 @@
   ['diff','λp.(p (λa s.(λi r.pair (succ i) (zero i r (cons (rmul a i) r))) (s t) (s f)) (pair 0 nil)) f'],
   ['integ','λp.(p (λa s.(λi r.pair (succ i) (cons (rdiv a (succ i)) r)) (s t) (s f)) (pair 0 (cons (pair 0 1) nil))) f'],
   ['fold','λg z p.p (λa h s.h (g s a)) (λs.s) z'],
-  ['evalpoly','λp x.fold (λr a.radd (rmul r x) a) (pair 0 1) p']
+  ['evalpoly','λp x.fold (λr a.radd (rmul r x) a) (pair 0 1) p'],
+  ['divmod',`λm base emit.
+    (λreset.m (λstate.state (λleft remainder quotient.left
+      (λtail k.k tail (succ remainder) quotient)
+      (λk.k reset 0 (succ quotient))))
+      (λk.k reset 0 0) (λleft remainder quotient.emit quotient remainder))
+    ((pred base) (λtail next done.next tail) (λnext done.done))`],
+  // For natural coefficients, f(1) bounds every coefficient. The base-(f(1)+1)
+  // digits of f(f(1)+1) therefore recover the coefficient list exactly.
+  ['encodepoly',`λfunction.
+    (λsum.zero sum (cons (pair 0 1) nil)
+      ((λbase.(λvalue.value
+        (λnext remaining digits.zero remaining digits
+          (divmod remaining base (λquotient digit.next quotient (cons (pair digit 1) digits))))
+        (λremaining digits.digits) value nil)
+        (function base)) (succ sum)))
+    (function 1)`]
  ].map(([name,source])=>({name,source,free:C.freeVars(C.parse(source))}));
  function compile(body){
   const needed=new Set(C.freeVars(C.parse(body,Infinity)));
@@ -32,10 +48,45 @@
   }
   return `λc n.${body}`;
  }
- const differentiate=coefficients=>compile(`diff (${polynomial(coefficients)})`);
- const integrate=coefficients=>compile(`integ (${polynomial(coefficients)})`);
- const derivativeAt=coefficients=>compile(`λx.evalpoly (diff (${polynomial(coefficients)})) x`);
- const integralFunction=coefficients=>compile(`λa b.(λp.rsub (evalpoly p b) (evalpoly p a)) (integ (${polynomial(coefficients)}))`);
+ const programs={
+  EVAL:compile('λp x.evalpoly p x'),
+  DIFF:compile('λp.diff p'),
+  INTEGRATE:compile('λp.integ p'),
+  DERIVATIVE:compile('λp x.evalpoly (diff p) x'),
+  DEFINITE:compile('λp a b.(λprimitive.rsub (evalpoly primitive b) (evalpoly primitive a)) (integ p)')
+ };
+ function program(operation){
+  if(!Object.hasOwn(programs,operation))throw new C.LambdaError('未知多项式运算。');
+  return programs[operation];
+ }
+ function expression(operation,source,...args){
+  return `(${program(operation)}) (${source})`+args.map(arg=>` (${arg})`).join('');
+ }
+ const churchPrograms={
+  ENCODE:compile('λfunction.encodepoly function'),
+  EVAL:compile('λfunction x.evalpoly (encodepoly function) x'),
+  DIFF:compile('λfunction.diff (encodepoly function)'),
+  INTEGRATE:compile('λfunction.integ (encodepoly function)'),
+  DERIVATIVE:compile('λfunction x.evalpoly (diff (encodepoly function)) x'),
+  DEFINITE:compile('λfunction a b.(λprimitive.rsub (evalpoly primitive b) (evalpoly primitive a)) (integ (encodepoly function))')
+ };
+ function churchProgram(operation){
+  if(!Object.hasOwn(churchPrograms,operation))throw new C.LambdaError('未知多项式运算。');
+  return churchPrograms[operation];
+ }
+ function churchExpression(operation,source,...args){
+  return `(${churchProgram(operation)}) (${source})`+args.map(arg=>` (${arg})`).join('');
+ }
+ function churchFunction(coefficients){
+  if(!coefficients.length||coefficients.some(n=>!Number.isSafeInteger(n)||n<0))throw new C.LambdaError('丘奇多项式需要自然数系数。');
+  let body=String(coefficients.at(-1));
+  for(let i=coefficients.length-2;i>=0;i--)body=`add (mul (${body}) x) ${coefficients[i]}`;
+  return `λx.(λadd mul.${body}) (λm n f z.m f (n f z)) (λm n f.m (n f))`;
+ }
+ const differentiate=coefficients=>expression('DIFF',polynomial(coefficients));
+ const integrate=coefficients=>expression('INTEGRATE',polynomial(coefficients));
+ const derivativeAt=coefficients=>expression('DERIVATIVE',polynomial(coefficients));
+ const integralFunction=coefficients=>expression('DEFINITE',polynomial(coefficients));
  function definite(coefficients,a,b){
   if(!Number.isSafeInteger(a)||!Number.isSafeInteger(b)||a<0||b<a)throw new Error('端点需为自然数且下限不大于上限。');
   return `(${integralFunction(coefficients)}) ${a} ${b}`;
@@ -72,6 +123,6 @@
   }
   return terms.join(' + ')||'0';
  }
- const API={polynomial,differentiate,integrate,derivativeAt,integralFunction,definite,readRational,readPolynomial,formatRational,formatPolynomial};
+ const API={polynomial,program,expression,churchProgram,churchExpression,churchFunction,differentiate,integrate,derivativeAt,integralFunction,definite,readRational,readPolynomial,formatRational,formatPolynomial};
  root.LambdaPolynomial=API;if(typeof module!=='undefined'&&module.exports)module.exports=API;
 })(typeof globalThis!=='undefined'?globalThis:window);

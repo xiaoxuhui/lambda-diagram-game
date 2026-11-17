@@ -5,10 +5,13 @@
   const $=id=>document.getElementById(id);
   const input=$('expression');
   const valueButton=$('decimal-value'),valueResult=$('decimal-value-result'),valueDetails=$('normal-form');
+  const interpretedDetails=$('interpreted-result'),interpretedExpression=$('interpreted-expression');
   let valueJob=null,valueSource=null,normalForm=null;
+  let interpretedSource=null,interpretedTerm=null;
+  let repeatedTerm=null;
   const state={ term:null, original:null, history:Trace.create(), dirty:false, running:false, timer:null,
     mode:'free', level:0, completed:new Set(), halt:'', scale:1, autoFit:true, model:null, speed:600, strategy:'normal', direction:'left',numberEncoding:'church',numberFormats:{},decimalPlaces:6,fast:false,encodings:null,encodingBusy:false };
-  let toastTimer,workspace,viewer,dataEditor,formatEditor,conversionController=null,compilingDefinitions=null,preparationTimer=null,historySource=null,renderedCount=0,diagramTerm=null,diagramRoute=null;
+  let toastTimer,workspace,viewer,dataEditor,formatEditor,guide,conversionController=null,compilingDefinitions=null,preparationTimer=null,historySource=null,renderedCount=0,diagramTerm=null,diagramRoute=null;
   const RUN_PAINT_INTERVAL=120;
   const INLINE_HISTORY_NODES=256;
   const HISTORY_PAGE_SIZE=32;
@@ -50,7 +53,7 @@
   function capture() {
     return {...dataEditor.capture(),draft:input.value,completed:[...state.completed],mode:state.mode,level:state.level,
       session:{original:state.original,steps:Math.max(0,state.history.length-1),dirty:state.dirty,halt:state.halt,...(state.encodings===null?{}:{encodings:state.encodings}),...(state.history.choices.length?{choices:state.history.choices}:{})},
-      view:{speed:state.speed,strategy:state.strategy,direction:state.direction,numberEncoding:state.numberEncoding,numberFormats:state.numberFormats,inputFormatDraft:formatEditor.capture(),decimalPlaces:state.decimalPlaces,...(palette===Palette.defaults?{}:{palette}),scale:state.scale,autoFit:state.autoFit,panX:$('diagram-viewport').scrollLeft,panY:$('diagram-viewport').scrollTop,historyOpen:$('history-details').open,helpOpen:!$('help-panel').hidden,hintOpen:!$('hint').hidden},
+      view:{speed:state.speed,strategy:state.strategy,direction:state.direction,numberEncoding:state.numberEncoding,numberFormats:state.numberFormats,inputFormatDraft:formatEditor.capture(),guideExample:guide.capture(),decimalPlaces:state.decimalPlaces,...(palette===Palette.defaults?{}:{palette}),scale:state.scale,autoFit:state.autoFit,panX:$('diagram-viewport').scrollLeft,panY:$('diagram-viewport').scrollTop,historyOpen:$('history-details').open,helpOpen:!$('help-panel').hidden,hintOpen:!$('hint').hidden},
       selection:{start:input.selectionStart,end:input.selectionEnd},error:$('error-message').hidden?'':$('error-message').textContent};
   }
   function applySnapshot(s) {
@@ -65,6 +68,7 @@
     state.scale=s.view.scale;state.autoFit=s.view.autoFit;state.speed=s.view.speed;state.strategy=s.view.strategy??'normal';state.direction=s.view.direction??'left';renderSpeed();
     state.numberEncoding=s.view.numberEncoding??'church';state.numberFormats=s.view.numberFormats??{};state.decimalPlaces=s.view.decimalPlaces??6;
     state.encodings=s.session.encodings??null;dataEditor.restore(s);formatEditor.restore(s.view.inputFormatDraft);
+    guide.restore(s.view.guideExample);
     applyPalette(s.view.palette??Palette.defaults);paletteEditor.restore(palette);
     $('history-details').open=s.view.historyOpen;$('help-panel').hidden=!s.view.helpOpen;$('help-toggle').setAttribute('aria-expanded',String(s.view.helpOpen));
     $('hint').hidden=!s.view.hintOpen;$('hint-toggle').textContent=s.view.hintOpen?'收起提示':'显示提示';$('hint-toggle').setAttribute('aria-expanded',String(s.view.hintOpen));
@@ -77,7 +81,7 @@
     clearTimeout(toastTimer); $('toast').textContent=message; $('toast').hidden=false;
     toastTimer=setTimeout(()=>$('toast').hidden=true,2400);
   }
-  function stop() { clearTimeout(state.timer); state.timer=null; state.running=false;state.fast=false; }
+  function stop() { clearTimeout(state.timer); state.timer=null; state.running=false;state.fast=false;repeatedTerm=null; }
   function cancelRewind(){rewindJob?.abort();rewindJob=null;}
   function changed() {
     cancelRewind();
@@ -110,7 +114,7 @@
       const parsed=window.LambdaMeta.repair(compiled.term,expanded);
       if(parsed!==compiled.term){
         input.value=C.format(parsed);
-        toast('已整理待解释表达式，末尾参数会在解释器内部执行。');
+        toast('解释器表达式已更新，待计算表达式会在解释器内部执行。');
       }
       dataEditor.remember(compiled.mappings);
       const term=parsed===compiled.term?expanded(parsed):parsed;
@@ -168,14 +172,29 @@
     $('zoom-label').textContent=`${Math.round(state.scale*100)}%`;
     $('fit').setAttribute('aria-pressed',String(state.autoFit));
   }
+  function describeInterpretation(term){
+    const decimal=window.LambdaDecimal.read(term);
+    if(decimal)return decimal.error?`错误：${decimal.error}`:`小数 ${window.LambdaDecimal.format(decimal)}`;
+    const integer=E.readBuiltin(term,'int');
+    if(integer!==null)return integer;
+    const number=C.churchNumber(term);
+    return number===null?E.readChurchList(term)??C.format(term):`丘奇数 ${number}`;
+  }
+  function renderInterpretation(source){
+    if(source===interpretedSource)return;
+    interpretedSource=source;
+    interpretedTerm=source?window.LambdaMeta.readTerm(source):null;
+    interpretedDetails.hidden=!interpretedTerm;
+    if(!interpretedTerm)interpretedDetails.open=false;
+    interpretedExpression.textContent=interpretedTerm&&interpretedDetails.open?C.format(interpretedTerm):'';
+  }
+  interpretedDetails.addEventListener('toggle',()=>{
+    interpretedExpression.textContent=interpretedTerm&&interpretedDetails.open?C.format(interpretedTerm):'';
+  });
   function decode(t, showFreeVariables=true) {
+    const interpreted=window.LambdaMeta.readTerm(t);
+    if(interpreted)return `解释器结果：${describeInterpretation(interpreted)}`;
     if(decodedTerms.has(t))return decodedTerms.get(t);
-    const interpreted=window.LambdaMeta.read(t);
-    if(interpreted!==null){
-      const number=C.churchNumber(C.parse(interpreted));
-      const text=number===null?`解释器结果：${interpreted}`:`解释器结果：丘奇数 ${number}`;
-      decodedTerms.set(t,text);return text;
-    }
     const decimal=window.LambdaDecimal.read(t);if(decimal){const text=decimal.error?`错误：${decimal.error}`:`小数 ${window.LambdaDecimal.format(decimal)}`;decodedTerms.set(t,text);return text;}
     const integer=E.readBuiltin(t,'int');
     if(integer!==null){decodedTerms.set(t,integer);return integer;}
@@ -241,7 +260,7 @@
   valueButton.addEventListener('click',evaluateValue);
   valueDetails.addEventListener('toggle',()=>{
     const expression=$('normal-form-expression');
-    if(normalForm&&valueDetails.open&&!expression.textContent)expression.textContent=C.format(normalForm);
+    if(normalForm&&valueDetails.open&&!expression.textContent)expression.textContent=C.format(window.LambdaMeta.readTerm(normalForm)??normalForm);
   });
   function showHistoryEntry(body,entry) {
     body.replaceChildren(code(C.format(entry.term)));
@@ -364,7 +383,8 @@
     const builtInResult=ready&&!redex
       ?E.readBuiltin(state.term,selectedBuiltin)??(state.encodings?.includes('list')?E.readChurchList(state.term):null)
       :null;
-    $('decoded').textContent=ready&&!(state.running&&redex)?(matches.length?matches.map(match=>`${match.number}_${match.name}`).join(' / ')+(matches.length>1?'（多项匹配）':''):builtInResult??(hasCustomData?'自定义数据':decode(state.term))):'';
+    renderInterpretation(ready&&!redex?state.term:null);
+    $('decoded').textContent=interpretedTerm?`解释器结果：${describeInterpretation(interpretedTerm)}`:ready&&!(state.running&&redex)?(matches.length?matches.map(match=>`${match.number}_${match.name}`).join(' / ')+(matches.length>1?'（多项匹配）':''):builtInResult??(hasCustomData?'自定义数据':decode(state.term))):'';
     const next=$('next-explanation'); next.replaceChildren();
     if(ready&&redex) {
       next.append('下一步：用 ',code(C.format(redex.term.arg)),' 替换函数体中自由出现的 ',code(redex.term.fn.param),'。必要时自动改名，避免变量捕获。');
@@ -382,12 +402,15 @@
       state.term=result.term;state.history.append(result,choice);state.halt='';
       // The preview is only a hint: confirm with an actual attempt before stopping.
       if(state.running&&!C.hasRedex(state.term)&&C.step(state.term,state.strategy,state.direction)===null)stop();
+      else if(repeatedTerm?.(state.term,result)){
+        stop();state.halt='检测到重复归约循环，自动运行已停止。可以回退、单步或调整归约顺序。';
+      }
       if(display)render(180); return true;
     } catch(e) {stop();state.halt=e.message;if(display)render();return false;}
   }
   function captureTap(target){const selection=diagramView.selection(target);return !state.dirty&&selection?{...selection,term:diagramTerm}:null;}
   function manualStep(selection){if(!selection||state.dirty||selection.term!==state.term)return;stop();advance(selection.path);}
-  function schedule() {
+  function schedule(delay=0) {
     state.timer=setTimeout(()=>{if(!state.running)return;
       const started=performance.now();
       const interval=state.fast?RUN_PAINT_INTERVAL:Math.max(state.speed,RUN_PAINT_INTERVAL);
@@ -401,8 +424,8 @@
         }else render(Math.min(180,interval*.8));
         lastRunPaint=performance.now();
       }
-      if(state.running)schedule();
-    },state.fast?0:state.speed);
+      if(state.running)schedule((performance.now()-started)*1.5);
+    },Math.max(delay,state.fast?12:state.speed));
   }
   function renderSpeed() {
     $('speed').value=[1200,600,180,10].includes(state.speed)?String(state.speed):'custom';
@@ -422,7 +445,7 @@
       if(state.strategy!=='normal'||state.direction!=='left')toast('解释器已切换到从左到右的正规序。');
       state.strategy='normal';state.direction='left';
     }
-    state.halt='';state.running=true;state.fast=fast||interpreter;lastRunPaint=performance.now();render();
+    state.halt='';state.running=true;state.fast=fast||interpreter;repeatedTerm=C.cycleCheck(state.term);lastRunPaint=performance.now();render();
     if(!C.findRedex(state.term,[],state.strategy,state.direction)){advance();if(!state.running)return;}
     schedule();
   }
@@ -453,12 +476,15 @@
     $('level-title').textContent=l.name; $('level-description').textContent=l.description;
     revealAnswer(!$('challenge-target').hidden);$('hint').textContent=l.hint;
     $('target-kind').textContent=l.targetType?'目标结果（归约至正规形）':'目标正规形';
-    $('progress-text').textContent=state.mode==='challenge'?`${state.completed.size} / ${P.levels.length} 关已完成`:'探索 · 输入 · 归约';
+    $('progress-text').textContent=state.mode==='challenge'?`${state.completed.size} / ${P.levels.length} 关已完成`:state.mode==='guide'?`${P.examples.length} 个示例原理`:'探索 · 输入 · 归约';
   }
   function renderMode() {
     const challenge=state.mode==='challenge';$('challenge-panel').hidden=!challenge;
-    $('mode-free').classList.toggle('active',!challenge);$('mode-challenge').classList.toggle('active',challenge);
-    $('mode-free').setAttribute('aria-pressed',String(!challenge));$('mode-challenge').setAttribute('aria-pressed',String(challenge));
+    $('guide-panel').hidden=state.mode!=='guide';
+    for(const [id,mode] of [['mode-free','free'],['mode-challenge','challenge'],['mode-guide','guide']]){
+      const active=state.mode===mode;$(id).classList.toggle('active',active);$(id).setAttribute('aria-pressed',String(active));
+    }
+    if(state.mode==='guide')guide.refresh();
     renderLevels();
   }
   function selectLevel(index) {
@@ -486,17 +512,30 @@
   }
   input.addEventListener('input',event=>{changed();if(!event.isComposing)queueLiteralPreparation();});
   input.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();convert();}});
-  $('compile-meta-lambda').addEventListener('click',()=>{
+  $('compile-meta-lambda').addEventListener('click',async()=>{
+    cancelConversion();
+    const controller=new AbortController(),entries=dataEditor.entries();
+    conversionController=controller;compilingDefinitions=new Map(entries.map(entry=>[entry.name,entry.term]));
     try{
-      const compiled=window.LambdaMeta.compile(input.value,term=>workspace.expand(term));
-      state.numberEncoding='church';dataEditor.select('church');
-      input.value=compiled;changed();
+      const compiled=await E.compile(input.value,entries,state.numberEncoding,{
+        numberFormats:state.numberFormats,signal:controller.signal,onProgress:literal=>{
+          encodingProgress.hidden=false;cancelEncoding.hidden=false;
+          encodingProgress.textContent=`正在准备解释器输入 ${literal.number}_${literal.name} · ${literal.steps} 步`;
+        }
+      });
+      if(controller.signal.aborted||conversionController!==controller)return;
+      const program=window.LambdaMeta.compileTerm(compiled.term,term=>workspace.expand(term));
+      dataEditor.remember(compiled.mappings);
+      input.value=C.format(program);changed();
       toast('解释器表达式已生成，请点击「转换成图示」。');
     }catch(error){
+      if(controller.signal.aborted)return;
       $('error-message').textContent=error.message;
       $('error-message').hidden=false;
       input.focus();
       if(error.position!=null)input.setSelectionRange(error.position,error.position+1);
+    }finally{
+      if(conversionController===controller)cancelConversion();
     }
   });
   $('edit-meta-source').addEventListener('click',()=>{
@@ -567,7 +606,7 @@
       $(key==='strategy'?'reduction-order':'reduction-direction').value=state[key];
       return;
     }
-    state[key]=value;state.halt='';if(state.running){clearTimeout(state.timer);state.timer=null;}
+    state[key]=value;state.halt='';if(state.running){clearTimeout(state.timer);state.timer=null;repeatedTerm=C.cycleCheck(state.term);}
     render();if(state.running)schedule();
   }
   $('reduction-order').addEventListener('change',()=>setReductionPreference('strategy',$('reduction-order').value,C.STRATEGIES));
@@ -583,6 +622,10 @@
   });
   $('mode-free').addEventListener('click',()=>{stop();state.mode='free';renderMode();render();save();});
   $('mode-challenge').addEventListener('click',()=>selectLevel(state.level));
+  $('mode-guide').addEventListener('click',()=>{
+    stop();cancelRewind();cancelConversion();if(valueJob)clearValue();
+    state.mode='guide';renderMode();render();save();
+  });
   $('stage-select').addEventListener('change',()=>{
     const stage=P.stages.find(s=>String(s.id)===$('stage-select').value);
     selectLevel(P.levels.findIndex(l=>l.id===stage.levelIds[0]));
@@ -596,7 +639,16 @@
   $('speed').addEventListener('change',save);
   dataEditor=window.LambdaDataEncodingEditor.init({getSelection:()=>state.numberEncoding,setSelection:value=>{state.numberEncoding=value;},getNumberFormats:()=>state.numberFormats,expand:term=>workspace?workspace.expand(term):term,queueSave:save,onChange:()=>{if(compilingDefinitions&&(compilingDefinitions.size!==dataEditor.entries().length||dataEditor.entries().some(entry=>compilingDefinitions.get(entry.name)!==entry.term))){changed();queueLiteralPreparation();}else{render();save();}},currentTerm:()=>state.term&&!state.dirty?state.term:null,loadTerm:(term,name)=>{state.numberEncoding=`custom:${name}`;setSource(C.format(term));},toast});
   formatEditor=window.LambdaInputFormatEditor.init({getSelection:()=>state.numberEncoding,getEntries:()=>dataEditor.entries(),getNumberFormats:()=>state.numberFormats,setNumberFormats:formats=>{state.numberFormats=formats;},setCustomFormat:(name,template)=>dataEditor.setInputFormat(name,template),onChange:()=>{changed();queueLiteralPreparation();},queueSave:save,toast});
+  guide=window.LambdaGuide.init({precision:()=>state.decimalPlaces,save,load:example=>{
+    stop();state.mode='free';state.numberEncoding=example.encoding??'church';
+    renderMode();setSource(P.inputSourceFor(example,state.decimalPlaces));save();
+    input.focus();input.scrollIntoView({block:'center'});
+  }});
   workspace=window.LambdaWorkspace.init({capture,apply:applySnapshot,toast,
+    pauseForRestore:()=>{
+      const busy=state.running||rewindJob||valueJob||conversionController;
+      if(busy){stop();cancelRewind();cancelConversion();if(valueJob)clearValue();render();}
+    },
     getNumberEncoding:()=>state.numberEncoding,getDecimalPlaces:()=>state.decimalPlaces,getDataEncodings:()=>dataEditor.entries(),
     compileSource:async(source,signal)=>{const compiled=await E.compile(source,dataEditor.entries(),state.numberEncoding,{signal,numberFormats:state.numberFormats});dataEditor.remember(compiled.mappings);return compiled;},
     currentExpression:()=>state.term&&!state.dirty?C.format(state.term):input.value,
@@ -605,6 +657,7 @@
       const after=end<input.value.length&&/[A-Za-z0-9_']/.test(input.value[end])?' ':'';
       insert(before+name+after);
     }});
-  if(!workspace.restoreInitial()){renderMode();convert();}
-  workspace.persist();
+  workspace.restoreInitial().then(restored=>{
+    if(!restored){renderMode();convert();workspace.persist();}
+  });
 })();

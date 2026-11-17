@@ -119,10 +119,11 @@
       canceled();let cache=literalCache.get(literal.definition);if(!cache){cache=new Map();literalCache.set(literal.definition,cache);}
       let term=cache.get(literal.number),steps=0;
       if(!term){
-        term=literal.term;let started=performance.now();
+        term=literal.term;const repeated=C.cycleCheck(term);let started=performance.now();
         while(true){
           canceled();const next=C.step(term);if(!next)break;term=next.term;steps++;
-          if(performance.now()-started>=8){options.onProgress?.({...literal,steps});await new Promise(resolve=>setTimeout(resolve,0));started=performance.now();}
+          if(repeated(term,next))throw new C.LambdaError(`数字编码「${literal.name}」进入重复归约循环。`);
+          if(performance.now()-started>=8){options.onProgress?.({...literal,steps});await new Promise(resolve=>setTimeout(resolve,12));started=performance.now();}
         }
         canceled();cache.set(literal.number,term);
       }

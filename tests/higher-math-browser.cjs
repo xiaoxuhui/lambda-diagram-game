@@ -8,7 +8,7 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
   for(const width of [1280,390]){
    const context=await browser.newContext({viewport:{width,height:900},hasTouch:true}),page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));await page.goto(base);
    const select=async(name)=>{const i=P.examples.findIndex(e=>e.name.includes(name));assert.ok(i>=0);await page.locator('#examples').selectOption(String(i));};
-   const runResult=async(text)=>{await page.locator('#speed-ms').fill('1');await page.locator('#run').click();await page.waitForFunction(()=>document.getElementById('state-badge').textContent==='已到正规形',null,{timeout:180000});assert.equal(await page.locator('#decoded').textContent(),text);};
+   const runResult=async(text)=>{await page.locator('#fast-run').click();await page.waitForFunction(()=>document.getElementById('state-badge').textContent==='已到正规形',null,{timeout:180000});assert.equal(await page.locator('#decoded').textContent(),text);};
    const run=(number,kind='Church 数')=>runResult(`${kind} ${number}`);
    await check(`${width}px higher mathematics contains combinations and all choices render`,async()=>{
     assert.equal(await page.locator('#examples optgroup').count(),9);assert.equal(await page.locator('#examples optgroup[label="高等数学"] option').count(),22);
@@ -19,7 +19,7 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
    await check(`${width}px original-polynomial symbolic derivative evaluates to 7`,async()=>{await select('符号求导并求值');await run(7,'有理数');});
    await check(`${width}px derivative generation changes when the original polynomial changes`,async()=>{
     await select('生成导函数');assert.match(await page.locator('#example-info').textContent(),/原式：x² \+ 3x/);await runResult('多项式：2x + 3');
-    await page.locator('#save-state').click();await page.reload();assert.equal(await page.locator('#decoded').textContent(),'多项式：2x + 3');
+    await page.locator('#save-state').click();await page.reload();await page.waitForFunction(()=>document.getElementById('decoded').textContent==='多项式：2x + 3');
     await page.locator('#expression').fill(M.differentiate([0,0,3]));await page.locator('#convert').click();await runResult('多项式：6x');
    });
    await check(`${width}px original 2x integrates to x squared and x retains its half coefficient`,async()=>{
@@ -28,7 +28,21 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
     await page.locator('#expression').fill(M.integrate([0,1]));await page.locator('#convert').click();await runResult('多项式：1/2x²');
    });
    await check(`${width}px definite integral really runs to 9 and restores`,async()=>{
-    await select('定积分');await run(9,'有理数');await page.locator('#save-state').click();await page.reload();assert.equal(await page.locator('#decoded').textContent(),'有理数 9');await page.locator('#back').click();await page.locator('#step').click();assert.equal(await page.locator('#decoded').textContent(),'有理数 9');
+    await select('定积分');await run(9,'有理数');await page.locator('#save-state').click();await page.reload();await page.waitForFunction(()=>document.getElementById('decoded').textContent==='有理数 9');await page.locator('#back').click();await page.locator('#step').click();assert.equal(await page.locator('#decoded').textContent(),'有理数 9');
+   });
+   await check(`${width}px saved Church functions are encoded inside the calculus Lambda programs`,async()=>{
+    await page.locator('#function-name').fill('CUSTOMPOLY');await page.locator('#function-source').fill('λx.(λm n f z.m f (n f z)) x x');await page.locator('#function-add').click();
+    const expression=M.churchExpression('DEFINITE','CUSTOMPOLY','0','3');
+    await page.locator('#expression').fill(expression);await page.locator('#convert').click();await run(9,'有理数');
+    assert.ok(Number(await page.locator('#step-count').textContent())>500);
+    await page.locator('#save-state').click();await page.reload();
+    await page.waitForFunction(()=>document.getElementById('decoded').textContent==='有理数 9');
+    assert.equal(await page.locator('#expression').inputValue(),expression);
+    await page.locator('#expression').fill(M.churchExpression('DIFF','CUSTOMPOLY'));await page.locator('#convert').click();await runResult('多项式：2');
+    await page.locator('#expression').fill(M.churchExpression('INTEGRATE','λx.x'));await page.locator('#convert').click();
+    await page.locator('#decimal-value').click();
+    await page.waitForFunction(()=>document.getElementById('decimal-value-result').textContent==='多项式：1/2x²');
+    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
    });
    await check(`${width}px geometric series really sums to 15`,async()=>{await select('等比求和');await run(15);});
    await check(`${width}px the super-logarithm runs to a height of 3`,async()=>{

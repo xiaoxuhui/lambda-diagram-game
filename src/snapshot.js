@@ -41,7 +41,7 @@
     const encodingEditing=encodingDraft.editing??null;
     if(encodingEditing!==null&&!dataEncodings.some(entry=>entry.name===encodingEditing))fail('正在编辑的数据编码不存在。');
     if(!Array.isArray(raw.completed)||raw.completed.length>P.levels.length||raw.completed.some(i=>!LEVEL_IDS.has(i)))fail('通关进度不合法。');
-    if(raw.mode!=='free'&&raw.mode!=='challenge')fail('游戏模式不合法。');
+    if(!['free','challenge','guide'].includes(raw.mode))fail('游戏模式不合法。');
     if(!Number.isInteger(raw.level)||raw.level<0||raw.level>=P.levels.length)fail('关卡编号不合法。');
     const s=raw.session;if(!object(s)||!Number.isSafeInteger(s.steps)||s.steps<0||typeof s.dirty!=='boolean')fail('归约状态不合法。');
     const original=s.original===null?null:ast(s.original);if(!original&&s.steps!==0)fail('没有起始表达式，无法恢复归约。');
@@ -75,6 +75,7 @@
     const numberEncoding=v.numberEncoding===undefined?'decimal':v.numberEncoding;if(!E.isBuiltin(numberEncoding)&&!dataEncodings.some(entry=>numberEncoding===`custom:${entry.name}`))fail('数字编码不合法。');
     const numberFormats=v.numberFormats??{};E.validateFormats(dataEncodings,numberFormats);
     const inputFormatDraft=v.inputFormatDraft;
+    if(v.guideExample!==undefined&&typeof v.guideExample!=='string')fail('讲解示例不合法。');
     if(inputFormatDraft!==undefined&&(!object(inputFormatDraft)||typeof inputFormatDraft.encoding!=='string'||typeof inputFormatDraft.text!=='string'))fail('输入形式草稿不合法。');
     const decimalPlaces=v.decimalPlaces===undefined?6:v.decimalPlaces;if(!Number.isSafeInteger(decimalPlaces)||decimalPlaces<0)fail('小数位数不合法。');
     const panX=v.panX??0,panY=v.panY??0;
@@ -90,10 +91,10 @@
     if(editing!==null&&(!L.validName(editing)||!functions.some(fn=>fn.name===editing)))fail('正在编辑的函数不存在或不合法。');
     return {version,savedAt:typeof raw.savedAt==='string'&&Number.isFinite(Date.parse(raw.savedAt))?raw.savedAt:new Date().toISOString(),draft:raw.draft,
       functions,dataEncodings,encodingDraft:{name:encodingDraft.name,source:encodingDraft.source,...(encodingEditing===null?{}:{editing:encodingEditing})},completed:[...new Set(raw.completed)],mode:raw.mode,level:raw.level,
-      session:{original,steps:s.steps,dirty:s.dirty,halt:s.halt,...(s.encodings===undefined?{}:{encodings:[...new Set(encodings)]}),...(paths===undefined?{}:{paths}),...(choices===undefined?{}:{choices})},view:{speed:v.speed,strategy,direction,numberEncoding,decimalPlaces,...(v.numberFormats===undefined?{}:{numberFormats:{...numberFormats}}),...(inputFormatDraft===undefined?{}:{inputFormatDraft:{encoding:inputFormatDraft.encoding,text:inputFormatDraft.text}}),...(palette===undefined?{}:{palette}),scale:v.scale,autoFit:v.autoFit,panX,panY,historyOpen:v.historyOpen,helpOpen:v.helpOpen,hintOpen:v.hintOpen},
+      session:{original,steps:s.steps,dirty:s.dirty,halt:s.halt,...(s.encodings===undefined?{}:{encodings:[...new Set(encodings)]}),...(paths===undefined?{}:{paths}),...(choices===undefined?{}:{choices})},view:{speed:v.speed,strategy,direction,numberEncoding,decimalPlaces,...(v.guideExample===undefined?{}:{guideExample:v.guideExample}),...(v.numberFormats===undefined?{}:{numberFormats:{...numberFormats}}),...(inputFormatDraft===undefined?{}:{inputFormatDraft:{encoding:inputFormatDraft.encoding,text:inputFormatDraft.text}}),...(palette===undefined?{}:{palette}),scale:v.scale,autoFit:v.autoFit,panX,panY,historyOpen:v.historyOpen,helpOpen:v.helpOpen,hintOpen:v.hintOpen},
       selection:{start:selection.start,end:selection.end},error:raw.error,functionDraft:{name:functionDraft.name,source:functionDraft.source,...(editing===null?{}:{editing})}};
   }
-  function replay(s,compact) {
+  function* replay(s,compact) {
     let term=s.session.original,choice=null,next=0;
     const trace=compact?Trace.create(term):null;
     const history=!compact&&term?[{term,change:null}]:[];
@@ -104,6 +105,7 @@
       if(!result)fail(Array.isArray(choice)?'归约路径未指向可归约项。':'步数超过实际可归约次数。');
       term=result.term;
       if(trace)trace.append(result,choice);else history.push({term,change:result});
+      yield i+1;
     }
     return {...s,term,...(trace?{trace}:{history}),hasSession:true};
   }
@@ -117,7 +119,7 @@
     if(new TextEncoder().encode(text).length>MAX_BYTES)fail('文件超过 2 MiB 上限。');
     return text;
   }
-  function decode(text,{compact=false}={}) {
+  function parseArchive(text) {
     if(typeof text!=='string'||text.length>MAX_BYTES||new TextEncoder().encode(text).length>MAX_BYTES)fail('文件超过 2 MiB 上限。');
     let raw;try{raw=JSON.parse(text);}catch{fail('不是有效的 JSON 文件。');}
     if(object(raw)&&raw.version===1) {
@@ -125,14 +127,56 @@
       const migrated={version:2,savedAt:new Date().toISOString(),draft,functions:[],completed:Array.isArray(raw.completed)?[...new Set(raw.completed.filter(i=>Number.isInteger(i)&&i>0&&i<6))]:[],
         mode:raw.mode==='challenge'?'challenge':'free',level:Number.isInteger(raw.level)&&raw.level>=0&&raw.level<5?raw.level:0,
         session:{original:null,steps:0,dirty:true,halt:''},view:{numberEncoding:'church',speed:600,scale:1,autoFit:true,historyOpen:false,helpOpen:false,hintOpen:false},selection:{start:0,end:0},error:''};
-      return {...validate(migrated),history:[],term:null,hasSession:false};
+      return {snapshot:validate(migrated),legacy:true};
     }
-    const snapshot=replay(validate(raw),compact);
+    const snapshot=validate(raw),archive={snapshot,legacy:false};
     if(Object.prototype.hasOwnProperty.call(raw,'checkpoint')) {
-      snapshot.checkpointText=raw.checkpoint===null?null:encode(replay(validate(raw.checkpoint),true));
+      archive.checkpoint=raw.checkpoint===null?null:validate(raw.checkpoint);
     }
-    return snapshot;
+    return archive;
   }
-  const API={MAX_BYTES,ast,validate,encode,encodeBackup,decode};root.LambdaSnapshot=API;
+  function finish(iterator){
+    let next=iterator.next();while(!next.done)next=iterator.next();return next.value;
+  }
+  function decode(text,{compact=false}={}) {
+    const {snapshot,legacy,checkpoint}=parseArchive(text);
+    if(legacy)return {...snapshot,history:[],term:null,hasSession:false};
+    const result=finish(replay(snapshot,compact));
+    if(checkpoint!==undefined)result.checkpointText=checkpoint===null?null:encode(finish(replay(checkpoint,true)));
+    return result;
+  }
+  async function decodeAsync(text,{signal,onProgress}={}){
+    const {snapshot,legacy,checkpoint}=parseArchive(text);
+    if(legacy)return {...snapshot,history:[],term:null,hasSession:false};
+    const total=snapshot.session.steps+(checkpoint?.session.steps??0);
+    const result=await replayAsync(replay(snapshot,true),signal,step=>onProgress?.(step,total));
+    if(checkpoint!==undefined){
+      result.checkpointText=checkpoint===null?null:encode(await replayAsync(replay(checkpoint,true),signal,
+        step=>onProgress?.(snapshot.session.steps+step,total)));
+    }
+    return result;
+  }
+  async function replayAsync(iterator,signal,onProgress){
+    let started=performance.now();
+    try{
+      for(;;){
+        signal?.throwIfAborted();
+        const next=iterator.next();
+        if(next.done)return next.value;
+        if(performance.now()-started>=8){
+          onProgress(next.value);
+          await new Promise(resolve=>setTimeout(resolve,12));
+          started=performance.now();
+        }
+      }
+    }finally{iterator.return();}
+  }
+  function decodeStartingState(text,{draftOnly=false}={}){
+    const {snapshot,legacy}=parseArchive(text),{original,encodings}=snapshot.session;
+    const term=draftOnly?null:original;
+    return {...snapshot,session:{original:term,encodings,steps:0,dirty:draftOnly||snapshot.session.dirty,halt:''},
+      term,trace:Trace.create(term),hasSession:draftOnly||!legacy};
+  }
+  const API={MAX_BYTES,ast,validate,encode,encodeBackup,decode,decodeAsync,decodeStartingState};root.LambdaSnapshot=API;
   if(typeof module!=='undefined'&&module.exports)module.exports=API;
 })(typeof globalThis!=='undefined'?globalThis:window);

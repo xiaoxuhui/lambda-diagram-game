@@ -23,10 +23,10 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
       await source(page,'(λx.(λa.a) x) ((λy.y) z)');await order(page,'applicative');await page.locator('#step').click();assert.equal(await current(page),nested);
       await page.locator('#step').click();assert.equal(await current(page),'(λx.x) z');await page.locator('#step').click();assert.equal(await current(page),'z');
     });
-    await check('normal discards unused divergence while applicative execution continues until manually paused',async()=>{
+    await check('normal discards unused divergence while applicative detects the repeating state',async()=>{
       await source(page,divergent);await order(page,'normal');await page.locator('#step').click();assert.equal(await current(page),'y');
       await source(page,divergent);await order(page,'applicative');const before=await current(page);await page.locator('#speed-ms').fill('10');await page.locator('#run').click();
-      await page.waitForFunction(()=>Number(document.getElementById('step-count').textContent)>=3);assert.equal(await page.locator('#run-label').textContent(),'暂停');await page.locator('#run').click();assert.equal(await current(page),before);
+      await page.waitForFunction(()=>document.getElementById('run-status').textContent.includes('重复归约循环'));assert.equal(await page.locator('#step-count').textContent(),'1');assert.equal(await current(page),before);
     });
     await check('changing order during running retains execution and changes the pending next step',async()=>{
       await source(page,nested);await order(page,'normal');await page.locator('#speed-ms').fill('60000');await page.locator('#run').click();await order(page,'applicative');

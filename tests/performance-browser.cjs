@@ -83,7 +83,7 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
       assert.equal(await page.evaluate(result=>LambdaCore.churchNumber(LambdaCore.parse(result)),result),2);
       assert.equal(await page.locator('#step-count').textContent(),'0');
       assert.equal(await page.locator('#reduction-order').inputValue(),'applicative');
-      await source('(λx.x x) (λx.x x)');await page.locator('#decimal-value').click();await page.locator('#decimal-value').click();
+      await source('(λx.f (x x)) (λx.f (x x))');await page.locator('#decimal-value').click();await page.locator('#decimal-value').click();
       assert.ok(await page.locator('#decimal-value-result').isHidden());
     });
     await check('optimized flows have no browser errors',async()=>assert.deepEqual(errors,[]));

@@ -5,6 +5,7 @@
   function normalize(term,{signal,onProgress}={}){
     const stack=[{kind:'quote'}],names=C.freeVars(term),normalForms=new WeakMap();
     let job={term,environment:null},value,nextName=0,steps=0;
+    let lastCall=null;
     function fresh(){
       let name;
       do{name='v'+nextName++;}while(names.has(name));
@@ -45,6 +46,10 @@
         case 'remember':frame.source.value=value;frame.source.term=null;frame.source.environment=null;break;
         case 'apply':
           if(value.term){
+            const continuation=stack.at(-1);
+            if(lastCall?.closure===value&&lastCall.argument===frame.argument&&lastCall.continuation===continuation)
+              throw new C.LambdaError('检测到重复求值循环，求值已停止。');
+            lastCall={closure:value,argument:frame.argument,continuation};
             steps++;
             // A tail call proceeds directly, without retaining a thunk for its result.
             job={term:value.term.body,environment:{name:value.term.param,argument:frame.argument,parent:value.environment}};
@@ -83,7 +88,7 @@
             if(!job&&!stack.length){resolve(value);return;}
           }while(performance.now()-start<8);
           onProgress?.(steps);
-          setTimeout(batch,0);
+          setTimeout(batch,12);
         }catch(error){reject(error);}
       }
       batch();

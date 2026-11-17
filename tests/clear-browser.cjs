@@ -50,7 +50,7 @@ const artifacts=path.join(__dirname,'artifacts');fs.mkdirSync(artifacts,{recursi
       await page.locator('#restore-state').click();assert.equal(await page.locator('#expression').inputValue(),'λq.q');
     });
     await check('clearing during automatic execution stops the timer and stays empty',async()=>{
-      await source('(λx.x x) (λx.x x)');await page.locator('#speed').selectOption('10');await page.locator('#run').click();
+      await source('(λx.f ((λt.t) (x x))) (λx.f ((λt.t) (x x)))');await page.locator('#speed').selectOption('10');await page.locator('#run').click();
       await page.waitForFunction(()=>Number(document.getElementById('step-count').textContent)>0);const running=await downloadClear(page);
       assert.ok(running.data.session.steps>0);await empty(page);await page.waitForTimeout(250);await empty(page);
     });

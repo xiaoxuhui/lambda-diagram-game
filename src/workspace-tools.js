@@ -8,6 +8,21 @@
     const cancel=document.createElement('button');cancel.id='function-cancel';cancel.type='button';cancel.className='button';cancel.textContent='取消编辑';cancel.hidden=true;
     $('function-add').before(cancel);
     let functions=[],checkpoint=null,saveTimer=null,restoring=false,editing=null,functionController=null;
+    let replayController=null,recoveredDraft=null;
+    const restoreDialog=$('restore-progress');
+    function cancelReplay(){replayController?.abort();}
+    $('cancel-restore').addEventListener('click',cancelReplay);
+    restoreDialog.addEventListener('cancel',event=>{event.preventDefault();cancelReplay();});
+    async function replaySave(text){
+      cancelReplay();
+      const controller=new AbortController();replayController=controller;
+      try{return await S.decodeAsync(text,{signal:controller.signal,onProgress:(step,total)=>{
+        $('restore-progress-text').textContent=`正在重放存档 ${step} / ${total} 步…`;
+        if(!restoreDialog.open)restoreDialog.showModal();
+      }});}finally{
+        if(replayController===controller){replayController=null;restoreDialog.close();}
+      }
+    }
     function abortFunctionCompile(){functionController?.abort();functionController=null;}
     const feedback=(message,error=false)=>{$('save-feedback').hidden=false;$('save-feedback').textContent=message;$('save-feedback').classList.toggle('error',error);};
     function captured() {return {...api.capture(),version:2,savedAt:new Date().toISOString(),functions,functionDraft:{name:$('function-name').value,source:$('function-source').value,...(editing===null?{}:{editing})}};}
@@ -23,9 +38,13 @@
     function storageStatus(ok) {
       $('storage-status').textContent=ok?'当前状态已自动保存':'自动保存不可用，请导出存档备份';$('storage-status').classList.toggle('storage-error',!ok);
     }
-    function persist() {
-      clearTimeout(saveTimer);if(restoring)return;
-      try{localStorage.setItem(AUTO,S.encode(captured()));storageStatus(true);}catch{storageStatus(false);}
+    function persist(force=false) {
+      clearTimeout(saveTimer);if(restoring||replayController)return;
+      try{
+        const snapshot=captured();
+        if(!force&&recoveredDraft!==null&&snapshot.draft===recoveredDraft&&snapshot.session.steps===0)return;
+        localStorage.setItem(AUTO,S.encode(snapshot));recoveredDraft=null;storageStatus(true);
+      }catch{storageStatus(false);}
     }
     function queueSave(){if(!restoring){clearTimeout(saveTimer);saveTimer=setTimeout(persist,180);}}
     function renderLibrary() {
@@ -54,14 +73,32 @@
       try {functions=snapshot.functions;renderLibrary();api.apply(snapshot);$('function-name').value=snapshot.functionDraft.name;$('function-source').value=snapshot.functionDraft.source;editing=snapshot.functionDraft.editing??null;renderEditMode();$('function-error').hidden=true;}
       finally{restoring=false;}
     }
-    function restoreInitial() {
-      let restored=false;
+    function recoverDraft(text,message,draftOnly=false){
+      const snapshot=S.decodeStartingState(text,{draftOnly});
+      apply(snapshot);recoveredDraft=snapshot.draft;checkpoint=text;
+      $('storage-status').textContent='已保留原自动存档';
+      feedback(message);
+    }
+    async function restoreInitial() {
+      let restored=false,text;
       try {
-        const text=localStorage.getItem(AUTO)||localStorage.getItem(LEGACY);
-        if(text){const snapshot=decode(text);apply(snapshot);restored=true;}
-      }catch(e){feedback(`自动存档未能恢复：${e.message}。可以重新导入备份。`,true);}
-      try{const text=localStorage.getItem(CHECKPOINT);if(text){decode(text);checkpoint=text;}}catch{/* Keep a corrupt checkpoint untouched. */}
-      $('restore-state').disabled=!checkpoint;renderLibrary();return restored;
+        text=localStorage.getItem(AUTO)||localStorage.getItem(LEGACY);
+        if(text){
+          if(new URLSearchParams(location.search).get('recover')==='1'){
+            recoverDraft(text,'已打开草稿，原存档保留。可点击「恢复已保存状态」重放。',true);
+          }else{
+            const snapshot=await replaySave(text);apply(snapshot);storageStatus(true);
+          }
+          restored=true;
+        }
+      }catch(e){
+        if(e.name==='AbortError'&&text){
+          recoverDraft(text,'已取消重放。原存档保留，可点击「恢复已保存状态」重新重放。');
+          restored=true;
+        }else feedback(`自动存档未能恢复：${e.message}。可以重新导入备份。`,true);
+      }
+      try{const saved=localStorage.getItem(CHECKPOINT);if(saved&&!checkpoint){S.decodeStartingState(saved);checkpoint=saved;}}catch{/* Keep a corrupt checkpoint untouched. */}
+      $('restore-state').disabled=!checkpoint;renderLibrary();if(restored)persist();return restored;
     }
     $('function-form').addEventListener('submit',async e=>{
       e.preventDefault();$('function-error').hidden=true;
@@ -82,13 +119,14 @@
     for(const id of ['function-name','function-source'])$(id).addEventListener('input',()=>{abortFunctionCompile();renderEditMode();queueSave();});
     document.querySelectorAll('[data-function-insert]').forEach(b=>{b.addEventListener('mousedown',e=>e.preventDefault());b.addEventListener('click',()=>{abortFunctionCompile();renderEditMode();const field=$('function-source');field.setRangeText(b.dataset.functionInsert,field.selectionStart,field.selectionEnd,'end');field.focus();queueSave();});});
     $('save-state').addEventListener('click',()=>{
-      try{const text=S.encode(captured());localStorage.setItem(CHECKPOINT,text);checkpoint=text;$('restore-state').disabled=false;persist();feedback('当前状态和关卡进度已保存。可随时恢复到这个位置。');api.toast('当前状态已保存');}
+      try{const text=S.encode(captured());localStorage.setItem(CHECKPOINT,text);checkpoint=text;$('restore-state').disabled=false;persist(true);feedback('当前状态和关卡进度已保存。可随时恢复到这个位置。');api.toast('当前状态已保存');}
       catch(e){feedback(`未能保存到浏览器：${e.message}。请使用「导出存档」备份当前状态。`,true);}
     });
-    $('restore-state').addEventListener('click',()=>{
+    $('restore-state').addEventListener('click',async()=>{
       if(!checkpoint)return;
-      try{const snapshot=decode(checkpoint);apply(snapshot);persist();feedback('已恢复保存时的状态。自动运行保持暂停，可单步或继续运行。');api.toast('已恢复当前状态');}
-      catch(e){feedback(e.message,true);}
+      api.pauseForRestore();
+      try{const snapshot=await replaySave(checkpoint);apply(snapshot);persist(true);feedback('已恢复保存时的状态。自动运行保持暂停，可单步或继续运行。');api.toast('已恢复当前状态');}
+      catch(e){feedback(e.name==='AbortError'?'已取消重放，当前状态保留。':e.message,e.name!=='AbortError');}
     });
     $('export-state').addEventListener('click',()=>{
       try{const text=S.encode(captured());root.LambdaDownload.save(`lambda-lab-save-${new Date().toISOString().replace(/[-:]/g,'').slice(0,15)}.json`,text,'application/json');feedback('完整存档已导出。可以在另一台设备导入继续。');}
@@ -103,7 +141,7 @@
         for(const [key,text] of previous){try{if(text===null)localStorage.removeItem(key);else localStorage.setItem(key,text);}catch{/* Keep the live scene and exported backup if storage itself is unavailable. */}}
         throw error;
       }
-      clearTimeout(saveTimer);apply(snapshot);clearEditor();checkpoint=null;$('restore-state').disabled=true;persist();return result;
+      clearTimeout(saveTimer);apply(snapshot);clearEditor();checkpoint=null;$('restore-state').disabled=true;persist(true);return result;
     }
     $('clear-all').addEventListener('click',()=>{
       try {
@@ -126,15 +164,16 @@
     $('import-state').addEventListener('click',()=>$('import-file').click());
     $('import-file').addEventListener('change',async()=>{
       const file=$('import-file').files[0];$('import-file').value='';if(!file)return;
-      try{if(file.size>S.MAX_BYTES)throw new C.LambdaError('存档文件超过 2 MiB 上限。');const snapshot=decode(await file.text());
+      api.pauseForRestore();
+      try{if(file.size>S.MAX_BYTES)throw new C.LambdaError('存档文件超过 2 MiB 上限。');const snapshot=await replaySave(await file.text());
         if(Object.prototype.hasOwnProperty.call(snapshot,'checkpointText')) {
           if(snapshot.checkpointText===null)localStorage.removeItem(CHECKPOINT);else localStorage.setItem(CHECKPOINT,snapshot.checkpointText);
           checkpoint=snapshot.checkpointText;$('restore-state').disabled=checkpoint===null;
         }
-        apply(snapshot);persist();feedback('存档已导入，函数库、计算状态和进度均已恢复。');api.toast('存档导入成功');}
-      catch(e){feedback(`导入失败：${e.message}。当前现场未改变。`,true);}
+        apply(snapshot);persist(true);feedback('存档已导入，函数库、计算状态和进度均已恢复。');api.toast('存档导入成功');}
+      catch(e){if(e.name==='AbortError')feedback('已取消重放，当前状态保留。');else feedback(`导入失败：${e.message}。当前现场未改变。`,true);}
     });
-    window.addEventListener('pagehide',persist);
+    window.addEventListener('pagehide',()=>persist());
     return {expand:t=>L.expand(t,functions),encodingsFor:t=>L.encodingsFor(t,functions),persist,queueSave,restoreInitial};
   }
   root.LambdaWorkspace={init};

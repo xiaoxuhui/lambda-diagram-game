@@ -7,7 +7,7 @@ const artifacts=path.join(__dirname,'artifacts');fs.mkdirSync(artifacts,{recursi
   if(!server.listening)await new Promise(r=>server.once('listening',r));
   const base=`http://127.0.0.1:${server.address().port}`;
   const browser=await playwright.chromium.launch({headless:true});console.log(`Workspace browser: Chromium ${browser.version()}`);
-  const context=await browser.newContext({viewport:{width:1440,height:1080},hasTouch:true,acceptDownloads:true});
+  const context=await browser.newContext({viewport:{width:1440,height:1080},hasTouch:true,acceptDownloads:true,reducedMotion:'reduce'});
   const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));let pass=0;
   const check=async(name,fn)=>{await fn();pass++;console.log(`PASS W${String(pass).padStart(2,'0')} ${name}`);};
   const source=async(text)=>{await page.locator('#number-encoding').selectOption('church');await page.locator('#expression').fill(text);await page.locator('#convert').click();};

@@ -25,7 +25,9 @@ test('compiled literal cache follows the converter definition and includes repea
   assert.ok(next.mappings[0].steps>0);assert.ok(C.equal(next.term,C.parse('λk.k 2 2')));
 });
 test('endless numeral conversions yield and can be canceled without a fixed step cutoff',async()=>{
-  const entries=E.define([],'Loop','λn.(λx.x x) (λx.x x)'),controller=new AbortController();
+  const cycle=E.define([],'Loop','λn.(λx.x x) (λx.x x)');
+  await assert.rejects(E.compile('0_Loop',cycle),/重复归约循环/);
+  const entries=E.define([],'Loop','λn f.(λx.f ((λt.t) (x x))) (λx.f ((λt.t) (x x)))'),controller=new AbortController();
   let progressed=false;const pending=E.compile('0_Loop',entries,'church',{signal:controller.signal,onProgress:()=>{progressed=true;controller.abort();}});
   await assert.rejects(pending,error=>error.name==='AbortError');assert.ok(progressed);
 });

@@ -93,13 +93,11 @@ const C=require('../src/core.js'),P=require('../src/presets.js');
       const text='λx.'+' '.repeat(20000)+'x';await source(text);assert.ok(await page.locator('#error-message').isHidden());assert.equal(await page.locator('#current-expression').textContent(),'λx.x');
       assert.equal(await page.locator('#char-count').textContent(),`${text.length} 字符`);
     });
-    await check('repeated states keep running until manually paused',async()=>{
+    await check('a confirmed cycle stops automatic run and remains available for single stepping',async()=>{
       await source('(λx.x x)(λx.x x)');await page.locator('#speed').selectOption('180');await page.locator('#run').click();
-      await page.waitForFunction(()=>Number(document.getElementById('step-count').textContent)>=3);
-      assert.equal(await page.locator('#run-label').textContent(),'暂停');await page.locator('#run').click();
-      const steps=await page.locator('#step-count').textContent();await page.waitForTimeout(250);
-      assert.equal(await page.locator('#step-count').textContent(),steps);
-      assert.ok(await page.locator('#step').isEnabled());
+      await page.waitForFunction(()=>document.getElementById('run-status').textContent.includes('重复归约循环'));
+      assert.equal(await page.locator('#step-count').textContent(),'1');
+      await page.locator('#step').click();assert.equal(await page.locator('#step-count').textContent(),'2');
     });
     await check('zoom controls and fit change SVG size',async()=>{
       await source(P.examples[5].term);const w=await page.locator('#diagram-mount svg').getAttribute('width');
@@ -210,6 +208,23 @@ const C=require('../src/core.js'),P=require('../src/presets.js');
       await page.locator('#history-details').evaluate(details=>details.open=true);
       await page.locator('#history-list li').last().getByRole('button',{name:'查看此步'}).click();
       assert.ok(await page.locator('#history-list li').last().locator('code').textContent());
+    });
+    await check('the interpreter preserves the numeric encoding and shows the decoded Lambda expression',async()=>{
+      await page.locator('#number-encoding').selectOption('decimal');
+      await page.locator('#expression').fill('(λx.x) 2');await page.locator('#convert').click();await page.locator('#step').click();
+      assert.equal(await page.locator('#decoded').textContent(),'小数 2');
+      const direct=await page.locator('#current-expression').textContent();
+      const compile=page.locator('#compile-meta-lambda');
+      if(!await compile.isVisible())await page.locator('summary').filter({hasText:'用 λ 解释 λ'}).click();
+      await compile.click();
+      assert.equal(await page.locator('#number-encoding').inputValue(),'decimal');
+      await page.locator('#convert').click();await page.locator('#run').click();
+      await page.waitForFunction(()=>document.getElementById('decoded').textContent==='解释器结果：小数 2');
+      await page.locator('#interpreted-result summary').click();
+      await page.waitForFunction(()=>document.getElementById('interpreted-expression').textContent.length>0);
+      const decoded=await page.locator('#interpreted-expression').textContent();
+      assert.ok(C.equal(C.parse(decoded),C.parse(direct)));
+      await page.locator('#back').click();assert.ok(await page.locator('#interpreted-result').isHidden());
     });
     await check('restoring the old interpreter runs the pasted example without any saved functions',async()=>{
       const legacy=fs.readFileSync(path.join(__dirname,'fixtures/meta-lambda-legacy.txt'),'utf8');

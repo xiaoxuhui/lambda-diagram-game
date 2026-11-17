@@ -43,7 +43,7 @@
       try{
         cancel();const entry=api.getEntry();if(!entry)throw new C.LambdaError('请先保存数据编码。');
         const number=E.naturalNumber($('encoding-table-number').value),term=C.A(entry.term,C.parse(number));
-        const task={name:entry.name,number,definition:entry.term,term,steps:0};generation=task;
+        const task={name:entry.name,number,definition:entry.term,term,steps:0},repeated=C.cycleCheck(term);generation=task;
         $('encoding-table-generate').disabled=true;$('encoding-table-cancel').hidden=false;
         function tick(){
           if(generation!==task)return;
@@ -57,8 +57,9 @@
                 store(task.name,task.number,task.term);status(`已加入 ${task.number}_${task.name}，生成过程执行 ${task.steps} 次归约。`);return;
               }
               task.term=result.term;task.steps++;
+              if(repeated(task.term,result))throw new C.LambdaError('数字编码进入重复归约循环。');
             }while(performance.now()-start<8);
-            status(`正在归约 ${task.number}_${task.name}：${task.steps} 步，可随时取消。`);timer=setTimeout(tick,0);
+            status(`正在归约 ${task.number}_${task.name}：${task.steps} 步，可随时取消。`);timer=setTimeout(tick,12);
           }catch(error){cancel();status(error.message,true);}
         }
         timer=setTimeout(tick,0);

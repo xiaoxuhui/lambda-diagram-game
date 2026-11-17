@@ -61,7 +61,8 @@ test('shared normalization reuses a complete result under binders without captur
   assert.ok(C.equal(result,C.parse('f (λx z.x) (λx z.x)')));
   assert.equal(result.fn.arg,result.arg);
   assert.equal(C.hasRedex(result),false);
-  await assert.rejects(Lazy.normalize(C.parse('(λx.x x) (λx.x x)'),{signal:AbortSignal.timeout(30)}),/取消/);
+  await assert.rejects(Lazy.normalize(C.parse('(λx.x x) (λx.x x)'),{signal:AbortSignal.timeout(1000)}),/重复求值循环/);
+  await assert.rejects(Lazy.normalize(C.parse('(λx.f (x x)) (λx.f (x x))'),{signal:AbortSignal.timeout(30)}),/取消/);
 });
 test('seeded differential reductions and alpha equality match the previous engine',()=>{
   let seed=9173;const random=n=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed%n;},names=['x','y','z'];

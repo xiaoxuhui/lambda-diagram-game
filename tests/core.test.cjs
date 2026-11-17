@@ -39,6 +39,12 @@ test('normal order discards divergent unused argument', () => {
 });
 test('normal order reduces inside abstractions', () => assert.equal(C.format(normal('λz.(λx.x) z').term), 'λz.z'));
 test('omega is identified as repeated state', () => assert.equal(normal('(λx.x x)(λx.x x)').status, 'cycle'));
+test('the Y combinator only reproduces an expanding loop when its neutral body is entered',()=>{
+  const term=C.parse('(λf.(λx.f (x x)) (λx.f (x x))) (λr.ok)');
+  assert.equal(C.normalize(term,50,'applicative').status,'cycle');
+  const result=C.normalize(term,50,'normal');
+  assert.equal(result.status,'normal');assert.equal(C.format(result.term),'ok');
+});
 test('SKK acts as identity', () => {
   const r = normal('(λx y z.(x z)(y z)) (λa b.a) (λa b.a)');
   assert.equal(r.status, 'normal'); assert.ok(C.equal(r.term, p('λx.x')));
