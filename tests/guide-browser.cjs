@@ -14,6 +14,7 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
       assert.equal(await page.locator('#mode-challenge + #mode-guide').count(),1);
       const original=await page.locator('#expression').inputValue();
       await page.locator('#mode-guide').click();assert.ok(await page.locator('#guide-panel').isVisible());
+      assert.ok(await page.locator('#lab-screen').isHidden());assert.ok(await page.locator('.save-bar').isHidden());
       assert.equal(await page.locator('#guide-example option').count(),P.examples.length);
       for(const [index,example] of P.examples.entries()){
         const doc=G.lesson(example);assert.ok(doc.principle.length>=2);
@@ -22,6 +23,7 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
         assert.equal(await page.locator('#guide-core').textContent(),doc.core);
         assert.equal(await page.locator('#guide-principle p').count(),doc.principle.length);
         assert.equal(await page.locator('#guide-expression').textContent(),P.inputSourceFor(example,6));
+        if(doc.inputs){assert.equal(await page.locator('#guide-inputs tbody tr').count(),doc.inputs.length);assert.equal(await page.locator('#guide-steps li').count(),doc.steps.length);}
       }
       assert.equal(await page.locator('#expression').inputValue(),original);
       assert.equal(await page.locator('#step-count').textContent(),'0');
@@ -39,7 +41,7 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
     await check('the selected explanation survives save and reload, and loads the displayed decimal program',async()=>{
       const index=P.examples.findIndex(e=>e.decimalOperation==='DIV');
       await page.locator('#guide-example').selectOption(String(index));
-      await page.locator('#save-state').click();await page.reload();
+      await page.waitForFunction(name=>JSON.parse(localStorage.getItem('lambda-lab-v2')||'{}').view?.guideExample===name,P.examples[index].name);await page.reload();
       await page.waitForFunction(()=>document.getElementById('mode-guide').getAttribute('aria-pressed')==='true');
       assert.equal(await page.locator('#guide-title').textContent(),P.examples[index].name);
       const expression=await page.locator('#guide-expression').textContent();
@@ -52,11 +54,25 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
     await check('long expressions and the third mode fit on mobile',async()=>{
       await page.setViewportSize({width:390,height:844});await page.locator('#mode-guide').click();
       await page.locator('#guide-example').selectOption(String(P.examples.findIndex(e=>e.decimalOperation==='SIN')));
-      await page.locator('#guide-expression').locator('..').locator('..').locator('summary').click();
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
       assert.ok((await page.locator('#guide-expression').textContent()).length>1000);
       fs.mkdirSync(path.resolve(__dirname,'artifacts'),{recursive:true});
-      await page.locator('#guide-panel').screenshot({path:path.resolve(__dirname,'artifacts/guide-mobile.png')});
+      await page.locator('#guide-input-section').screenshot({path:path.resolve(__dirname,'artifacts/guide-input-mobile.png')});
+      await page.locator('#guide-steps-section').screenshot({path:path.resolve(__dirname,'artifacts/guide-series-mobile.png')});
+    });
+    await check('advanced lessons show actual derivations and expandable runtime helper definitions',async()=>{
+      const derivative=P.examples.findIndex(e=>e.name.startsWith('符号求导'));
+      await page.locator('#guide-example').selectOption(String(derivative));
+      assert.match(await page.locator('#guide-steps').textContent(),/\[2\/1,3\/1\]/);
+      assert.match(await page.locator('#guide-inputs').textContent(),/丘奇多项式函数/);
+      await page.locator('#guide-all-symbols > summary').click();
+      const encoder=page.locator('#guide-symbols details').filter({has:page.locator('summary',{hasText:/^encodepoly：/})}).last();
+      await encoder.locator('summary').click();assert.match(await encoder.locator('code').textContent(),/^encodepoly = λ/);
+      await page.locator('#guide-example').selectOption(String(P.examples.findIndex(e=>e.decimalOperation==='POW')));
+      assert.match(await page.locator('#guide-inputs').textContent(),/3_church/);
+      await page.locator('#guide-example').selectOption(String(P.examples.findIndex(e=>e.decimalOperation==='TAN')));
+      assert.match(await page.locator('#guide-steps').textContent(),/0.8776/);
+      assert.match(await page.locator('#guide-boundaries').textContent(),/四位截断/);
     });
     await check('offline bundle contains the complete explanation catalog',async()=>{
       const offline=await context.newPage();await offline.goto(base+'/dist/lambda-lab.html');

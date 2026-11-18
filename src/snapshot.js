@@ -3,6 +3,7 @@
   const C=root.LambdaCore||require('./core.js'),L=root.LambdaLibrary||require('./library.js'),P=root.LambdaPresets||require('./presets.js'),E=root.LambdaDataEncoding||require('./data-encoding.js');
   const Palette=root.LambdaPalette||require('./palette.js');
   const Trace=root.LambdaTrace||require('./trace.js');
+  const Guard=root.LambdaRunGuard||require('./run-guard.js');
   const LEVEL_IDS=new Set(P.levels.map(l=>l.id));
   const MAX_BYTES=2*1024*1024;
   const fail=message=>{throw new C.LambdaError(`存档无效：${message}`);};
@@ -27,7 +28,9 @@
     const functions=raw.functions.map(f=>{
       if(!object(f))fail('函数定义不完整。');
       if(f.source!==undefined&&typeof f.source!=='string')fail('函数原始定义需为文本。');
-      return {name:f.name,term:ast(f.term),...(f.source===undefined?{}:{source:f.source}),...(f.encodings===undefined?{}:{encodings:f.encodings}),...(f.sourceFree===undefined?{}:{sourceFree:f.sourceFree})};
+      const term=ast(f.term),retired=f.sourceSyntax==='math';
+      // Keep functions saved by the removed input mode usable without its parser.
+      return {name:f.name,term,...(retired?{source:C.format(term)}:f.source===undefined?{}:{source:f.source}),...(f.encodings===undefined?{}:{encodings:f.encodings}),...(retired?{sourceFree:[...C.freeVars(term)]}:f.sourceFree===undefined?{}:{sourceFree:f.sourceFree})};
     });L.validate(functions);
     if(raw.dataEncodings!==undefined&&!Array.isArray(raw.dataEncodings))fail('数据编码列表不合法。');
     const dataEncodings=(raw.dataEncodings??[]).map(entry=>{
@@ -70,6 +73,7 @@
     }
     if(typeof s.halt!=='string'||s.halt.length>500)fail('暂停信息不合法。');
     const v=raw.view;if(!object(v)||!Number.isInteger(v.speed)||v.speed<1||v.speed>60000||!Number.isFinite(v.scale)||v.scale<.02||v.scale>16)fail('视图设置不合法。');
+    const growthWindowMs=v.growthWindowMs??Guard.DEFAULT_MS;if(![0,1000,3000,10000,30000].includes(growthWindowMs))fail('运行增长观察窗口不合法。');
     const strategy=v.strategy===undefined?'normal':v.strategy;if(!C.STRATEGIES.includes(strategy))fail('归约顺序不合法。');
     const direction=v.direction===undefined?'left':v.direction;if(!C.DIRECTIONS.includes(direction))fail('归约方向不合法。');
     const numberEncoding=v.numberEncoding===undefined?'decimal':v.numberEncoding;if(!E.isBuiltin(numberEncoding)&&!dataEncodings.some(entry=>numberEncoding===`custom:${entry.name}`))fail('数字编码不合法。');
@@ -89,10 +93,14 @@
     if(!object(functionDraft)||typeof functionDraft.name!=='string'||functionDraft.name.length>32||typeof functionDraft.source!=='string')fail('函数编辑草稿不合法。');
     const editing=functionDraft.editing??null;
     if(editing!==null&&(!L.validName(editing)||!functions.some(fn=>fn.name===editing)))fail('正在编辑的函数不存在或不合法。');
-    return {version,savedAt:typeof raw.savedAt==='string'&&Number.isFinite(Date.parse(raw.savedAt))?raw.savedAt:new Date().toISOString(),draft:raw.draft,
+    const retiredDraft=v.inputSyntax==='math',draft=retiredDraft&&original&&!s.dirty?C.format(original):raw.draft;
+    const unconverted=retiredDraft&&(!original||s.dirty);
+    const draftFunction=raw.functions.find(fn=>fn.name===editing);
+    const functionSource=functionDraft.syntax==='math'&&draftFunction?.sourceSyntax==='math'&&functionDraft.source===draftFunction.source?C.format(functions.find(fn=>fn.name===editing).term):functionDraft.source;
+    return {version,savedAt:typeof raw.savedAt==='string'&&Number.isFinite(Date.parse(raw.savedAt))?raw.savedAt:new Date().toISOString(),draft,
       functions,dataEncodings,encodingDraft:{name:encodingDraft.name,source:encodingDraft.source,...(encodingEditing===null?{}:{editing:encodingEditing})},completed:[...new Set(raw.completed)],mode:raw.mode,level:raw.level,
-      session:{original,steps:s.steps,dirty:s.dirty,halt:s.halt,...(s.encodings===undefined?{}:{encodings:[...new Set(encodings)]}),...(paths===undefined?{}:{paths}),...(choices===undefined?{}:{choices})},view:{speed:v.speed,strategy,direction,numberEncoding,decimalPlaces,...(v.guideExample===undefined?{}:{guideExample:v.guideExample}),...(v.numberFormats===undefined?{}:{numberFormats:{...numberFormats}}),...(inputFormatDraft===undefined?{}:{inputFormatDraft:{encoding:inputFormatDraft.encoding,text:inputFormatDraft.text}}),...(palette===undefined?{}:{palette}),scale:v.scale,autoFit:v.autoFit,panX,panY,historyOpen:v.historyOpen,helpOpen:v.helpOpen,hintOpen:v.hintOpen},
-      selection:{start:selection.start,end:selection.end},error:raw.error,functionDraft:{name:functionDraft.name,source:functionDraft.source,...(editing===null?{}:{editing})}};
+      session:{original,steps:s.steps,dirty:s.dirty,halt:s.halt,...(s.encodings===undefined?{}:{encodings:[...new Set(encodings)]}),...(paths===undefined?{}:{paths}),...(choices===undefined?{}:{choices})},view:{growthWindowMs,speed:v.speed,strategy,direction,numberEncoding,decimalPlaces,...(v.guideExample===undefined?{}:{guideExample:v.guideExample}),...(v.numberFormats===undefined?{}:{numberFormats:{...numberFormats}}),...(inputFormatDraft===undefined?{}:{inputFormatDraft:{encoding:inputFormatDraft.encoding,text:inputFormatDraft.text}}),...(palette===undefined?{}:{palette}),scale:v.scale,autoFit:v.autoFit,panX,panY,historyOpen:v.historyOpen,helpOpen:v.helpOpen,hintOpen:v.hintOpen},
+      selection:{start:Math.min(selection.start,draft.length),end:Math.min(selection.end,draft.length)},error:raw.error||(unconverted?'数学写法已移除。原草稿已保留，请改写为 λ 表达式。':''),functionDraft:{name:functionDraft.name,source:functionSource,...(editing===null?{}:{editing})}};
   }
   function* replay(s,compact) {
     let term=s.session.original,choice=null,next=0;

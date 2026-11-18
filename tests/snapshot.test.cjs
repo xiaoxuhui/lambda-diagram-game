@@ -3,6 +3,31 @@ const C=require('../src/core.js'),L=require('../src/library.js'),S=require('../s
 function sample(){return {version:2,savedAt:'2026-10-09T00:00:00.000Z',draft:'(λx.x)(λy.y)',functions:L.add([],'ID','λx.x'),completed:[1,3],mode:'challenge',level:2,
   session:{original:C.parse('(λx.x)(λy.y)'),steps:1,dirty:false,halt:''},view:{speed:180,scale:1.5,autoFit:false,historyOpen:true,helpOpen:false,hintOpen:true},selection:{start:2,end:3},error:''};}
 
+test('growth-protection settings survive saves and older snapshots enable the default protection',()=>{
+  assert.equal(S.decode(S.encode(sample())).view.growthWindowMs,1000);
+  for(const duration of [0,1000,3000,10000,30000]){const s=sample();s.view.growthWindowMs=duration;assert.equal(S.decode(S.encode(s)).view.growthWindowMs,duration);}
+  for(const duration of [-1,'1000',2,Infinity]){const s=sample();s.view.growthWindowMs=duration;assert.throws(()=>S.encode(s),/观察窗口/);}
+});
+
+test('archives from the removed math input mode keep compiled functions and calculations usable',()=>{
+  const s=sample(),term=C.parse('λx.(λm n f z.m f (n f z)) x 1');
+  s.view.inputSyntax='math';s.draft='ADDONE(4)';s.functions=[{name:'ADDONE',source:'x -> x+1',sourceSyntax:'math',term,sourceFree:[]}];
+  s.session={original:C.A(term,C.parse('4')),steps:0,dirty:false,halt:''};
+  s.functionDraft={name:'ADDONE',source:'x -> x+1',syntax:'math',editing:'ADDONE'};
+  const restored=S.decode(JSON.stringify(s));
+  assert.ok(C.equal(C.parse(restored.draft),s.session.original));
+  assert.ok(C.equal(C.parse(restored.functions[0].source),term));
+  assert.equal(restored.functionDraft.source,C.format(term));
+  assert.equal(C.churchNumber(C.normalize(restored.term).term),5);
+  assert.equal(restored.view.inputSyntax,undefined);assert.equal(restored.functions[0].sourceSyntax,undefined);
+  assert.equal(C.churchNumber(C.normalize(S.decode(S.encode(restored)).term).term),5);
+});
+
+test('unconverted drafts from the removed input mode are retained as text',()=>{
+  const s=sample();s.view.inputSyntax='math';s.draft='x -> x^2+3*x';s.session.dirty=true;
+  const restored=S.decode(JSON.stringify(s));assert.equal(restored.draft,s.draft);assert.match(restored.error,/原草稿已保留/);
+});
+
 test('function original source survives snapshots and independent backup checkpoints',()=>{
   const s=sample();s.functions=L.add(s.functions,'N','  ID 3\n');const restored=S.decode(S.encodeBackup(s,S.encode(s)));
   assert.equal(restored.functions[1].source,'  ID 3\n');assert.deepEqual(restored.functions,s.functions);

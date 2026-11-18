@@ -1,10 +1,13 @@
 (function(root){
   'use strict';
   const C=root.LambdaCore||require('./core.js');
+  const Guard=root.LambdaRunGuard||require('./run-guard.js');
 
-  function normalize(term,{signal,onProgress}={}){
+  function normalize(term,{signal,onProgress,growthWindowMs=Guard.DEFAULT_MS,waitWindowMs=0,onPause}={}){
     const stack=[{kind:'quote'}],names=C.freeVars(term),normalForms=new WeakMap();
     let job={term,environment:null},value,nextName=0,steps=0;
+    const guard=Guard.create({windowMs:growthWindowMs,initial:stack.length});
+    const waitGuard=Guard.create({windowMs:waitWindowMs,requireGrowth:false});
     // Track unfinished demands, including calls whose result is still being
     // normalized under a neutral head or lambda. Repeating one is productive
     // growth as well as a possible black hole; neither has a finite normal form.
@@ -96,17 +99,32 @@
       }
     }
     return new Promise((resolve,reject)=>{
+      let settled=false;
+      function finish(error,result){if(settled)return;settled=true;signal?.removeEventListener('abort',abort);if(error)reject(error);else resolve(result);}
+      function abort(){finish(new Error('求值已取消。'));}
+      signal?.addEventListener('abort',abort,{once:true});
       function batch(){
+        if(settled)return;
         try{
-          if(signal?.aborted){reject(new Error('求值已取消。'));return;}
+          if(signal?.aborted){abort();return;}
           const start=performance.now();
           do{
             for(let i=0;i<256&&(job||stack.length);i++)visit();
-            if(!job&&!stack.length){resolve(value);return;}
+            if(!job&&!stack.length){finish(null,value);return;}
+            const waiting=waitGuard.check(stack.length);
+            if(waiting||guard.check(stack.length)){
+              const message=waiting?Guard.waitingMessage:Guard.message;
+              if(!onPause){const error=new C.LambdaError(message);error.name=waiting?'WaitPauseError':'GrowthPauseError';finish(error);return;}
+              Promise.resolve(onPause({steps,message,reason:waiting?'wait':'growth'})).then(proceed=>{
+                if(settled)return;
+                if(!proceed){abort();return;}
+                guard.reset(stack.length);waitGuard.reset(stack.length);setTimeout(batch,12);
+              },error=>finish(error));return;
+            }
           }while(performance.now()-start<8);
           onProgress?.(steps);
           setTimeout(batch,12);
-        }catch(error){reject(error);}
+        }catch(error){finish(error);}
       }
       batch();
     });

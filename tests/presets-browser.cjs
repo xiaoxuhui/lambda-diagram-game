@@ -60,12 +60,11 @@ const P=require('../src/presets.js');process.env.PORT='0';const server=require('
     ]){
       const example=await select(name);
       assert.equal(example.operands.length,1);
-      assert.match(await page.locator('#run').getAttribute('title'),/直接计算移位结果/);
-      await page.locator('#run').click();
+      await page.locator('#decimal-value').click();
       await page.waitForFunction(value=>document.getElementById('decimal-value-result').textContent===`小数 ${value}`,single);
       await page.locator('#expression').fill('3_church '+P.inputSourceFor(example));
       await page.locator('#convert').click();
-      await page.locator('#run').click();
+      await page.locator('#decimal-value').click();
       await page.waitForFunction(value=>document.getElementById('decimal-value-result').textContent===`小数 ${value}`,repeated);
       assert.equal(await page.locator('#step-count').textContent(),'0');
     }

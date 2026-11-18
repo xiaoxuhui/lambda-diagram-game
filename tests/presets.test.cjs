@@ -49,7 +49,7 @@ for(const e of P.examples.filter(e=>e.expected!==undefined))test(`example reache
   const parsed=e.encoding==='decimal'?E.parse(P.inputSourceFor(e)).term:C.parse(e.term);
   assert.equal(C.freeVars(parsed).size,0,e.name);
   assert.ok(e.category&&e.description);
-  let value;if(e.category==='高等小数')value=await Lazy.normalize(parsed,{signal:AbortSignal.timeout(15000)});
+  let value;if(e.category==='高等小数')value=await Lazy.normalize(parsed,{signal:AbortSignal.timeout(15000),onPause:()=>true});
   else if(e.encoding==='decimal'){value=parsed;for(let n=0;n<100000;n++){const r=C.step(value);if(!r)break;value=r.term;}assert.equal(C.findRedex(value),null);}
   else value=result(e.term);
   if(e.expectedType==='decimal')assert.equal(D.format(D.read(value)),e.expected,e.name);
@@ -70,7 +70,7 @@ test('scientific decimal programs respond to edits, including domain errors',asy
     ['SINH',['2_decimal'],'双曲示例的输入范围是 −1 到 1']
   ]){
     const term=E.parse(D.expression(op,args)).term;
-    const value=await Lazy.normalize(term,{signal:AbortSignal.timeout(15000)});
+    const value=await Lazy.normalize(term,{signal:AbortSignal.timeout(15000),onPause:()=>true});
     assert.equal(D.format(D.read(value)),expected,op+' '+args.join(' '));
   }
 });

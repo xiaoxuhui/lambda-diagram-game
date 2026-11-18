@@ -31,7 +31,7 @@ const artifacts=path.join(__dirname,'artifacts');fs.mkdirSync(artifacts,{recursi
     });
     await check('duplicate and invalid definitions are rejected',async()=>{
       await add('ID','λx y.x');assert.match(await page.locator('#function-error').textContent(),/已存在/);assert.equal(await row('ID').count(),1);
-      await add('1Invalid','λx.x');assert.match(await page.locator('#function-error').textContent(),/函数名/);
+      await add('Invalid Name','λx.x');assert.match(await page.locator('#function-error').textContent(),/函数名/);
       await add('BAD','λx.');assert.ok(await page.locator('#function-error').isVisible());assert.equal(await row('BAD').count(),0);
     });
     await check('using current expression creates a reusable definition',async()=>{
@@ -90,7 +90,7 @@ const artifacts=path.join(__dirname,'artifacts');fs.mkdirSync(artifacts,{recursi
       assert.equal(await page.locator('#expression').inputValue(),before);assert.equal(await row('COPY').count(),1);
     });
     await check('invalid AST import cannot alter current library',async()=>{
-      const s=JSON.parse(exported);s.session.original={type:'var',name:'<bad>'};await upload(JSON.stringify(s));await page.waitForFunction(()=>document.getElementById('save-feedback').textContent.includes('变量名不合法'));
+      const s=JSON.parse(exported);s.session.original={type:'var',name:'bad name'};await upload(JSON.stringify(s));await page.waitForFunction(()=>document.getElementById('save-feedback').textContent.includes('变量名不合法'));
       assert.equal(await row('COPY').count(),1);assert.equal(await page.locator('#expression').inputValue(),'λz.');
     });
     await check('oversized import is rejected before replacing state',async()=>{

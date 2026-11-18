@@ -6,12 +6,13 @@
   const input=$('expression');
   const valueButton=$('decimal-value'),valueResult=$('decimal-value-result'),valueDetails=$('normal-form');
   const interpretedDetails=$('interpreted-result'),interpretedExpression=$('interpreted-expression');
-  let valueJob=null,valueSource=null,normalForm=null;
+  let valueJob=null,valueSource=null,normalForm=null,valueResume=null;
   let interpretedSource=null,interpretedTerm=null;
-  let repeatedTerm=null;
+  let repeatedTerm=null,runGuard=null;
+  const Guard=window.LambdaRunGuard;
   let labPan=null;
   const state={ term:null, original:null, history:Trace.create(), dirty:false, running:false, timer:null,
-    mode:'free', level:0, completed:new Set(), halt:'', scale:1, autoFit:true, model:null, speed:600, strategy:'normal', direction:'left',numberEncoding:'church',numberFormats:{},decimalPlaces:6,fast:false,encodings:null,encodingBusy:false };
+    mode:'free', level:0, completed:new Set(), halt:'', scale:1, autoFit:true, model:null, speed:600, strategy:'normal', direction:'left',numberEncoding:'church',numberFormats:{},decimalPlaces:6,growthWindowMs:Guard.DEFAULT_MS,fast:false,encodings:null,encodingBusy:false };
   let toastTimer,workspace,viewer,dataEditor,formatEditor,guide,conversionController=null,compilingDefinitions=null,preparationTimer=null,historySource=null,renderedCount=0,diagramTerm=null,diagramRoute=null;
   const RUN_PAINT_INTERVAL=120;
   const INLINE_HISTORY_NODES=256;
@@ -54,7 +55,7 @@
   function capture() {
     return {...dataEditor.capture(),draft:input.value,completed:[...state.completed],mode:state.mode,level:state.level,
       session:{original:state.original,steps:Math.max(0,state.history.length-1),dirty:state.dirty,halt:state.halt,...(state.encodings===null?{}:{encodings:state.encodings}),...(state.history.choices.length?{choices:state.history.choices}:{})},
-      view:{speed:state.speed,strategy:state.strategy,direction:state.direction,numberEncoding:state.numberEncoding,numberFormats:state.numberFormats,inputFormatDraft:formatEditor.capture(),guideExample:guide.capture(),decimalPlaces:state.decimalPlaces,...(palette===Palette.defaults?{}:{palette}),scale:state.scale,autoFit:state.autoFit,panX:labPan?.x??$('diagram-viewport').scrollLeft,panY:labPan?.y??$('diagram-viewport').scrollTop,historyOpen:$('history-details').open,helpOpen:!$('help-panel').hidden,hintOpen:!$('hint').hidden},
+      view:{growthWindowMs:state.growthWindowMs,speed:state.speed,strategy:state.strategy,direction:state.direction,numberEncoding:state.numberEncoding,numberFormats:state.numberFormats,inputFormatDraft:formatEditor.capture(),guideExample:guide.capture(),decimalPlaces:state.decimalPlaces,...(palette===Palette.defaults?{}:{palette}),scale:state.scale,autoFit:state.autoFit,panX:labPan?.x??$('diagram-viewport').scrollLeft,panY:labPan?.y??$('diagram-viewport').scrollTop,historyOpen:$('history-details').open,helpOpen:!$('help-panel').hidden,hintOpen:!$('hint').hidden},
       selection:{start:input.selectionStart,end:input.selectionEnd},error:$('error-message').hidden?'':$('error-message').textContent};
   }
   function applySnapshot(s) {
@@ -67,6 +68,7 @@
     revealAnswer(false);
     state.original=s.session.original;state.term=s.term;state.history=s.trace??Trace.create(s.session.original);state.dirty=s.session.dirty;state.halt=s.session.halt;
     state.scale=s.view.scale;state.autoFit=s.view.autoFit;state.speed=s.view.speed;state.strategy=s.view.strategy??'normal';state.direction=s.view.direction??'left';renderSpeed();
+    state.growthWindowMs=s.view.growthWindowMs??Guard.DEFAULT_MS;$('growth-window').value=String(state.growthWindowMs);
     labPan=s.mode==='guide'?{x:s.view.panX,y:s.view.panY}:null;
     state.numberEncoding=s.view.numberEncoding??'church';state.numberFormats=s.view.numberFormats??{};state.decimalPlaces=s.view.decimalPlaces??6;
     state.encodings=s.session.encodings??null;dataEditor.restore(s);formatEditor.restore(s.view.inputFormatDraft);
@@ -83,7 +85,7 @@
     clearTimeout(toastTimer); $('toast').textContent=message; $('toast').hidden=false;
     toastTimer=setTimeout(()=>$('toast').hidden=true,2400);
   }
-  function stop() { clearTimeout(state.timer); state.timer=null; state.running=false;state.fast=false;repeatedTerm=null; }
+  function stop() { clearTimeout(state.timer); state.timer=null; state.running=false;state.fast=false;repeatedTerm=null;runGuard=null; }
   function cancelRewind(){rewindJob?.abort();rewindJob=null;}
   function changed() {
     cancelRewind();
@@ -235,14 +237,14 @@
     decodedTerms.set(t,text);return text;
   }
   function code(text) { const el=document.createElement('code'); el.textContent=text; return el; }
-  const runsShiftDirectly=()=>window.LambdaDecimal.isShiftExpression(state.original);
   function updateValueButtons(){
     valueButton.textContent=valueJob?'取消求值':'快速求值';
-    $('run-label').textContent=state.running?'暂停':runsShiftDirectly()&&valueJob?'取消求值':'运行';
-    $('run').title=runsShiftDirectly()?'直接计算移位结果。使用「单步」或「快速运行」查看逐步归约。':'';
+    $('run-label').textContent=state.running?'暂停':'运行';
+    $('run').title='按设定间隔逐步归约，不受快速计算增长观察窗口影响。';
   }
   function clearValue(){
     valueJob?.abort();valueJob=null;valueSource=null;normalForm=null;
+    valueResume?.(false);valueResume=null;$('continue-value').hidden=true;
     valueResult.hidden=true;valueDetails.hidden=true;valueDetails.open=false;
     $('normal-form-expression').textContent='';updateValueButtons();
   }
@@ -253,7 +255,11 @@
     const controller=new AbortController();valueJob=controller;valueSource=state.term;
     updateValueButtons();valueResult.hidden=false;valueResult.textContent='正在求值…';
     try{
-      const result=await window.LambdaLazyEval.normalize(valueSource,{signal:controller.signal});
+      const result=await window.LambdaLazyEval.normalize(valueSource,{signal:controller.signal,growthWindowMs:0,waitWindowMs:()=>state.growthWindowMs,onPause:progress=>{
+        if(valueJob!==controller||controller.signal.aborted)return false;
+        valueResult.textContent=progress.message;$('continue-value').hidden=false;
+        return new Promise(resolve=>{valueResume=resolve;});
+      }});
       if(valueJob===controller){
         normalForm=result;
         valueResult.textContent=decode(result,false);
@@ -262,10 +268,12 @@
     }catch(error){
       if(valueJob===controller)valueResult.textContent=error.message;
     }finally{
-      if(valueJob===controller){valueJob=null;updateValueButtons();}
+      if(valueJob===controller){valueJob=null;$('continue-value').hidden=true;valueResume=null;updateValueButtons();}
     }
   }
   valueButton.addEventListener('click',evaluateValue);
+  $('continue-value').addEventListener('click',()=>{const resume=valueResume;valueResume=null;$('continue-value').hidden=true;valueResult.textContent='继续求值中…';resume?.(true);});
+  $('growth-window').addEventListener('change',()=>{state.growthWindowMs=Number($('growth-window').value);runGuard?.reset(C.inspect(state.term).nodes);save();});
   valueDetails.addEventListener('toggle',()=>{
     const expression=$('normal-form-expression');
     if(normalForm&&valueDetails.open&&!expression.textContent)expression.textContent=C.format(window.LambdaMeta.readTerm(normalForm)??normalForm);
@@ -414,6 +422,9 @@
         const growth=repeatedTerm.reason==='growth';
         stop();state.halt=growth?'检测到递归展开无限增长，自动运行已停止。可以回退、单步或调整归约顺序。':'检测到重复归约循环，自动运行已停止。可以回退、单步或调整归约顺序。';
       }
+      else if(state.fast&&runGuard?.check(C.inspect(state.term).nodes)){
+        stop();state.halt=Guard.message+' 点击快速运行可从当前步骤继续。';
+      }
       if(display)render(180); return true;
     } catch(e) {stop();state.halt=e.message;if(display)render();return false;}
   }
@@ -447,14 +458,15 @@
   async function run(fast=false) {
     if(state.running){stop();render(100);return;}
     if(!state.term||state.dirty||rewindJob) return;
-    if(!fast&&runsShiftDirectly()){await evaluateValue();return;}
     if(window.LambdaMeta.needsRepair(state.original)&&!await convert())return;
     const interpreter=window.LambdaMeta.isProgram(state.original);
     if(interpreter){
       if(state.strategy!=='normal'||state.direction!=='left')toast('解释器已切换到从左到右的正规序。');
       state.strategy='normal';state.direction='left';
     }
-    state.halt='';state.running=true;state.fast=fast||interpreter;repeatedTerm=C.cycleCheck(state.term);lastRunPaint=performance.now();render();
+    state.halt='';state.running=true;state.fast=fast;repeatedTerm=C.cycleCheck(state.term);
+    runGuard=fast?Guard.create({windowMs:()=>state.growthWindowMs,initial:C.inspect(state.term).nodes}):null;
+    lastRunPaint=performance.now();render();
     if(!C.findRedex(state.term,[],state.strategy,state.direction)){advance();if(!state.running)return;}
     schedule();
   }

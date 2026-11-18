@@ -2,6 +2,7 @@
   'use strict';
   const P=root.LambdaPresets||require('./presets.js');
   const Details=root.LambdaGuideDetails||require('./guide-details.js');
+  const Advanced=root.LambdaGuideAdvanced||require('./guide-advanced.js');
   const lessons={
     '恒等函数 I':[
       'I = λx.x',
@@ -302,7 +303,7 @@
     SQRT:['从输入值和 1 中较大者开始，用牛顿迭代更新估计值。每轮计算“原数除以当前估计”，再与当前估计求平均，工作值截断到 4 位小数；估计不再下降时结束。','求 √2\n2 → (2+2/2)/2=1.5\n→ (1.5+2/1.5)/2≈1.4166\n→ … → 页面显示 ≈1.414'],
     SIN:['先利用奇对称性记录输入符号，再按 2π 周期缩小绝对角度，并把角度折回适合近似的小区间。使用 sin 的奇次泰勒多项式，必要时借用余弦多项式。','sin(0.5)\n≈ 0.5−0.5³/6+0.5⁵/120−0.5⁷/5040\n→ ≈0.479'],
     COS:['利用 cos(x)=sin(x+π/2)，先把输入平移半个 π，再进入与正弦相同的周期缩减和多项式近似流程。','cos(0.5)=sin(0.5+π/2)\n→ 周期与对称性缩减\n→ ≈0.877'],
-    TAN:['分别计算正弦和余弦，再对二者做带符号小数除法。分母按工作位数截断；截断后为零时返回除零错误。','tan(0.5)=sin(0.5)/cos(0.5)\n≈0.4794/0.8775\n→ ≈0.546'],
+    TAN:['分别计算正弦和余弦，再对二者做带符号小数除法。分母按工作位数截断；截断后为零时返回除零错误。','tan(0.5)=sin(0.5)/cos(0.5)\n≈0.4794/0.8776\n→ ≈0.546'],
     SINH:['双曲正弦使用奇次泰勒多项式，各项系数为正，因此与正弦交替正负的系数不同。负输入通过奇次项保留负号。','sinh(−0.5)\n≈ −0.5+(−0.5)³/6+(−0.5)⁵/120+…\n→ ≈−0.521'],
     COSH:['双曲余弦使用偶次泰勒多项式，从常数项 1 开始，各项相加。因为只有偶次幂，正负输入的结果相同。','cosh(0.5)\n≈1+0.5²/2+0.5⁴/24+0.5⁶/720+…\n→ ≈1.127'],
     TANH:['先计算双曲正弦和双曲余弦，再做小数除法。这里继承双曲多项式的输入范围和工作精度。','tanh(0.5)=sinh(0.5)/cosh(0.5)\n≈0.521/1.127\n→ ≈0.462']
@@ -319,14 +320,19 @@
       let walkthrough=walk;
       if(example.name.startsWith('带符号除法'))walkthrough='−7.5÷2 → 对齐整数单位 75÷20\n→ 长除法得到 3.75\n→ 两个输入符号不同，结果 −3.75';
       if(example.name.startsWith('倒数'))walkthrough='1÷0.4 → 同比例变成 10÷4\n→ 商为 2.5';
-      return {...Details.describe(example,precision),principle:[method,notes],walkthrough};
+      return {...Details.describe(example,precision),principle:[method,notes],walkthrough,...Advanced.describe(example,precision)};
     }
     const entry=lessons[example.name];
     if(!entry)throw new Error(`Missing explanation for ${example.name}`);
-    return {...Details.describe(example,precision),core:entry[0],principle:entry[1],walkthrough:entry[2]};
+    return {...Details.describe(example,precision),core:entry[0],principle:entry[1],walkthrough:entry[2],...Advanced.describe(example,precision)};
   }
   function init(api){
     const $=id=>document.getElementById(id),category=$('guide-category'),search=$('guide-search'),select=$('guide-example');
+    const inputs=document.createElement('section');inputs.id='guide-input-section';
+    inputs.innerHTML='<h3>输入参数：按什么顺序，传什么数据</h3><p>下表按完整表达式的参数顺序排列。数值相同但编码不同，仍是不同的 λ 数据。</p><div class="guide-table-scroll"><table id="guide-inputs"><thead><tr><th>参数</th><th>示例写法</th><th>编码</th><th>作用</th></tr></thead><tbody></tbody></table></div><p id="guide-parameter-note"></p><pre id="guide-call-box"><code id="guide-call"></code></pre>';
+    $('guide-core-section').before(inputs);
+    const inputLink=document.createElement('a');inputLink.href='#guide-input-section';inputLink.textContent='输入参数';
+    document.querySelector('.guide-toc').children[0].after(inputLink);
     let selected=0,filtered=[];
     for(const name of new Set(P.examples.map(example=>example.category||'入门'))){
       const option=document.createElement('option');option.value=name;option.textContent=name;category.append(option);
@@ -335,18 +341,33 @@
       const example=P.examples[selected],doc=lesson(example,api.precision());
       $('guide-title').textContent=example.name;
       $('guide-purpose').textContent=example.description??'从下面的关键表达式开始，跟随参数替换理解计算。';
-      $('guide-encoding').textContent=example.encoding==='decimal'
+      $('guide-encoding').textContent=doc.encodingText??(example.encoding==='decimal'
         ?'数据表示使用符号、低位在前的十进制数位列表、小数位数和近似标记。公式与过程使用数值及辅助函数名作简写。'
-        :'数字按丘奇自然数表示；列表、有序对与布尔值也由 λ 函数编码。公式与过程使用辅助函数名作简写。';
+        :'数字按丘奇自然数表示；列表、有序对与布尔值也由 λ 函数编码。公式与过程使用辅助函数名作简写。');
+      inputs.hidden=!doc.inputs?.length;
+      inputLink.hidden=inputs.hidden;
+      $('guide-inputs').querySelector('tbody').replaceChildren(...(doc.inputs??[]).map(input=>{
+        const row=document.createElement('tr');for(const value of [input.name,input.value,input.encoding,input.role]){
+          const cell=document.createElement('td');cell.textContent=value;row.append(cell);
+        }return row;
+      }));
+      $('guide-parameter-note').textContent=doc.parameterNote??'讲解中的辅助函数名是完整表达式内部的局部绑定；不需要先把它们保存到函数库。';
+      $('guide-call-box').hidden=!doc.compact;$('guide-call').textContent=doc.compact?'按下方局部定义书写的调用：\n'+doc.compact:'';
       $('guide-core').textContent=doc.core;
       const paragraphs=values=>values.map(text=>{const p=document.createElement('p');p.textContent=text;return p;});
       $('guide-basics').replaceChildren(...paragraphs(doc.basics));
       $('guide-foundation').textContent=doc.foundation;
-      $('guide-symbols').replaceChildren(...doc.symbols.map(symbol=>{
+      const symbolItem=symbol=>{
         const item=document.createElement('div'),details=document.createElement('details'),title=document.createElement('summary'),explanation=document.createElement('p'),pre=document.createElement('pre'),code=document.createElement('code');
-        title.textContent=symbol.name;explanation.textContent=symbol.meaning;code.textContent=`${symbol.name} = ${symbol.source}`;
+        title.textContent=symbol.name+'：'+symbol.meaning.split('。')[0];explanation.textContent=symbol.meaning;code.textContent=`${symbol.name} = ${symbol.source}`;
         pre.append(code);details.append(title,explanation,pre);item.append(details);return item;
-      }));
+      };
+      const keyNames=doc.featured??doc.symbols.slice(-5).map(symbol=>symbol.name),keySymbols=doc.symbols.filter(symbol=>keyNames.includes(symbol.name)),others=doc.symbols.filter(symbol=>!keyNames.includes(symbol.name));
+      $('guide-symbols').replaceChildren(...keySymbols.map(symbolItem));
+      if(others.length){const details=document.createElement('details'),summary=document.createElement('summary');
+        details.id='guide-all-symbols';summary.textContent=`其余 ${others.length} 个辅助函数：中文说明与完整 λ 定义`;
+        details.append(summary,...others.map(symbolItem));$('guide-symbols').append(details);
+      }
       $('guide-principle').replaceChildren(...paragraphs(doc.principle));
       $('guide-walkthrough').textContent=doc.walkthrough;
       $('guide-steps').replaceChildren(...doc.steps.map(([title,explanation,expression])=>{
