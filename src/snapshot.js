@@ -12,7 +12,7 @@
     function walk(t,depth) {
       ++count;
       if(!object(t))fail('表达式结构不完整。');
-      const name=n=>{if(typeof n!=='string'||n.length>C.LIMITS.nameChars||!/^[A-Za-z][A-Za-z0-9_']*$/.test(n))fail('变量名不合法。');return n;};
+      const name=n=>{if(!C.validName(n))fail('变量名不合法。');return n;};
       if(t.type==='var')return C.V(name(t.name));
       if(t.type==='abs')return C.L(name(t.param),walk(t.body,depth+1));
       if(t.type==='app')return C.A(walk(t.fn,depth+1),walk(t.arg,depth+1));
@@ -46,7 +46,7 @@
     const s=raw.session;if(!object(s)||!Number.isSafeInteger(s.steps)||s.steps<0||typeof s.dirty!=='boolean')fail('归约状态不合法。');
     const original=s.original===null?null:ast(s.original);if(!original&&s.steps!==0)fail('没有起始表达式，无法恢复归约。');
     const encodings=s.encodings??[];
-    if(!Array.isArray(encodings)||encodings.some(name=>typeof name!=='string'||!(/^[\p{L}][\p{L}\p{N}_']*$/u.test(name))))fail('表达式编码标记不合法。');
+    if(!Array.isArray(encodings)||encodings.some(name=>!C.validName(name)))fail('表达式编码标记不合法。');
     const getChoice=(choice,allowOrder)=>{
       if(choice===null||allowOrder&&Trace.isOrder(choice))return choice;
       if(!Array.isArray(choice)||choice.some(part=>!['body','fn','arg'].includes(part)))fail('归约路径不合法。');

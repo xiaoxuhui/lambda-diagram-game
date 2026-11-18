@@ -4,6 +4,9 @@
   const V = name => Object.freeze({ type: 'var', name });
   const L = (param, body) => Object.freeze({ type: 'abs', param, body });
   const A = (fn, arg) => Object.freeze({ type: 'app', fn, arg });
+  const namePattern = /^[^\sλ\\().\[\],`]+/u;
+  const validName = name => typeof name === 'string' && !!name && namePattern.exec(name)?.[0] === name;
+  const formatName = name => /^-?[0-9]/.test(name) ? '`'+name+'`' : name;
   function churchList(items) {
     const free=new Set();
     for(const item of items)for(const name of freeVars(item))free.add(name);
@@ -40,12 +43,21 @@
     for (let i = 0; i < source.length;) {
       if (/\s/.test(source[i])) { i++; continue; }
       const start = i, c = source[i];
+      if(c==='`'){
+        const end=source.indexOf('`',i+1),name=end<0?'':source.slice(i+1,end);
+        if(!validName(name))throw new LambdaError('反引号内需要一个名称，不能含空白或 λ、点、括号等语法符号。',i);
+        out.push({kind:'name',value:name,pos:i});i=end+1;continue;
+      }
       const custom=literalMatcher?.(source,i);
       if(custom){
         const raw=source.slice(i,i+custom.length);
-        out.push(/^[A-Za-z][A-Za-z0-9_']*$/.test(raw)?{kind:'name',value:raw,literal:custom,pos:i}:{kind:'number',value:custom.value,suffix:custom.encoding,pos:i});i+=custom.length;continue;
+        out.push(validName(raw)&&!/^[-0-9]/.test(raw)?{kind:'name',value:raw,literal:custom,pos:i}:{kind:'number',value:custom.value,suffix:custom.encoding,pos:i});i+=custom.length;continue;
       }
       if ('λ\\.()[],'.includes(c)) { out.push({ kind: c === '\\' ? 'λ' : c, pos: i++ }); continue; }
+      const word=namePattern.exec(source.slice(i));
+      if(word&&!/^-?[0-9]+(?:_.*)?$/.test(word[0])){
+        out.push({kind:'name',value:word[0],pos:i});i+=word[0].length;continue;
+      }
       if(!decimal && c==='-' && /[0-9]/.test(source[i+1]||'')) throw new LambdaError('丘奇数只支持非负整数，不能输入负数。',i);
       const numeric=(decimal?/^-?[0-9]+(?:\.[0-9]+)?/:/^[0-9]+/).exec(source.slice(i));
       if(numeric) {
@@ -54,15 +66,15 @@
         if(!decimal && !Number.isSafeInteger(value)) throw new LambdaError('数字超出可精确表示的整数范围。',i);
         i+=numeric[0].length;let suffix=null;
         if(suffixes&&source[i]==='_'){
-          const match=/^[\p{L}][\p{L}\p{N}_']*/u.exec(source.slice(i+1));
+          const match=namePattern.exec(source.slice(i+1));
           if(!match)throw new LambdaError('下划线后需要数据编码名称，例如 3_MyData。',i);
           suffix=match[0];i+=1+suffix.length;
         }
         out.push({kind:'number',value:decimal?numeric[0]:value,suffix,pos:start});continue;
       }
-      const m = /^[a-zA-Z][a-zA-Z0-9_']*/.exec(source.slice(i));
+      const m = namePattern.exec(source.slice(i));
       if (m) { out.push({ kind: 'name', value: m[0], pos: start }); i += m[0].length; continue; }
-      throw new LambdaError(`无法识别「${c}」，变量请用英文字母开头。`, i);
+      throw new LambdaError(`无法识别「${c}」。名称不能使用空白或 λ、点、括号等语法符号。`, i);
     }
     out.push({ kind: 'end', pos: source.length }); return out;
   }
@@ -127,8 +139,8 @@
       while(stack.length){const entry=stack.pop();if(typeof entry==='string'){parts.push(entry);continue;}
         const [node,ctx]=entry,brackets=node.type==='abs'?ctx>0:node.type==='app'&&ctx>1;
         if(brackets){parts.push('(');stack.push(')');}
-        if(node.type==='var')parts.push(node.name);
-        else if(node.type==='abs'){parts.push(`λ${node.param}.`);stack.push([node.body,0]);}
+        if(node.type==='var')parts.push(formatName(node.name));
+        else if(node.type==='abs'){parts.push(`λ${formatName(node.param)}.`);stack.push([node.body,0]);}
         else stack.push([node.arg,2],' ',[node.fn,1]);
       }
       text=parts.join('');if(text.length<=512&&analyze(t).stable)formatted.set(t,text);
@@ -224,18 +236,40 @@
       const a=analyze(left),b=analyze(right);
       return a.nodes<=8192&&a.nodes===b.nodes&&a.depth===b.depth&&equal(left,right);
     };
-    return (term,change)=>{
+    function grows(before,replacement,path){
+      const size=analyze(before).nodes,stack=[replacement];
+      const underBinders=!path.includes('fn'),free=underBinders?freeVars(before):null;
+      while(stack.length){
+        const node=stack.pop();if(analyze(node).nodes<size)continue;
+        if(same(before,node))return true;
+        if(node.type==='abs'){
+          // A returned lambda may erase its body when applied by an outer
+          // application. Descend only when it is itself being normalized.
+          if(underBinders&&!free.has(node.param))stack.push(node.body);
+          continue;
+        }
+        if(node.type!=='app')continue;
+        // A repeated computation in function position must be evaluated again.
+        // Arguments are demanded for a normal form only under a neutral head.
+        stack.push(node.fn);let head=node.fn;
+        while(head.type==='app')head=head.fn;
+        if(head.type==='var')stack.push(node.arg);
+      }
+      return false;
+    }
+    const check=(term,change)=>{
+      check.reason='';
       if(change){
         const {before,replacement}=change;
-        if(same(before,replacement))return true;
-        // A neutral head leaves the same reducible application in its argument.
-        if(replacement.type==='app'&&replacement.fn.type==='var'&&same(before,replacement.arg))return true;
+        if(same(before,replacement)){check.reason='cycle';return true;}
+        if(grows(before,replacement,change.path)){check.reason='growth';return true;}
       }
       length++;
-      if(same(checkpoint,term))return true;
+      if(same(checkpoint,term)){check.reason='cycle';return true;}
       if(length===power){checkpoint=term;power*=2;length=0;}
       return false;
     };
+    return check;
   }
   const STRATEGIES=Object.freeze(['normal','applicative']);
   const DIRECTIONS=Object.freeze(['left','right']);
@@ -306,7 +340,7 @@
     return body.type === 'var' && body.name === x ? n : null;
   }
   function parseInput(source,maxChars=LIMITS.chars){if(!root.LambdaDecimal)throw new LambdaError('列表小数模块尚未加载。');return parse(source,maxChars,root.LambdaDecimal.encodeLiteral);}
-  const API = { LIMITS, STRATEGIES, DIRECTIONS, LambdaError, V, L, A, churchList, parse, parseInput, format, inspect, freeVars, substitute, alphaKey, key, equal, hasRedex, findRedex, step, stepAt, normalize, churchNumber, cycleCheck };
+  const API = { LIMITS, STRATEGIES, DIRECTIONS, LambdaError, validName, formatName, V, L, A, churchList, parse, parseInput, format, inspect, freeVars, substitute, alphaKey, key, equal, hasRedex, findRedex, step, stepAt, normalize, churchNumber, cycleCheck };
   root.LambdaCore = API;
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
 })(typeof globalThis !== 'undefined' ? globalThis : window);

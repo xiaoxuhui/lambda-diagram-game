@@ -46,7 +46,16 @@ test('legacy v1 migrates progress and draft without pretending to have history',
 test('bad JSON and unknown version are rejected',()=>{assert.throws(()=>S.decode('{'),/JSON/);assert.throws(()=>S.decode('{"version":99}'),/版本/);});
 test('oversized file is rejected before parsing',()=>assert.throws(()=>S.decode(' '.repeat(S.MAX_BYTES+1)),/2 MiB/));
 test('multibyte text obeys byte budget, not just character count',()=>assert.throws(()=>S.decode('汉'.repeat(800000)),/2 MiB/));
-test('malformed AST and executable-looking nodes are rejected',()=>{for(const term of [{type:'eval',code:'alert(1)'},{type:'abs',param:'x'},{type:'var',name:'<script>'}]){const s=sample();s.session.original=term;assert.throws(()=>S.decode(JSON.stringify(s)),/存档无效/);}});
+test('malformed AST and syntax delimiters in names are rejected',()=>{for(const term of [{type:'eval',code:'alert(1)'},{type:'abs',param:'x'},{type:'var',name:'a(b)'}]){const s=sample();s.session.original=term;assert.throws(()=>S.decode(JSON.stringify(s)),/存档无效/);}});
+
+test('new name forms survive archive roundtrips in functions, terms and encodings',()=>{
+  const E=require('../src/data-encoding.js'),s=sample();
+  s.functions=L.add([],'1号函数','λ_值._值',Infinity,'church',6,[]);
+  s.dataEncodings=E.define([],'+编码','λn.n');
+  s.session={original:C.parse('λ_值.+编码 _值'),steps:0,dirty:false,halt:'',encodings:['+编码']};
+  const restored=S.decode(S.encode(s));assert.deepEqual(restored.functions,s.functions);
+  assert.deepEqual(restored.dataEncodings,s.dataEncodings);assert.deepEqual(restored.term,s.session.original);
+});
 test('deep AST roundtrips without the old depth quota',()=>{let t=C.V('x');for(let i=0;i<301;i++)t=C.L('x',t);const s=sample();s.session={original:t,steps:0,dirty:false,halt:''};assert.equal(C.inspect(S.decode(S.encode(s)).term).depth,302);});
 test('all AST occurrences survive beyond the old node quota',()=>{let t=C.V('x');for(let i=0;i<12;i++)t=C.A(t,t);const s=sample();s.session={original:t,steps:0,dirty:false,halt:''};assert.equal(C.inspect(S.decode(S.encode(s)).term).nodes,8191);});
 test('impossible replay steps are rejected',()=>{const s=sample();s.session.steps=2;assert.throws(()=>S.decode(JSON.stringify(s)),/步数/);});

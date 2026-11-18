@@ -35,7 +35,16 @@ test('deleting dependency preserves compiled definition',()=>{
 });
 test('deletion is immutable and unknown deletion is harmless',()=>{const f=L.add([],'F','λx.x');assert.equal(L.remove(f,'F').length,0);assert.equal(f.length,1);assert.deepEqual(L.remove(f,'Z'),f);});
 test('duplicate names cannot silently replace a function',()=>{const f=L.add([],'F','λx.x');assert.throws(()=>L.add(f,'F','λx y.x'),/已存在/);assert.equal(f.length,1);});
-test('invalid names and overlong names are rejected',()=>{for(const n of ['','1f','a b','__proto__','x'.repeat(33)])assert.throws(()=>L.add([],n,'λx.x'),/函数名/);});
+test('only empty names and syntax delimiters are rejected',()=>{for(const n of ['','a b','λx','x.y','x(y)','[x]','a,b','`x`'])assert.throws(()=>L.add([],n,'λx.x'),/函数名/);});
+
+test('functions with non-letter starts, symbols and long names can be called and renamed',()=>{
+  for(const name of ['1f','1号函数','_加法','+','🙂','__proto__','123','1_Box','x'.repeat(100)]){
+    const functions=L.add([],name,'λx.x');
+    assert.ok(C.equal(C.normalize(L.expand(p(C.formatName(name)+' y'),functions)).term,p('y')));
+    assert.equal(L.update(functions,name,'@新名','λx.x')[0].name,'@新名');
+    assert.throws(()=>L.add([],name,'λx.'+C.formatName(name)),/自身/);
+  }
+});
 test('names colliding with object prototypes are safe',()=>{const f=L.add([],'constructor','λx.x');assert.ok(C.equal(L.expand(p('constructor'),f),p('λx.x')));});
 test('invalid definitions leave library unchanged',()=>{const f=[];assert.throws(()=>L.add(f,'F','λx.'),/表达式/);assert.deepEqual(f,[]);});
 test('direct self-reference is rejected but bound same name is valid',()=>{assert.throws(()=>L.add([],'F','λx.F x'),/自身/);assert.equal(L.add([],'F','λF.F').length,1);});

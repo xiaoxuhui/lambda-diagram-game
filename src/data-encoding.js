@@ -6,7 +6,7 @@
   const isBuiltin=name=>builtinKeys.includes(name);
   const builtins=new Map(Object.entries(builtinLabels).flatMap(([key,label])=>[[key,key],[label,key]]));
   const literalCache=new WeakMap();
-  const validStoredName=name=>typeof name==='string'&&/^[\p{L}][\p{L}\p{N}_']*$/u.test(name)&&!['church','丘奇数','decimal','列表小数'].includes(name);
+  const validStoredName=name=>C.validName(name)&&!['church','丘奇数','decimal','列表小数'].includes(name);
   const validName=name=>validStoredName(name)&&!builtins.has(name);
   function validateTemplate(template){
     if(typeof template!=='string'||template.split('{n}').length!==2)throw new C.LambdaError('输入形式需要且只能包含一个 {n}，例如 C{n}、{n}c 或 [{n}]。');
@@ -51,7 +51,7 @@
     if(!Array.isArray(entries))throw new C.LambdaError('自定义数据编码列表不合法。');
     const names=new Set();
     for(const entry of entries){
-      if(!entry||!validStoredName(entry.name)||names.has(entry.name))throw new C.LambdaError('编码名称重复或不合法；请以字母或汉字开头，内置编码名称不能占用。');
+      if(!entry||!validStoredName(entry.name)||names.has(entry.name))throw new C.LambdaError('编码名称重复或含语法符号；名称不能为空，内置编码名称不能占用。');
       if(typeof entry.source!=='string'||!entry.term)throw new C.LambdaError('数据转换函数缺失。');
       C.inspect(entry.term);if(C.freeVars(entry.term).size)throw new C.LambdaError('数据转换函数不能含未定义的自由变量。');
       if(entry.table!==undefined&&!Array.isArray(entry.table))throw new C.LambdaError('数字表达式对照表不合法。');
@@ -67,7 +67,7 @@
   }
   function define(entries,name,source,expand=term=>term,editing=null,numberFormats={}){
     validate(entries);name=name.trim();
-    if(name===editing?!validStoredName(name):!validName(name))throw new C.LambdaError('编码名称需以字母或汉字开头，可含数字、下划线和单引号；不能使用内置编码名称。');
+    if(name===editing?!validStoredName(name):!validName(name))throw new C.LambdaError('编码名称不能为空，也不能含空白或 λ、点、括号等语法符号；不能使用内置编码名称。');
     if(editing!==null&&!entries.some(entry=>entry.name===editing))throw new C.LambdaError('要编辑的数据编码已不存在。');
     if(entries.some(entry=>entry.name===name&&entry.name!==editing))throw new C.LambdaError(`编码「${name}」已存在，请选择它进行编辑。`);
     // Converter definitions always receive Church numbers; they do not recursively encode themselves.
@@ -141,7 +141,8 @@
     return {...parsed,term:rebuilt.get(parsed.term),mappings};
   }
   function isLiteral(source,entries=[],numberFormats={}){
-    source=source.trim();if(/^-?[0-9]+(?:\.[0-9]+)?(?:_[\p{L}][\p{L}\p{N}_']*)?$/u.test(source))return true;
+    source=source.trim();const numeric=/^-?[0-9]+(?:\.[0-9]+)?(?:_(.*))?$/u.exec(source);
+    if(numeric&&(numeric[1]===undefined||C.validName(numeric[1])))return true;
     try{const match=literalMatcher(entries,numberFormats)(source,0);return !!match&&match.length===source.length;}catch{return false;}
   }
   const TRUE=C.parse('λx y.x'),FALSE=C.parse('λx y.y'),integerTag=C.parse('λa b c d.d');

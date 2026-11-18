@@ -69,9 +69,19 @@ test('malformed suffixes, undefined names and invalid custom values have positio
   for(const source of ['3_','3_Missing','-1_Box','0.5_Box','0.5','-1','1.2.3_Box']){
     assert.throws(()=>E.parse(source,box()),error=>error instanceof C.LambdaError&&Number.isInteger(error.position),source);
   }
-  for(const name of ['decimal','church','丘奇数','列表小数','bad-name','2Bad',''])assert.throws(()=>E.define([],name,'λn.n'));
+  for(const name of ['decimal','church','丘奇数','列表小数','bad name','bad.name',''])assert.throws(()=>E.define([],name,'λn.n'));
   assert.throws(()=>E.define([],'Open','λn.m'),/自由变量/);
   assert.throws(()=>E.define(box(),'Box','λn.n'),/已存在/);
+});
+
+test('custom suffixes accept numeric, underscore, Unicode and symbol names',async()=>{
+  for(const name of ['2Bad','_我的编码','+','🙂','123','bad-name']){
+    const entries=E.define([],name,'λn.λk.k n');
+    assert.ok(E.isLiteral('3_'+name,entries));
+    const compiled=await E.compile('3_'+name,entries);
+    assert.ok(C.equal(compiled.term,C.parse('λk.k 3')));
+    assert.deepEqual(compiled.encodings,[name]);
+  }
 });
 test('saved converters expand library dependencies and redefinition is explicit',()=>{
   const library=L.add([],'WRAP','λn.λk.k n'),entries=E.define([],'Wrapped','WRAP',term=>L.expand(term,library));

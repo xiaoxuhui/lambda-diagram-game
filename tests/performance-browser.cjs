@@ -83,8 +83,27 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
       assert.equal(await page.evaluate(result=>LambdaCore.churchNumber(LambdaCore.parse(result)),result),2);
       assert.equal(await page.locator('#step-count').textContent(),'0');
       assert.equal(await page.locator('#reduction-order').inputValue(),'applicative');
-      await source('(λx.f (x x)) (λx.f (x x))');await page.locator('#decimal-value').click();await page.locator('#decimal-value').click();
+      await source('(λx.f (x x)) (λx.f (x x))');await page.locator('#decimal-value').click();
+      await page.waitForFunction(()=>document.querySelector('#decimal-value-result').textContent.includes('无限增长'));
+      await source('(λf.(λx.f (x x)) (λx.f (x x))) (λr n.r ((λn f x.f (n f x)) n)) 0');
+      await page.locator('#decimal-value').click();await page.locator('#decimal-value').click();
       assert.ok(await page.locator('#decimal-value-result').isHidden());
+    });
+    await check('fast running stops expanding recursion and still allows manual steps and undo',async()=>{
+      await page.locator('#reduction-order').selectOption('normal');
+      for(const text of [
+        '(λx.f (f (x x))) (λx.f (f (x x)))',
+        '(λx.f (x x) (x x)) (λx.f (x x) (x x))',
+        '(λx.x x x) (λx.x x x)',
+        '(λx.λn.f (x x)) (λx.λn.f (x x))'
+      ]){
+        await source(text);await page.locator('#fast-run').click();
+        await page.waitForFunction(()=>document.getElementById('state-badge').textContent==='已暂停');
+        assert.match(await page.locator('#run-status').textContent(),/无限增长/);
+        const steps=Number(await page.locator('#step-count').textContent());assert.equal(steps,1);
+        await page.locator('#step').click();assert.equal(Number(await page.locator('#step-count').textContent()),steps+1);
+        await page.locator('#back').click();assert.equal(Number(await page.locator('#step-count').textContent()),steps);
+      }
     });
     await check('optimized flows have no browser errors',async()=>assert.deepEqual(errors,[]));
     console.log(`Performance browser checks: ${count} passed, 0 failed.`);

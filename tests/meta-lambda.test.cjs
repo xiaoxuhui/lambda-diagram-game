@@ -16,6 +16,9 @@ test('the generated Lambda program normalizes code and preserves binding',()=>{
     ['λx.(λx.x) x','λx.x'],
     ['(λx.x x) (λu.u)','λu.u'],
     ['x0 ((λz.z) Hello_2)','x0 Hello_2'],
+    ['(λx.x) _值','_值'],
+    ['(λx.x) +','+'],
+    ['(λx.x) `123`','`123`'],
     ["(λu.λv.u) x0'", "λu.x0'"],
     ['(λa.b) ((λx.x x) (λx.x x))','b'],
     ['2 (λa.a) b','b']

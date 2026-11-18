@@ -18,7 +18,20 @@ test('missing dot is rejected', () => assert.throws(() => p('λx x'), /一个点
 test('missing binder is rejected', () => assert.throws(() => p('λ.x'), /一个变量/));
 test('missing parenthesis is rejected', () => assert.throws(() => p('(λx.x'), /右括号/));
 test('extra parenthesis is rejected', () => assert.throws(() => p('x)'), /多余/));
-test('illegal token is located', () => assert.throws(() => p('x + y'), e => e.position === 2));
+test('unclosed quoted name is located', () => assert.throws(() => p('x `y'), e => e.position === 2));
+
+test('names allow non-letter starts and Unicode without changing numeric literals',()=>{
+  for(const name of ['_x','+','@加法','1号函数','1f','中文','🙂','__proto__']){
+    assert.equal(p(name).name,name);
+    assert.ok(C.equal(C.normalize(p(`(λ${name}.${name}) y`)).term,p('y')));
+    assert.deepEqual(p(C.format(p(name))),p(name));
+  }
+  for(const name of ['123','1_Box','-2']){
+    const source='`'+name+'`';assert.equal(p(source).name,name);
+    assert.deepEqual(p(C.format(C.L(name,C.V(name)))),C.L(name,C.V(name)));
+  }
+  assert.equal(C.churchNumber(p('3')),3);
+});
 test('naked lambda argument is rejected with help', () => assert.throws(() => p('f λx.x'), /需要括号/));
 test('default source length is unlimited while explicit caller budgets still work', () => {
   const source='λx.'+' '.repeat(20000)+'x';assert.ok(C.equal(p(source),p('λx.x')));

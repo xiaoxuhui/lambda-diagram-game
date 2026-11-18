@@ -1,6 +1,7 @@
 (function(root){
   'use strict';
   const P=root.LambdaPresets||require('./presets.js');
+  const Details=root.LambdaGuideDetails||require('./guide-details.js');
   const lessons={
     '恒等函数 I':[
       'I = λx.x',
@@ -306,7 +307,7 @@
     COSH:['双曲余弦使用偶次泰勒多项式，从常数项 1 开始，各项相加。因为只有偶次幂，正负输入的结果相同。','cosh(0.5)\n≈1+0.5²/2+0.5⁴/24+0.5⁶/720+…\n→ ≈1.127'],
     TANH:['先计算双曲正弦和双曲余弦，再做小数除法。这里继承双曲多项式的输入范围和工作精度。','tanh(0.5)=sinh(0.5)/cosh(0.5)\n≈0.521/1.127\n→ ≈0.462']
   };
-  function lesson(example){
+  function lesson(example,precision=6){
     if(example.decimalOperation){
       const [method,walk]=decimalLessons[example.decimalOperation];
       const notes=example.category==='高等小数'&&['SIN','COS','TAN'].includes(example.decimalOperation)
@@ -318,11 +319,11 @@
       let walkthrough=walk;
       if(example.name.startsWith('带符号除法'))walkthrough='−7.5÷2 → 对齐整数单位 75÷20\n→ 长除法得到 3.75\n→ 两个输入符号不同，结果 −3.75';
       if(example.name.startsWith('倒数'))walkthrough='1÷0.4 → 同比例变成 10÷4\n→ 商为 2.5';
-      return {core:`${example.decimalOperation} (${example.operands.join(') (')})`,principle:[method,notes],walkthrough};
+      return {...Details.describe(example,precision),principle:[method,notes],walkthrough};
     }
     const entry=lessons[example.name];
     if(!entry)throw new Error(`Missing explanation for ${example.name}`);
-    return {core:entry[0],principle:entry[1],walkthrough:entry[2]};
+    return {...Details.describe(example,precision),core:entry[0],principle:entry[1],walkthrough:entry[2]};
   }
   function init(api){
     const $=id=>document.getElementById(id),category=$('guide-category'),search=$('guide-search'),select=$('guide-example');
@@ -331,16 +332,30 @@
       const option=document.createElement('option');option.value=name;option.textContent=name;category.append(option);
     }
     function render(){
-      const example=P.examples[selected],doc=lesson(example);
+      const example=P.examples[selected],doc=lesson(example,api.precision());
       $('guide-title').textContent=example.name;
       $('guide-purpose').textContent=example.description??'从下面的关键表达式开始，跟随参数替换理解计算。';
       $('guide-encoding').textContent=example.encoding==='decimal'
         ?'数据表示使用符号、低位在前的十进制数位列表、小数位数和近似标记。公式与过程使用数值及辅助函数名作简写。'
         :'数字按丘奇自然数表示；列表、有序对与布尔值也由 λ 函数编码。公式与过程使用辅助函数名作简写。';
       $('guide-core').textContent=doc.core;
-      const paragraphs=doc.principle.map(text=>{const p=document.createElement('p');p.textContent=text;return p;});
-      $('guide-principle').replaceChildren(...paragraphs);
+      const paragraphs=values=>values.map(text=>{const p=document.createElement('p');p.textContent=text;return p;});
+      $('guide-basics').replaceChildren(...paragraphs(doc.basics));
+      $('guide-foundation').textContent=doc.foundation;
+      $('guide-symbols').replaceChildren(...doc.symbols.map(symbol=>{
+        const item=document.createElement('div'),details=document.createElement('details'),title=document.createElement('summary'),explanation=document.createElement('p'),pre=document.createElement('pre'),code=document.createElement('code');
+        title.textContent=symbol.name;explanation.textContent=symbol.meaning;code.textContent=`${symbol.name} = ${symbol.source}`;
+        pre.append(code);details.append(title,explanation,pre);item.append(details);return item;
+      }));
+      $('guide-principle').replaceChildren(...paragraphs(doc.principle));
       $('guide-walkthrough').textContent=doc.walkthrough;
+      $('guide-steps').replaceChildren(...doc.steps.map(([title,explanation,expression])=>{
+        const item=document.createElement('li'),heading=document.createElement('h4'),text=document.createElement('p');
+        heading.textContent=title;text.textContent=explanation;item.append(heading,text);
+        if(expression){const pre=document.createElement('pre'),code=document.createElement('code');code.textContent=expression;pre.append(code);item.append(pre);}
+        return item;
+      }));
+      $('guide-boundaries').replaceChildren(...paragraphs(doc.boundaries));$('guide-exercise').textContent=doc.exercise;
       const parameters=P.parametersFor(example);
       $('guide-parameters').textContent=parameters.length?`完整表达式末尾的参数依次为${parameters.join('、')}。`:'函数的参数顺序见关键表达式，完整表达式包含示例的输入数据。';
       $('guide-expression').textContent=P.inputSourceFor(example,api.precision());
@@ -350,8 +365,8 @@
     function filter(){
       const query=search.value.trim().toLowerCase();
       filtered=P.examples.flatMap((example,index)=>{
-        const doc=lesson(example),name=example.category||'入门';
-        return (!category.value||category.value===name)&&`${name} ${example.name} ${example.description??''} ${doc.core} ${doc.principle.join(' ')}`.toLowerCase().includes(query)?[index]:[];
+        const name=example.category||'入门';
+        return (!category.value||category.value===name)&&`${name} ${example.name} ${example.description??''}`.toLowerCase().includes(query)?[index]:[];
       });
       if(!filtered.includes(selected))selected=filtered[0]??selected;
       const options=filtered.map(index=>{const option=document.createElement('option');option.value=index;option.textContent=P.examples[index].name;return option;});

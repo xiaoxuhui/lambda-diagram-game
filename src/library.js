@@ -2,7 +2,7 @@
   'use strict';
   const C=root.LambdaCore || require('./core.js');
   const LIMITS={count:Infinity,nodes:Infinity,nameChars:Infinity};
-  const validName=name=>typeof name==='string'&&/^[A-Za-z][A-Za-z0-9_']{0,31}$/.test(name);
+  const validName=C.validName;
   function names(t,out=new Set()) {
     if(t.type==='var')out.add(t.name);
     else if(t.type==='abs'){out.add(t.param);names(t.body,out);}
@@ -13,9 +13,9 @@
     const seen=new Set();let nodes=0,nameChars=0;
     for(const fn of functions) {
       if(fn.source!==undefined&&typeof fn.source!=='string')throw new C.LambdaError('函数原始定义需为文本。');
-      if(fn.encodings!==undefined&&(!Array.isArray(fn.encodings)||fn.encodings.some(name=>typeof name!=='string'||!/^[\p{L}][\p{L}\p{N}_']*$/u.test(name))))throw new C.LambdaError('函数编码标记不合法。');
-      if(fn.sourceFree!==undefined&&(!Array.isArray(fn.sourceFree)||fn.sourceFree.some(name=>typeof name!=='string'||!/^[A-Za-z][A-Za-z0-9_']*$/.test(name))))throw new C.LambdaError('函数原文变量标记不合法。');
-      if(!validName(fn.name))throw new C.LambdaError('函数名需以英文字母开头，最多 32 字符，可含数字、下划线和单引号。');
+      if(fn.encodings!==undefined&&(!Array.isArray(fn.encodings)||fn.encodings.some(name=>!C.validName(name))))throw new C.LambdaError('函数编码标记不合法。');
+      if(fn.sourceFree!==undefined&&(!Array.isArray(fn.sourceFree)||fn.sourceFree.some(name=>!C.validName(name))))throw new C.LambdaError('函数原文变量标记不合法。');
+      if(!validName(fn.name))throw new C.LambdaError('函数名不能为空，也不能含空白或 λ、点、括号等语法符号；不限制首字符。');
       if(seen.has(fn.name))throw new C.LambdaError(`函数「${fn.name}」已存在，请换一个名字。`);
       seen.add(fn.name);nodes+=C.inspect(fn.term).nodes;
       const stack=[fn.term];while(stack.length){const t=stack.pop();if(t.type==='var')nameChars+=t.name.length;else if(t.type==='abs'){nameChars+=t.param.length;stack.push(t.body);}else stack.push(t.fn,t.arg);}
@@ -36,7 +36,7 @@
   }
   function add(functions,name,source,maxChars=C.LIMITS.chars,numberEncoding='church',precision=6,dataEncodings=null,prepared=null) {
     name=name.trim();
-    if(!validName(name))throw new C.LambdaError('函数名需以英文字母开头，最多 32 字符，可含数字、下划线和单引号。');
+    if(!validName(name))throw new C.LambdaError('函数名不能为空，也不能含空白或 λ、点、括号等语法符号；不限制首字符。');
     if(functions.some(f=>f.name===name))throw new C.LambdaError(`函数「${name}」已存在，请换一个名字。`);
     const compiled=prepared??(dataEncodings!==null?(root.LambdaDataEncoding||require('./data-encoding.js')).parse(source,dataEncodings,maxChars,numberEncoding):null);
     const parsed=compiled?compiled.term:numberEncoding==='decimal'?C.parseInput(source,maxChars):C.parse(source,maxChars);

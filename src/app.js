@@ -9,6 +9,7 @@
   let valueJob=null,valueSource=null,normalForm=null;
   let interpretedSource=null,interpretedTerm=null;
   let repeatedTerm=null;
+  let labPan=null;
   const state={ term:null, original:null, history:Trace.create(), dirty:false, running:false, timer:null,
     mode:'free', level:0, completed:new Set(), halt:'', scale:1, autoFit:true, model:null, speed:600, strategy:'normal', direction:'left',numberEncoding:'church',numberFormats:{},decimalPlaces:6,fast:false,encodings:null,encodingBusy:false };
   let toastTimer,workspace,viewer,dataEditor,formatEditor,guide,conversionController=null,compilingDefinitions=null,preparationTimer=null,historySource=null,renderedCount=0,diagramTerm=null,diagramRoute=null;
@@ -53,7 +54,7 @@
   function capture() {
     return {...dataEditor.capture(),draft:input.value,completed:[...state.completed],mode:state.mode,level:state.level,
       session:{original:state.original,steps:Math.max(0,state.history.length-1),dirty:state.dirty,halt:state.halt,...(state.encodings===null?{}:{encodings:state.encodings}),...(state.history.choices.length?{choices:state.history.choices}:{})},
-      view:{speed:state.speed,strategy:state.strategy,direction:state.direction,numberEncoding:state.numberEncoding,numberFormats:state.numberFormats,inputFormatDraft:formatEditor.capture(),guideExample:guide.capture(),decimalPlaces:state.decimalPlaces,...(palette===Palette.defaults?{}:{palette}),scale:state.scale,autoFit:state.autoFit,panX:$('diagram-viewport').scrollLeft,panY:$('diagram-viewport').scrollTop,historyOpen:$('history-details').open,helpOpen:!$('help-panel').hidden,hintOpen:!$('hint').hidden},
+      view:{speed:state.speed,strategy:state.strategy,direction:state.direction,numberEncoding:state.numberEncoding,numberFormats:state.numberFormats,inputFormatDraft:formatEditor.capture(),guideExample:guide.capture(),decimalPlaces:state.decimalPlaces,...(palette===Palette.defaults?{}:{palette}),scale:state.scale,autoFit:state.autoFit,panX:labPan?.x??$('diagram-viewport').scrollLeft,panY:labPan?.y??$('diagram-viewport').scrollTop,historyOpen:$('history-details').open,helpOpen:!$('help-panel').hidden,hintOpen:!$('hint').hidden},
       selection:{start:input.selectionStart,end:input.selectionEnd},error:$('error-message').hidden?'':$('error-message').textContent};
   }
   function applySnapshot(s) {
@@ -66,6 +67,7 @@
     revealAnswer(false);
     state.original=s.session.original;state.term=s.term;state.history=s.trace??Trace.create(s.session.original);state.dirty=s.session.dirty;state.halt=s.session.halt;
     state.scale=s.view.scale;state.autoFit=s.view.autoFit;state.speed=s.view.speed;state.strategy=s.view.strategy??'normal';state.direction=s.view.direction??'left';renderSpeed();
+    labPan=s.mode==='guide'?{x:s.view.panX,y:s.view.panY}:null;
     state.numberEncoding=s.view.numberEncoding??'church';state.numberFormats=s.view.numberFormats??{};state.decimalPlaces=s.view.decimalPlaces??6;
     state.encodings=s.session.encodings??null;dataEditor.restore(s);formatEditor.restore(s.view.inputFormatDraft);
     guide.restore(s.view.guideExample);
@@ -134,6 +136,7 @@
     }
   }
   function renderDiagram(redex, duration, undone) {
+    if(state.mode==='guide')return;
     const mount=$('diagram-mount');
     const route=state.dirty?null:redex?.path??null;
     diagramView.setEnabled(!state.dirty);
@@ -145,7 +148,7 @@
       ?state.history.peek(historyIndex).change:null;
     diagramHistory=state.history;diagramHistoryIndex=historyIndex;
     if(!change&&state.term&&diagramTerm===state.term&&diagramPalette===palette&&(route===diagramRoute||(route&&diagramRoute&&route.length===diagramRoute.length&&route.every((part,i)=>part===diagramRoute[i])))){
-      applyScale();return;
+      applyScale();restoreLabPan();return;
     }
     diagramTerm=state.term;diagramRoute=route;diagramPalette=palette;
     const anchor=state.autoFit?null:viewer?.anchor();
@@ -157,9 +160,14 @@
     applyScale();
     viewer?.restore(anchor);
     diagramView.transitionFrom(previous,duration,change,reverse);
+    restoreLabPan();
+  }
+  function restoreLabPan(){
+    if(!labPan)return;
+    $('diagram-viewport').scrollLeft=labPan.x;$('diagram-viewport').scrollTop=labPan.y;labPan=null;
   }
   function applyScale() {
-    if(!state.model) return;
+    if(!state.model||state.mode==='guide') return;
     const viewport=$('diagram-viewport'),m=state.model;
     if(state.autoFit) state.scale=Math.min(2.2,(viewport.clientWidth-48)/m.width,(viewport.clientHeight-48)/m.height);
     state.scale=Math.max(.02,Math.min(16,state.scale));
@@ -403,7 +411,8 @@
       // The preview is only a hint: confirm with an actual attempt before stopping.
       if(state.running&&!C.hasRedex(state.term)&&C.step(state.term,state.strategy,state.direction)===null)stop();
       else if(repeatedTerm?.(state.term,result)){
-        stop();state.halt='检测到重复归约循环，自动运行已停止。可以回退、单步或调整归约顺序。';
+        const growth=repeatedTerm.reason==='growth';
+        stop();state.halt=growth?'检测到递归展开无限增长，自动运行已停止。可以回退、单步或调整归约顺序。':'检测到重复归约循环，自动运行已停止。可以回退、单步或调整归约顺序。';
       }
       if(display)render(180); return true;
     } catch(e) {stop();state.halt=e.message;if(display)render();return false;}
@@ -479,6 +488,14 @@
     $('progress-text').textContent=state.mode==='challenge'?`${state.completed.size} / ${P.levels.length} 关已完成`:state.mode==='guide'?`${P.examples.length} 个示例原理`:'探索 · 输入 · 归约';
   }
   function renderMode() {
+    const reading=state.mode==='guide';
+    if(reading&&!$('lab-screen').hidden){
+      viewer?.cancelZoom();diagramView.cancelTransition();
+      labPan??={x:$('diagram-viewport').scrollLeft,y:$('diagram-viewport').scrollTop};
+    }
+    $('lab-screen').hidden=reading;document.querySelector('.save-bar').hidden=reading;
+    document.querySelector('.intro').hidden=reading;
+    document.body.classList.toggle('guide-reading',reading);
     const challenge=state.mode==='challenge';$('challenge-panel').hidden=!challenge;
     $('guide-panel').hidden=state.mode!=='guide';
     for(const [id,mode] of [['mode-free','free'],['mode-challenge','challenge'],['mode-guide','guide']]){
@@ -623,9 +640,10 @@
   $('mode-free').addEventListener('click',()=>{stop();state.mode='free';renderMode();render();save();});
   $('mode-challenge').addEventListener('click',()=>selectLevel(state.level));
   $('mode-guide').addEventListener('click',()=>{
-    stop();cancelRewind();cancelConversion();if(valueJob)clearValue();
+    stop();cancelRewind();cancelConversion();historyJob?.abort();if(valueJob)clearValue();
     state.mode='guide';renderMode();render();save();
   });
+  $('guide-back').addEventListener('click',()=>{state.mode='free';renderMode();render();save();$('mode-guide').focus();});
   $('stage-select').addEventListener('change',()=>{
     const stage=P.stages.find(s=>String(s.id)===$('stage-select').value);
     selectLevel(P.levels.findIndex(l=>l.id===stage.levelIds[0]));
@@ -653,9 +671,9 @@
     compileSource:async(source,signal)=>{const compiled=await E.compile(source,dataEditor.entries(),state.numberEncoding,{signal,numberFormats:state.numberFormats});dataEditor.remember(compiled.mappings);return compiled;},
     currentExpression:()=>state.term&&!state.dirty?C.format(state.term):input.value,
     insertFunction:name=>{const start=input.selectionStart,end=input.selectionEnd;
-      const before=start&&/[A-Za-z0-9_']/.test(input.value[start-1])?' ':'';
-      const after=end<input.value.length&&/[A-Za-z0-9_']/.test(input.value[end])?' ':'';
-      insert(before+name+after);
+      const before=start&&!/[\sλ\\.(\[]/.test(input.value[start-1])?' ':'';
+      const after=end<input.value.length&&!/[\s.)\],]/.test(input.value[end])?' ':'';
+      insert(before+C.formatName(name)+after);
     }});
   workspace.restoreInitial().then(restored=>{
     if(!restored){renderMode();convert();workspace.persist();}

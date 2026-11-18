@@ -51,6 +51,21 @@
 #restore-progress::backdrop{background:#18223855}
 #restore-progress p{margin:0 0 12px}
 .guide-panel{padding:22px 24px;margin-bottom:22px;min-width:0}
+.guide-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;border-bottom:1px solid var(--border);padding-bottom:14px;margin-bottom:20px}
+.guide-reading #help-panel,.guide-reading .top-right{display:none}
+.guide-heading h1{font-size:25px;line-height:1.4;margin:0 0 6px;color:#244f38}
+.guide-heading p{margin:0}
+.guide-toc{display:flex;flex-wrap:wrap;gap:8px 18px;padding:12px 0;border-block:1px solid var(--border);margin:20px 0}
+.guide-toc a{color:#356d50;font-size:12px;text-underline-offset:4px}
+.guide-panel article>section{scroll-margin-top:18px}
+.guide-panel article p{font-size:14px;line-height:2}
+.guide-panel h4{font-size:14px;color:#31583f;margin:16px 0 6px}
+.guide-panel ol{padding-left:25px}
+.guide-panel li{padding-left:5px;margin:16px 0}
+.guide-panel dl>div{border-top:1px solid #e3e9df;padding:5px 0}
+.guide-panel dl summary{font-family:var(--mono)}
+.guide-panel dl pre{max-height:180px}
+@media(max-width:640px){.guide-heading{flex-direction:column;gap:10px}.guide-heading h1{font-size:22px}.guide-panel article p{font-size:13px}}
 .guide-controls{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:12px}
 .guide-controls label,.guide-picker{display:flex;align-items:center;gap:9px;font-size:12px;color:#526c5d;min-width:0}
 .guide-controls input{min-width:0;max-width:100%;padding:7px 9px;border:1px solid #dfe4dd;border-radius:5px;background:#fafbf8;color:#354e40}
@@ -103,13 +118,14 @@
       <p id="challenge-feedback" class="challenge-feedback" role="status"></p>
     </section>
     <section id="guide-panel" class="card guide-panel" aria-label="示例原理讲解" hidden>
+      <div class="guide-heading"><div><h1>原理讲解</h1><p>从数据编码、变量绑定到完整算法，逐层读懂每个示例。</p></div><button id="guide-back" class="button" type="button">返回实验画面</button></div>
       <div class="guide-controls"><label>分类<select id="guide-category"><option value="">全部分类</option></select></label><label>查找示例<input id="guide-search" type="search" placeholder="例如 前驱、积分、sin"></label></div>
       <label class="guide-picker">选择示例<select id="guide-example"></select></label>
       <p id="guide-count" class="syntax-note" role="status"></p>
-      <article id="guide-article"><h2 id="guide-title"></h2><p id="guide-purpose"></p><p id="guide-encoding"></p><h3>关键表达式</h3><pre><code id="guide-core"></code></pre><h3>计算原理</h3><div id="guide-principle"></div><h3>计算过程</h3><pre><code id="guide-walkthrough"></code></pre><p id="guide-parameters"></p><details><summary>完整可运行表达式</summary><pre><code id="guide-expression"></code></pre></details></article>
+      <article id="guide-article"><h2 id="guide-title"></h2><p id="guide-purpose"></p><nav class="guide-toc" aria-label="本篇目录"><a href="#guide-basics-section">先备知识</a><a href="#guide-core-section">表达式拆解</a><a href="#guide-principle-section">计算原理</a><a href="#guide-steps-section">逐步过程</a><a href="#guide-boundaries-section">结果与边界</a><a href="#guide-source-section">完整表达式</a></nav><section id="guide-basics-section"><h3>先备知识与数据编码</h3><p id="guide-encoding"></p><div id="guide-basics"></div><pre><code id="guide-foundation"></code></pre></section><section id="guide-core-section"><h3>关键表达式与辅助函数</h3><pre><code id="guide-core"></code></pre><dl id="guide-symbols"></dl><p id="guide-parameters"></p></section><section id="guide-principle-section"><h3>计算原理</h3><div id="guide-principle"></div></section><section id="guide-steps-section"><h3>逐步计算过程</h3><pre><code id="guide-walkthrough"></code></pre><ol id="guide-steps"></ol></section><section id="guide-boundaries-section"><h3>结果与边界情况</h3><div id="guide-boundaries"></div><h3>动手验证</h3><p id="guide-exercise"></p></section><section id="guide-source-section"><h3>完整可运行表达式</h3><p>以下内容与示例载入的表达式一致，包含辅助函数的 λ 定义。可以滚动查看或载入实验画面运行。</p><pre><code id="guide-expression"></code></pre></section></article>
       <div class="guide-actions"><button id="guide-previous" class="button" type="button">上一个示例</button><button id="guide-next" class="button" type="button">下一个示例</button><button id="guide-load" class="button primary" type="button">载入自由实验</button></div>
     </section>
-    <div class="workspace">
+    <div id="lab-screen" class="workspace">
       <aside class="editor-column">
         <section class="card editor-card">
           <div class="section-heading"><div><span class="section-number">01</span><h2>写下表达式</h2></div><span class="mini-label">INPUT</span></div>
@@ -136,9 +152,9 @@
         </section>
         <section class="card function-card">
           <div class="section-heading"><div><span class="section-number">ƒ</span><h2>自定义函数</h2></div><span id="function-count" class="mini-label">0 个函数</span></div>
-          <p class="function-note">保存后按名称调用，如 <code>ID (λy.y)</code>。</p>
+          <p class="function-note">保存后按名称调用，如 <code>ID (λy.y)</code>。名称可以用中文、数字开头或符号，如 <code>1号函数</code>、<code>_加法</code>、<code>+</code>；纯数字名称用反引号调用，如 <code>`123`</code>。</p>
           <p id="function-edit-status" class="function-note" role="status" hidden></p>
-          <form id="function-form"><label for="function-name">函数名称</label><input id="function-name" placeholder="例如 ID、ADD、SUCC" maxlength="32" autocomplete="off" spellcheck="false"><label for="function-source">函数定义</label><textarea id="function-source" placeholder="例如 λx.x" spellcheck="false" autocapitalize="off" aria-describedby="function-error"></textarea><div id="function-keys" class="function-keys" role="group" aria-label="函数定义快捷输入"><button type="button" data-function-insert="λ" aria-label="函数定义插入 λ">λ</button></div><p id="function-error" class="error-message" role="alert" hidden></p><div class="function-actions"><button id="function-use-current" type="button" class="button">使用当前式</button><button id="function-add" type="submit" class="button primary">新增函数 +</button></div></form>
+          <form id="function-form"><label for="function-name">函数名称</label><input id="function-name" placeholder="例如 ID、ADD、SUCC" autocomplete="off" spellcheck="false"><label for="function-source">函数定义</label><textarea id="function-source" placeholder="例如 λx.x" spellcheck="false" autocapitalize="off" aria-describedby="function-error"></textarea><div id="function-keys" class="function-keys" role="group" aria-label="函数定义快捷输入"><button type="button" data-function-insert="λ" aria-label="函数定义插入 λ">λ</button></div><p id="function-error" class="error-message" role="alert" hidden></p><div class="function-actions"><button id="function-use-current" type="button" class="button">使用当前式</button><button id="function-add" type="submit" class="button primary">新增函数 +</button></div></form>
           <div id="function-list" class="function-list"></div><p class="function-foot">定义在保存时展开。删除函数后，已转换的图示仍可运行；再次转换会使用最新函数库。</p>
         </section>
         <section class="card rules-card"><div class="section-heading"><div><span class="section-number">λ</span><h2>读懂线路</h2></div></div><div class="rule"><span class="legend-line lambda-line"></span><p><strong>抽象</strong><span>一条横线，绑定一个变量。</span></p></div><div class="rule"><span class="legend-line var-line"></span><p><strong>变量</strong><span>竖线连接到它所属的 λ。</span></p></div><div class="rule"><span class="legend-line app-line"></span><p><strong>应用</strong><span>横线连接函数与参数。</span></p></div><p class="rules-foot">颜色辅助追踪绑定；连线结构决定含义。</p></section>
@@ -186,6 +202,9 @@
   const V = name => Object.freeze({ type: 'var', name });
   const L = (param, body) => Object.freeze({ type: 'abs', param, body });
   const A = (fn, arg) => Object.freeze({ type: 'app', fn, arg });
+  const namePattern = /^[^\sλ\\().\[\],`]+/u;
+  const validName = name => typeof name === 'string' && !!name && namePattern.exec(name)?.[0] === name;
+  const formatName = name => /^-?[0-9]/.test(name) ? '`'+name+'`' : name;
   function churchList(items) {
     const free=new Set();
     for(const item of items)for(const name of freeVars(item))free.add(name);
@@ -222,12 +241,21 @@
     for (let i = 0; i < source.length;) {
       if (/\s/.test(source[i])) { i++; continue; }
       const start = i, c = source[i];
+      if(c==='`'){
+        const end=source.indexOf('`',i+1),name=end<0?'':source.slice(i+1,end);
+        if(!validName(name))throw new LambdaError('反引号内需要一个名称，不能含空白或 λ、点、括号等语法符号。',i);
+        out.push({kind:'name',value:name,pos:i});i=end+1;continue;
+      }
       const custom=literalMatcher?.(source,i);
       if(custom){
         const raw=source.slice(i,i+custom.length);
-        out.push(/^[A-Za-z][A-Za-z0-9_']*$/.test(raw)?{kind:'name',value:raw,literal:custom,pos:i}:{kind:'number',value:custom.value,suffix:custom.encoding,pos:i});i+=custom.length;continue;
+        out.push(validName(raw)&&!/^[-0-9]/.test(raw)?{kind:'name',value:raw,literal:custom,pos:i}:{kind:'number',value:custom.value,suffix:custom.encoding,pos:i});i+=custom.length;continue;
       }
       if ('λ\\.()[],'.includes(c)) { out.push({ kind: c === '\\' ? 'λ' : c, pos: i++ }); continue; }
+      const word=namePattern.exec(source.slice(i));
+      if(word&&!/^-?[0-9]+(?:_.*)?$/.test(word[0])){
+        out.push({kind:'name',value:word[0],pos:i});i+=word[0].length;continue;
+      }
       if(!decimal && c==='-' && /[0-9]/.test(source[i+1]||'')) throw new LambdaError('丘奇数只支持非负整数，不能输入负数。',i);
       const numeric=(decimal?/^-?[0-9]+(?:\.[0-9]+)?/:/^[0-9]+/).exec(source.slice(i));
       if(numeric) {
@@ -236,15 +264,15 @@
         if(!decimal && !Number.isSafeInteger(value)) throw new LambdaError('数字超出可精确表示的整数范围。',i);
         i+=numeric[0].length;let suffix=null;
         if(suffixes&&source[i]==='_'){
-          const match=/^[\p{L}][\p{L}\p{N}_']*/u.exec(source.slice(i+1));
+          const match=namePattern.exec(source.slice(i+1));
           if(!match)throw new LambdaError('下划线后需要数据编码名称，例如 3_MyData。',i);
           suffix=match[0];i+=1+suffix.length;
         }
         out.push({kind:'number',value:decimal?numeric[0]:value,suffix,pos:start});continue;
       }
-      const m = /^[a-zA-Z][a-zA-Z0-9_']*/.exec(source.slice(i));
+      const m = namePattern.exec(source.slice(i));
       if (m) { out.push({ kind: 'name', value: m[0], pos: start }); i += m[0].length; continue; }
-      throw new LambdaError(`无法识别「${c}」，变量请用英文字母开头。`, i);
+      throw new LambdaError(`无法识别「${c}」。名称不能使用空白或 λ、点、括号等语法符号。`, i);
     }
     out.push({ kind: 'end', pos: source.length }); return out;
   }
@@ -309,8 +337,8 @@
       while(stack.length){const entry=stack.pop();if(typeof entry==='string'){parts.push(entry);continue;}
         const [node,ctx]=entry,brackets=node.type==='abs'?ctx>0:node.type==='app'&&ctx>1;
         if(brackets){parts.push('(');stack.push(')');}
-        if(node.type==='var')parts.push(node.name);
-        else if(node.type==='abs'){parts.push(`λ${node.param}.`);stack.push([node.body,0]);}
+        if(node.type==='var')parts.push(formatName(node.name));
+        else if(node.type==='abs'){parts.push(`λ${formatName(node.param)}.`);stack.push([node.body,0]);}
         else stack.push([node.arg,2],' ',[node.fn,1]);
       }
       text=parts.join('');if(text.length<=512&&analyze(t).stable)formatted.set(t,text);
@@ -406,18 +434,40 @@
       const a=analyze(left),b=analyze(right);
       return a.nodes<=8192&&a.nodes===b.nodes&&a.depth===b.depth&&equal(left,right);
     };
-    return (term,change)=>{
+    function grows(before,replacement,path){
+      const size=analyze(before).nodes,stack=[replacement];
+      const underBinders=!path.includes('fn'),free=underBinders?freeVars(before):null;
+      while(stack.length){
+        const node=stack.pop();if(analyze(node).nodes<size)continue;
+        if(same(before,node))return true;
+        if(node.type==='abs'){
+          // A returned lambda may erase its body when applied by an outer
+          // application. Descend only when it is itself being normalized.
+          if(underBinders&&!free.has(node.param))stack.push(node.body);
+          continue;
+        }
+        if(node.type!=='app')continue;
+        // A repeated computation in function position must be evaluated again.
+        // Arguments are demanded for a normal form only under a neutral head.
+        stack.push(node.fn);let head=node.fn;
+        while(head.type==='app')head=head.fn;
+        if(head.type==='var')stack.push(node.arg);
+      }
+      return false;
+    }
+    const check=(term,change)=>{
+      check.reason='';
       if(change){
         const {before,replacement}=change;
-        if(same(before,replacement))return true;
-        // A neutral head leaves the same reducible application in its argument.
-        if(replacement.type==='app'&&replacement.fn.type==='var'&&same(before,replacement.arg))return true;
+        if(same(before,replacement)){check.reason='cycle';return true;}
+        if(grows(before,replacement,change.path)){check.reason='growth';return true;}
       }
       length++;
-      if(same(checkpoint,term))return true;
+      if(same(checkpoint,term)){check.reason='cycle';return true;}
       if(length===power){checkpoint=term;power*=2;length=0;}
       return false;
     };
+    return check;
   }
   const STRATEGIES=Object.freeze(['normal','applicative']);
   const DIRECTIONS=Object.freeze(['left','right']);
@@ -488,7 +538,7 @@
     return body.type === 'var' && body.name === x ? n : null;
   }
   function parseInput(source,maxChars=LIMITS.chars){if(!root.LambdaDecimal)throw new LambdaError('列表小数模块尚未加载。');return parse(source,maxChars,root.LambdaDecimal.encodeLiteral);}
-  const API = { LIMITS, STRATEGIES, DIRECTIONS, LambdaError, V, L, A, churchList, parse, parseInput, format, inspect, freeVars, substitute, alphaKey, key, equal, hasRedex, findRedex, step, stepAt, normalize, churchNumber, cycleCheck };
+  const API = { LIMITS, STRATEGIES, DIRECTIONS, LambdaError, validName, formatName, V, L, A, churchList, parse, parseInput, format, inspect, freeVars, substitute, alphaKey, key, equal, hasRedex, findRedex, step, stepAt, normalize, churchNumber, cycleCheck };
   root.LambdaCore = API;
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
 })(typeof globalThis !== 'undefined' ? globalThis : window);
@@ -564,7 +614,17 @@
   function normalize(term,{signal,onProgress}={}){
     const stack=[{kind:'quote'}],names=C.freeVars(term),normalForms=new WeakMap();
     let job={term,environment:null},value,nextName=0,steps=0;
-    let lastCall=null;
+    // Track unfinished demands, including calls whose result is still being
+    // normalized under a neutral head or lambda. Repeating one is productive
+    // growth as well as a possible black hole; neither has a finite normal form.
+    const activeCalls=new WeakMap();
+    function enter(call){
+      let argumentsFor=activeCalls.get(call.closure);
+      if(!argumentsFor){argumentsFor=new WeakSet();activeCalls.set(call.closure,argumentsFor);}
+      if(argumentsFor.has(call.argument))throw new C.LambdaError('检测到重复求值循环或递归展开无限增长，求值已停止。');
+      argumentsFor.add(call.argument);
+    }
+    function leave(call){activeCalls.get(call.closure).delete(call.argument);}
     function fresh(){
       let name;
       do{name='v'+nextName++;}while(names.has(name));
@@ -604,20 +664,27 @@
       switch(frame.kind){
         case 'remember':frame.source.value=value;frame.source.term=null;frame.source.environment=null;break;
         case 'apply':
+          // Provenance belongs to normalization of the result, not to a later
+          // application of a returned function (which may discard its body).
+          while(value.origin)value=value.target;
           if(value.term){
-            const continuation=stack.at(-1);
-            if(lastCall?.closure===value&&lastCall.argument===frame.argument&&lastCall.continuation===continuation)
-              throw new C.LambdaError('检测到重复求值循环，求值已停止。');
-            lastCall={closure:value,argument:frame.argument,continuation};
+            const call={closure:value,argument:frame.argument};enter(call);
+            stack.push({kind:'finishCall',call});
             steps++;
-            // A tail call proceeds directly, without retaining a thunk for its result.
             job={term:value.term.body,environment:{name:value.term.param,argument:frame.argument,parent:value.environment}};
           }else deliver({fn:value,arg:frame.argument});
           break;
+        case 'finishCall':
+          leave(frame.call);deliver({origin:frame.call,target:value});break;
+        case 'leaveOrigin':leave(frame.call);break;
         case 'quote': {
           const normal=normalForms.get(value);
           if(normal){deliver(normal);break;}
           stack.push({kind:'rememberForm',source:value});
+          if(value.origin){
+            enter(value.origin);stack.push({kind:'leaveOrigin',call:value.origin},{kind:'quote'});
+            deliver(value.target);break;
+          }
           if(value.term){
             const name=fresh(),argument={value:{name}};
             stack.push({kind:'abstract',name},{kind:'quote'});
@@ -723,8 +790,11 @@
     return params.reduceRight((term,param)=>L(param,term),body);
   }
   function encodeName(name){
-    const body=[...name].reduceRight((tail,character)=>
-      A(A(V('c'),numeral(alphabet.indexOf(character))),tail),V('n'));
+    const codes=[...name].every(character=>alphabet.includes(character))
+      ?[...name].map(character=>alphabet.indexOf(character))
+      :[alphabet.length,...new TextEncoder().encode(name)];
+    const body=codes.reduceRight((tail,code)=>
+      A(A(V('c'),numeral(code)),tail),V('n'));
     return L('c',L('n',body));
   }
   function quote(term){
@@ -774,13 +844,17 @@
   function readName(term){
     if(term.type!=='abs'||term.body.type!=='abs'||term.param===term.body.param)return null;
     const cons=term.param,nil=term.body.param;
-    let name='',body=term.body.body;
+    const codes=[];let body=term.body.body;
     while(body.type==='app'&&body.fn.type==='app'&&body.fn.fn.type==='var'&&body.fn.fn.name===cons){
       const code=C.churchNumber(body.fn.arg);
-      if(code===null||code>=alphabet.length)return null;
-      name+=alphabet[code];body=body.arg;
+      if(code===null||code>255)return null;
+      codes.push(code);body=body.arg;
     }
-    return body.type==='var'&&body.name===nil&&/^[A-Za-z][A-Za-z0-9_']*$/.test(name)?name:null;
+    if(body.type!=='var'||body.name!==nil)return null;
+    let name;
+    if(codes[0]===alphabet.length){try{name=new TextDecoder('utf-8',{fatal:true}).decode(Uint8Array.from(codes.slice(1)));}catch{return null;}}
+    else {if(codes.some(code=>code>=alphabet.length))return null;name=codes.map(code=>alphabet[code]).join('');}
+    return C.validName(name)?name:null;
   }
   function readTerm(term){
     if(term.type!=='abs')return null;
@@ -1019,7 +1093,7 @@
   const isBuiltin=name=>builtinKeys.includes(name);
   const builtins=new Map(Object.entries(builtinLabels).flatMap(([key,label])=>[[key,key],[label,key]]));
   const literalCache=new WeakMap();
-  const validStoredName=name=>typeof name==='string'&&/^[\p{L}][\p{L}\p{N}_']*$/u.test(name)&&!['church','丘奇数','decimal','列表小数'].includes(name);
+  const validStoredName=name=>C.validName(name)&&!['church','丘奇数','decimal','列表小数'].includes(name);
   const validName=name=>validStoredName(name)&&!builtins.has(name);
   function validateTemplate(template){
     if(typeof template!=='string'||template.split('{n}').length!==2)throw new C.LambdaError('输入形式需要且只能包含一个 {n}，例如 C{n}、{n}c 或 [{n}]。');
@@ -1064,7 +1138,7 @@
     if(!Array.isArray(entries))throw new C.LambdaError('自定义数据编码列表不合法。');
     const names=new Set();
     for(const entry of entries){
-      if(!entry||!validStoredName(entry.name)||names.has(entry.name))throw new C.LambdaError('编码名称重复或不合法；请以字母或汉字开头，内置编码名称不能占用。');
+      if(!entry||!validStoredName(entry.name)||names.has(entry.name))throw new C.LambdaError('编码名称重复或含语法符号；名称不能为空，内置编码名称不能占用。');
       if(typeof entry.source!=='string'||!entry.term)throw new C.LambdaError('数据转换函数缺失。');
       C.inspect(entry.term);if(C.freeVars(entry.term).size)throw new C.LambdaError('数据转换函数不能含未定义的自由变量。');
       if(entry.table!==undefined&&!Array.isArray(entry.table))throw new C.LambdaError('数字表达式对照表不合法。');
@@ -1080,7 +1154,7 @@
   }
   function define(entries,name,source,expand=term=>term,editing=null,numberFormats={}){
     validate(entries);name=name.trim();
-    if(name===editing?!validStoredName(name):!validName(name))throw new C.LambdaError('编码名称需以字母或汉字开头，可含数字、下划线和单引号；不能使用内置编码名称。');
+    if(name===editing?!validStoredName(name):!validName(name))throw new C.LambdaError('编码名称不能为空，也不能含空白或 λ、点、括号等语法符号；不能使用内置编码名称。');
     if(editing!==null&&!entries.some(entry=>entry.name===editing))throw new C.LambdaError('要编辑的数据编码已不存在。');
     if(entries.some(entry=>entry.name===name&&entry.name!==editing))throw new C.LambdaError(`编码「${name}」已存在，请选择它进行编辑。`);
     // Converter definitions always receive Church numbers; they do not recursively encode themselves.
@@ -1154,7 +1228,8 @@
     return {...parsed,term:rebuilt.get(parsed.term),mappings};
   }
   function isLiteral(source,entries=[],numberFormats={}){
-    source=source.trim();if(/^-?[0-9]+(?:\.[0-9]+)?(?:_[\p{L}][\p{L}\p{N}_']*)?$/u.test(source))return true;
+    source=source.trim();const numeric=/^-?[0-9]+(?:\.[0-9]+)?(?:_(.*))?$/u.exec(source);
+    if(numeric&&(numeric[1]===undefined||C.validName(numeric[1])))return true;
     try{const match=literalMatcher(entries,numberFormats)(source,0);return !!match&&match.length===source.length;}catch{return false;}
   }
   const TRUE=C.parse('λx y.x'),FALSE=C.parse('λx y.y'),integerTag=C.parse('λa b c d.d');
@@ -1945,7 +2020,142 @@
 </script><script>
 (function(root){
   'use strict';
+  const C=root.LambdaCore||require('./core.js'),D=root.LambdaDecimal||require('./decimal.js');
+  const names={ADD:'小数加法',SUB:'小数减法',MUL:'小数乘法',DIV:'小数除法',NEG:'取负',ABS:'绝对值',POW:'自然数次幂',SHL:'左移一位',SHR:'右移一位',SQRT:'平方根',SIN:'正弦',COS:'余弦',TAN:'正切',SINH:'双曲正弦',COSH:'双曲余弦',TANH:'双曲正切'};
+  const meanings={
+    t:'真。接收两个候选值并选择第一个。',f:'假。接收两个候选值并选择第二个。',i:'恒等函数。原样返回收到的参数，也作为小数记录的类型标记。',
+    not:'布尔取反。把真假选择器收到的两个分支交换。',and:'逻辑与。第一个条件为真时取第二个条件，否则返回假。',or:'逻辑或。第一个条件为真时返回真，否则取第二个条件。',xor:'异或。两个符号不同时返回真，用来决定乘除法的负号。',
+    pair:'有序对。保存两个值，等待选择器取出其中一个。',fst:'向有序对传入真，取出第一项。',snd:'向有序对传入假，取出第二项。',
+    nil:'空数位表。选择列表的结束分支。',cons:'数位表节点。把首位和剩余表一起传给非空分支。',head:'选择数位表首位，空表返回数位零。',tail:'选择数位表的剩余部分，空表返回空表。',empty:'判断数位表是否为空。非空分支返回假，结束分支返回真。',
+    add:'丘奇自然数加法。把两段函数迭代串联。',mul:'丘奇自然数乘法。重复调用另一段迭代。',succ:'丘奇后继。增加一次函数作用。',pred:'丘奇前驱。用延迟状态略去第一次函数作用，零的前驱仍为零。',sub:'对第一个自然数重复取前驱，次数由第二个自然数决定。',zero:'自然数零判断。零次迭代保留真，正次数迭代返回假。',lt:'自然数严格小于。检查第二个数减第一个数是否为正。',eq:'自然数相等。检查两个方向的截断减法是否都为零。',
+    y:'不动点组合子。把函数自身传回递归体，提供递归调用。',trim:'删除数位表最高端的多余零。非零数字保持原次序。',reverse:'用累积表反转数位顺序，供从高位开始的长除法使用。',pad:'在低位端添加指定数量的零，相当于把数位整数乘以十的幂。',cmp:'比较两个低位在前的数位表。从更高位的比较结果决定大小，相同时才比较当前位。相等返回零，小于返回一，大于返回二。',
+    plus:'带进位的逐位加法。计算当前两位与进位之和，达到十时减十并向下一位传一。',minus:'带借位的逐位减法。当前位不足时先加十，再向下一位借一。',table:'保存零到九的标准丘奇数位。',forceDigit:'把计算得到的数位取回零到九的标准表示，减少悬挂计算。',forceList:'逐位整理数位表后再交给后续函数。',split:'把一个自然数按十拆成商和余数，分别作为进位和当前数位。',timesdigit:'数位整数乘以一个数位。每位乘积加旧进位后，再按十拆分。',times:'逐位竖式乘法。计算部分乘积、按位补零，再累加。',
+    divstep:'对一个部分余数重复减去除数，返回当前商位和新余数。',longdiv:'从高位到低位带入被除数的各位，每次调用部分除法，累计商和余数。',
+    sign:'从小数记录取出符号。真表示负，假表示非负。',digits:'从小数记录取出低位在前的十进制数位表。',scale:'从小数记录取出小数位数。它是一个丘奇自然数。',approx:'从小数记录取出近似标记。真表示结果经过截断或近似。',
+    make:'构造小数记录。整理数位表，并把零的符号规范为非负，然后封装标记、符号、数位、位数和近似标记。',compose:'函数复合。先执行右侧函数，再把结果交给左侧函数。',maxScale:'选择两个输入中较大的小数位数。',alignAt:'把两个数位整数补零到指定小数位数，再交给后续函数。',align:'先决定公共小数位数，再执行补零对齐。',negate:'取出小数的五个字段，翻转符号，再调用小数构造函数。',sumAligned:'处理对齐后的带符号相加。同号做加法，异号先比较绝对值再相减。',
+    dadd:'组合对齐、符号判断和逐位加减，得到带符号小数和。',dsub:'翻转第二个数的符号，再调用小数加法。',dmul:'数位整数做竖式乘法，小数位数相加，符号做异或。',ddiv:'检查除数、对齐输入、生成指定数量的小数位，再用长除法构造商。',error:'构造除数为零的错误记录。',dneg:'使用取负函数。',
+    one:'列表小数编码的常数一。',half:'列表小数编码的常数二分之一。',cut:'按指定工作位数截断小数，丢弃低端的多余数位。',forceNat:'把自然数计算结果整理成标准迭代表示。',force:'依次整理小数的符号、数位、位数和近似标记。',dshl:'把数位表加上自身，小数位数保持不变，得到两倍。',dshr:'数位整数乘五，小数位数加一，得到精确的一半。',work:'整理中间小数，并截断到四位工作精度。',estimate:'把结果截断到三位小数并设置近似标记。',powerBy:'保存累计乘积，按自然数指数逐次乘入底数。',dpow:'把累计乘积初始化为一，交给重复乘法。',dabs:'把符号设为非负，并重新构造小数。',domain:'构造实数平方根定义域错误。',rangeError:'构造双曲示例输入范围错误。',angleError:'构造角度输入范围错误。',nonnegativeLess:'对齐两个非负小数的数位，再比较它们的大小。',
+    dsqrt:'牛顿迭代。把当前估计与原数除以当前估计求平均；估计不再下降时结束。',sinSeries:'使用带有限小数系数的正弦奇次多项式。',cosSeries:'使用带有限小数系数的余弦偶次多项式。',sinhSeries:'使用系数为正的双曲正弦奇次多项式。',coshSeries:'使用系数为正的双曲余弦偶次多项式。',withinRange:'先检查输入绝对值是否超过一，再执行双曲函数。',pi:'有限小数常数 π，取 3.14159265。',halfPi:'有限小数常数 π/2。',quarterPi:'有限小数常数 π/4。',period:'有限小数常数 2π，用作角度周期。',smallSin:'把小区间的正弦计算交给正弦或余弦多项式。',halfWave:'利用半波对称性把角度折回更小区间。',fullWave:'根据角度位于哪个半周期决定符号。',sinAngle:'利用符号、周期和对称性处理角度。',cosAngle:'给角度加上 π/2，再调用正弦角度计算。',withinAngle:'先检查输入绝对值是否超过一千弧度，再计算三角函数。',dsin:'检查角度、计算正弦并标记三位小数近似。',dcos:'检查角度、计算余弦并标记近似。',dtan:'用正弦除以余弦，检查截断后的分母是否为零。',dsinh:'检查范围，再用双曲正弦多项式计算近似。',dcosh:'检查范围，再用双曲余弦多项式计算近似。',dtanh:'计算双曲正弦与双曲余弦的商。'
+  };
+  const syntax=[
+    'λx.body 表示一个接收参数 x 的函数，点后面是函数体。λx y.body 是 λx.λy.body 的简写。函数名和变量名只用于指出绑定关系。',
+    'f a b 按 (f a) b 读取。归约 (λx.body) argument 时，要替换 body 中由这个 λx 绑定的 x。进入新的同名 λx 后，原绑定不再负责其中的变量。',
+    '箭头 → 表示一次或一段归约。下面的数值和辅助函数名方便跟踪状态，辅助函数的实际定义可逐项展开，最下方给出完整可运行程序。'
+  ];
+  const commonSteps=[
+    ['确认输入的表示','先确定输入是丘奇数、布尔、有序对还是列表。它们都以函数表示，传入的选择器或组合函数决定如何读取数据。'],
+    ['找到最外层可以应用的 λ','沿着关键表达式识别函数及其实际参数。参数进入函数体后，继续检查函数体和内部应用。'],
+    ['跟踪每次替换后的状态','对照上面的计算过程，观察返回值、累计值或分支选择在哪一步改变。绑定变量改名时，所指向的参数关系保持一致。'],
+    ['检查返回结构','最后根据当前编码读取结果。一个 λ 函数体里仍含可归约项时，程序会继续处理内部，整个表达式都不能再归约时才到达正规形。']
+  ];
+  const arithmeticSteps={
+    '恒等函数 I':[['对应形参和实参','在 (λx.x) y 中，左边函数绑定变量 x，右边实参为自由变量 y。','形参 x ↦ 实参 y'],['替换函数体','函数体就是 x，它由当前的 λx 绑定，所以这一处换成 y。','(λx.x) y → y'],['检查终止','剩下的 y 是一个自由变量，没有函数应用可以继续归约。']],
+    '前驱 · 3 − 1 → 2':[['命名内部更新函数','用 A 表示更新函数，Z 表示忽略第一次 f 的初始函数。','A = λg h.h (g f)\nZ = λu.x\nI = λu.u'],['第一次更新','把 Z 代入 A 的参数 g。Z f 返回初值 x，所以这轮还没有产生 f 的作用。','A Z → λh.h (Z f) → λh.h x'],['第二次更新','新的状态接收 f 后才会形成一次真正的函数应用。','A (A Z) → λh.h ((A Z) f)\n→ λh.h (f x)'],['第三次更新','再次把 f 传给上轮状态，函数应用增加到两次。','A (A (A Z)) → λh.h (f (f x))'],['取出结果','丘奇 3 已重复更新三次。最后传入 I，返回两次 f 的作用，所以结果是丘奇数 2。','(λh.h (f (f x))) I → f (f x)']],
+    '加法 · 2 + 3':[['传入两个迭代次数','m 接收丘奇 2，n 接收丘奇 3。剩下的 λf x 表示结果也将是一个丘奇数。','ADD 2 3 → λf x.2 f (3 f x)'],['理解内层','3 f x 形成三次 f 的作用。外面的 2 以这一整个结果为初值。','3 f x → f (f (f x))'],['接上外层迭代','外层再应用两次 f，总共五次。','2 f (f (f (f x))) → f (f (f (f (f x))))'],['识别结果','λf x 后出现五层 f，符合丘奇数 5 的定义。']],
+    '乘法 · 2 × 3 → 6':[['先合成一次工作','n f 在这里是 3 f，它接收一个初值后会执行三次 f。'],['把整段工作重复两次','m 取 2，因此 2 会把 3 f 整体调用两次。','2 (3 f) x → (3 f) ((3 f) x)'],['数清函数作用次数','内层产生三次 f，外层再产生三次，总计六次。'],['返回丘奇数','最终结果保留 λf x，因此后续可以继续把它当迭代次数使用。']],
+    '减法 · 5 − 2 → 3':[['把第二个数当作次数','n 取 2，迭代函数是 PRED，初值是 m=5。','2 PRED 5 → PRED (PRED 5)'],['第一次取前驱','前驱通过略过第一次函数作用，把 5 的迭代结构变成 4。'],['第二次取前驱','再次应用相同程序，把 4 变成 3。'],['检查零的边界','如果中途已经到零，后续前驱都保持为零。']]
+  };
+  const polynomialSteps=[
+    ['求系数上界','原输入是普通丘奇多项式函数 f。程序先计算 s=f(1)，它恰好等于所有自然数系数之和。每个系数都不超过这个和。'],
+    ['选择不会混淆系数的基数','令 b=s+1。因为每个系数都小于 b，f(b) 的 b 进制各位正好对应这些系数。零多项式在 s=0 时单独返回零系数表。','f(x)=x²+3x 时\ns=f(1)=4，b=5\nf(5)=40'],
+    ['用除法逐位取出系数','divmod 每次返回商与余数。余数是当前最低位系数，商进入下一轮。新系数插到列表前面，因此最后成为降序系数。','40÷5 → 商8，余0\n8÷5 → 商1，余3\n1÷5 → 商0，余1\n系数列表 [1,3,0]'],
+    ['执行所选的符号运算','求导把系数乘以原次数并去掉常数项。积分把系数除以原次数加一，并追加积分常数零。分数用分子与分母的有序对精确保留。'],
+    ['按需要再代入或相减','求导并求值会把导函数交给 Horner 程序。定积分则把原函数分别代入上限、下限，再计算差。所有这些阶段都包含在同一个 λ 程序里。']
+  ];
+  function polynomialProcess(example){
+    const evaluation=example.name.startsWith('多项式'),linear=example.name.startsWith('定积分')||example.name.startsWith('生成原函数');
+    const steps=polynomialSteps.map(step=>step.slice());
+    steps[1][2]=evaluation?'f(x)=2x²+3x+1\ns=f(1)=6，b=7\nf(7)=120':linear?'f(x)=2x\ns=f(1)=2，b=3\nf(3)=6':steps[1][2];
+    steps[2][2]=evaluation?'120÷7 → 商17，余1\n17÷7 → 商2，余3\n2÷7 → 商0，余2\n系数列表 [2,3,1]':linear?'6÷3 → 商2，余0\n2÷3 → 商0，余2\n系数列表 [2,0]':steps[2][2];
+    if(evaluation){
+      steps[3]=['按 Horner 顺序代入','取最高次系数作为累计值，反复乘以输入 x 再加下一项系数。','累计值 2\n2×2+3=7\n7×2+1=15'];
+      steps[4]=['返回有理数','每个系数保存分子和分母，结果 15/1 在结果区显示为有理数 15。'];
+    }
+    return steps;
+  }
+  const definitions={
+    I:['λx.x','恒等函数，原样返回输入。'],TRUE:['λa b.a','选择第一个分支。'],FALSE:['λa b.b','选择第二个分支。'],
+    SUCC:['λn f x.f (n f x)','在丘奇数的函数体外增加一次 f。'],ADD:['λm n f x.m f (n f x)','先重复 n 次，再重复 m 次。'],MUL:['λm n f.m (n f)','把 n 次作用合成的一段工作重复 m 次。'],POW:['λbase exponent.exponent base','让指数迭代底数这个函数。'],
+    PRED:['λn f x.n (λg h.h (g f)) (λu.x) (λu.u)','通过延迟第一次作用形成前驱。'],SUB:['λm n.n PRED m','将 m 连续取 n 次前驱，结果截断在零。'],ISZERO:['λn.n (λx.FALSE) TRUE','零次迭代保留真，至少一次迭代返回假。'],LE:['λm n.ISZERO (SUB m n)','检查自然数截断减法是否为零。'],
+    PAIR:['λa b selector.selector a b','把两个值交给选择器。'],FIRST:['λp.p TRUE','读取有序对的第一项。'],SECOND:['λp.p FALSE','读取有序对的第二项。'],Y:['λf.(λx.f (x x)) (λx.f (x x))','满足 Y F → F (Y F)，为递归体提供自身。'],
+    NIL:['λc n.n','丘奇空列表，直接返回折叠初值。'],CONS:['λhead tail c n.c head (tail c n)','丘奇列表头插，先折叠尾部再与首项组合。']
+  };
+  const decimalSteps={
+    NEG:[
+      ['展开输入记录','1.25 的数位整数是 125，小数位数是 2。数位从低位保存，所以列表依次为 5、2、1。符号假表示正数，最后的假表示精确值。','a = λk.k i f L 2 f\nL = cons 5 (cons 2 (cons 1 nil))'],
+      ['取出原符号','sign 把一个字段选择器传给 a。a 再把五个字段交给选择器，它返回第二个字段 s，因此这里得到 f。','sign a\n= a (λtag s d p e.s)\n→ (λtag s d p e.s) i f L 2 f\n→ f'],
+      ['执行布尔取反','not p 的定义是 p f t。原符号 f 选择第二个分支 t，于是负号变为真。','not f → f f t\n→ (λx y.y) f t → t'],
+      ['取回其他字段','digits、scale、approx 分别选择数位表、位数和近似标记。这里取回 L、2、f；125 与两位小数共同决定绝对值仍为 1.25。','negate a\n→ make t L 2 f'],
+      ['构造结果并处理零','make 整理数位表，再计算 and s (not (empty d))。L 非空，因此新符号为真。如果输入是零，数位表整理后为空，make 会将符号规范为假。','empty L → f\nnot f → t\nand t t → t\nmake t L 2 f → λk.k i t L 2 f'],
+      ['读出数值','记录中的 t 表示负数。列表从高位读回为 125，再按位数 2 放置小数点，得到 −1.25。','绝对值 = 125 / 10²\n符号为负 → −1.25']
+    ],
+    SHL:[
+      ['读出原数据','输入 −1.25 的符号为真，数位表为 [5,2,1]，小数位数为 2。函数把这几个字段交给内部处理函数。','a → (i, t, [5,2,1], 2, f)'],
+      ['最低位相加并产生进位','plus 的第三个参数是进位。首位 5+5+0=10，达到十，因此当前位保留 0，下一位收到进位 1。','5 + 5 + 0 = 10\n当前数位 0，向下一位传 1'],
+      ['继续处理更高位','第二位计算 2+2+1=5，进位归零。第三位计算 1+1+0=2，得到低位在前的 [0,5,2]。','2+2+1=5\n1+1+0=2\n新数位表 [0,5,2]'],
+      ['保持小数位数和符号','数位整数变成 250，小数位数仍为 2，绝对值因此变成 2.50。原负号继续传给 make。','make t [0,5,2] 2 f\n→ −250/10² = −2.50\n页面省去末尾零，显示 −2.5'],
+      ['重复移动的含义','一次左移只做一次翻倍。用丘奇数把整个一位移位函数重复三次，就会连续乘以 2 三次。','−1.25 → −2.5 → −5 → −10']
+    ],
+    SHR:[
+      ['把除以二改写成十进制整数操作','若输入值为 D/10ᵖ，则一半为 5D/10ᵖ⁺¹。函数因此把数位整数乘以五，并对位数执行一次后继。','125/10² ÷ 2 = (125×5)/10³'],
+      ['计算最低位与进位','timesdigit 把当前数位乘五，再加旧进位。25 按十拆成进位 2 和当前位 5。','5×5+0=25\n当前位 5，进位 2'],
+      ['计算其余数位','下一位得到 2×5+2=12，保留 2、进位 1。再下一位得到 1×5+1=6，保留 6。','2×5+2=12 → 数位 2，进位 1\n1×5+1=6 → 数位 6，进位 0\n结果数位表 [5,2,6]'],
+      ['增加小数位数','succ 2 得到 3。新的数位整数是 625，因此数值为 625/1000，结果精确。','make f [5,2,6] 3 f\n→ 0.625'],
+      ['小于一的数同样适用','位数可以继续增加。原数 0.1 的一半为 0.05，过程不会把它向下取整成零。','0.1 → 0.05 → 0.025']
+    ]
+  };
+  const decimalProcesses={
+    ADD:[['对齐小数位','读取两边的小数位数，取较大者。位数较少的一边补低位零，符号和实际数值保持对应。'],['选择加法或减法','符号异或为假时调用 plus；异或为真时用 cmp 比较绝对值，选择大数减小数，结果使用大数的符号。'],['逐位传递进位或借位','每个数位都是丘奇自然数。自然数加减只用于当前数位与进借位，列表保留整个十进制数。'],['封装并识别结果','make 去掉最高端多余的零，保存公共小数位数，并把两个输入的近似标记合并。']],
+    SUB:[['转换第二个参数','先执行 negate b，翻转第二个小数的符号。'],['复用带符号相加','调用 dadd a (negate b)，继续执行对齐、比较绝对值和逐位加减。'],['确定结果符号','例如 1−2 的较大绝对值来自第二个负数，所以结果符号为负。'],['规范零','绝对值相同时减法得到空数位表，make 将零规范成非负。']],
+    MUL:[['拆出两个数位表','分别读取数字、符号和位数。数字列表按低位在前保存。'],['生成部分乘积','timesdigit 计算一位乘整个列表的结果。split 把每次结果按十拆成当前位和进位。'],['按位置补零并累加','当前乘数位置每高一位，就给对应的部分乘积补一个低位零，再交给 plus 相加。'],['组合符号与小数位数','两个位数相加，两个符号做异或。于是 0.2×0.3 的整数部分是 6，位数为 2，读成 0.06。']],
+    DIV:[['统一整数单位','对齐输入位数，然后按所需输出精度给被除数补零。'],['从最高位开始长除','reverse 把数位表改成从高位读入，longdiv 每次把下一位并入余数。'],['求一个商位','divstep 在余数仍不小于除数时重复相减，计数就是当前商位。'],['读回商并判断精确性','完成后构造商，输出小数位数采用精度参数。余数非零时设置近似标记。除数零在开始前返回错误。']],
+    ABS:[['选择绝对值字段','读取原数位表、小数位数和近似标记。'],['指定非负符号','调用 make 时把符号字段设为 f。'],['保留绝对值','数位整数和小数位数共同决定的绝对值不变。'],['构造结果','零和正数也能通过同一个构造过程返回。']],
+    POW:[['初始化乘积','累计值使用列表小数一，指数使用丘奇自然数。'],['检查指数','指数零直接返回当前累计值。'],['执行一次乘法','用 dmul 把底数乘进累计值，force 将这一轮的结果整理成小数记录。'],['递减并继续','对指数取前驱后再次计算，最终乘积的符号由实际乘法决定。']],
+    SQRT:[['检查定义域','负号为真时返回错误，零直接返回零。'],['选择初始估计','选择输入与一中较大者作为初始值，避免从零作除数。'],['执行牛顿更新','计算输入除以当前估计，再与当前估计相加乘二分之一，中间值按四位工作精度整理。'],['判断是否继续','新值仍小于旧值时继续迭代；不再下降时返回旧值并按三位结果精度设置近似标记。']],
+    SIN:[['检查角度与符号','输入使用弧度，先检查绝对值范围并保存原符号。'],['消去整周期','大角度先求它包含多少个有限小数周期，减去这些周期。'],['利用对称性缩小区间','fullWave、halfWave 和 smallSin 逐层处理半周期符号与区间映射。'],['计算有限多项式','sinSeries 或 cosSeries 按 Horner 形式逐项使用小数乘加，最后恢复原符号并设置近似标记。']],
+    COS:[['读取角度','输入使用弧度，先检查角度范围。'],['平移半个 π','cosAngle 计算 x+π/2，再调用 sinAngle。'],['缩小区间并计算','进入与正弦相同的周期和对称性处理，再执行适合小区间的有限多项式。'],['返回近似记录','estimate 截断结果位数，并把近似标记设为真。']],
+    TAN:[['分别求分子和分母','sinAngle 与 cosAngle 分别得到正弦和余弦的工作值。'],['检查分母','余弦按四位工作精度截断后为零时，返回除零错误。'],['执行小数除法','使用 ddiv 对正弦和余弦做四位工作精度的带符号除法。'],['形成最终近似','estimate 再整理为显示用的近似小数。']],
+    SINH:[['限制工作区间','当前程序先检查绝对值是否超过一。'],['计算奇次多项式','使用 x、x³、x⁵、x⁷ 项，系数均为正。'],['逐层乘加并整理','Horner 形式复用 x²，work 在中间步骤采用四位工作精度。'],['显示近似结果','estimate 采用三位结果精度。负输入通过奇次幂得到负结果。']],
+    COSH:[['限制工作区间','当前程序先检查绝对值是否超过一。'],['计算偶次多项式','从常数一开始，依次累加二次、四次、六次和八次项。'],['逐层乘加并整理','每个中间值都由小数乘加计算，work 负责工作精度。'],['显示近似结果','偶次项使正负输入得到相同结果，estimate 标记结果为近似值。']],
+    TANH:[['限制工作区间','当前程序仅接受绝对值不超过一的输入。'],['计算两个多项式','分别执行双曲正弦与双曲余弦的工作多项式。'],['求商','将双曲正弦作为分子、双曲余弦作为分母执行 ddiv。'],['显示近似结果','输出继承多项式近似和工作精度的截断，带近似标记。']]
+  };
+  function decimalDefinitions(example,precision){
+    const bindings=[];let term=D.program(example.decimalOperation,precision);
+    while(term.type==='app'&&term.fn.type==='abs'){
+      bindings.push({name:term.fn.param,term:term.arg});term=term.fn.body;
+    }
+    const key='d'+example.decimalOperation.toLowerCase(),registry=new Map(bindings.map(item=>[item.name,item.term]));
+    let main=registry.get(key);
+    while(main?.type==='var'&&registry.has(main.name))main=registry.get(main.name);
+    return {core:`${names[example.decimalOperation]} = ${C.format(main)}`,symbols:bindings.map(item=>({name:item.name,meaning:meanings[item.name]??'此辅助值参与下面所示的局部 λ 定义，完整表达式按相同名称绑定它。',source:C.format(item.term)}))};
+  }
+  function describe(example,precision=6){
+    if(example.decimalOperation){
+      const operation=example.decimalOperation,definitions=decimalDefinitions(example,precision);
+      return {...definitions,
+        basics:[...syntax,'小数是一个可读取字段的函数。它把五个字段交给读取者 k，顺序是类型标记、符号、数位表、小数位数和近似标记。','符号真表示负，假表示非负。数位表是低位在前的 Scott 列表，选择非空分支可以直接取得首位与剩余表。小数位数 p 表示数位整数要除以 10ᵖ。','后面所有短函数名都来自实际运行程序。点击辅助函数名可以查看它的作用与真实 λ 定义。'],
+        foundation:'t = λx y.x\nf = λx y.y\ncons = λhead rest next end.next head rest\nnil = λnext end.end\n1.25 = λk.k i f (cons 5 (cons 2 (cons 1 nil))) 2 f',
+        steps:decimalSteps[operation]??decimalProcesses[operation],
+        boundaries:operation==='DIV'?['当前完整表达式的除法小数位数为 '+precision+'。例如 1÷8 至少保留三位才会完整得到 0.125。','除数为零时返回错误；用尽指定小数位后仍有余数时，输出带近似标记。']:
+          ['SIN','COS','TAN','SQRT','SINH','COSH','TANH'].includes(operation)?['这里的多项式系数、π 和中间小数都采用有限精度，结果用近似标记表示。数学公式与实际截断结果可能有差别。','平方根要求输入非负。三角函数输入为弧度且绝对值不超过一千；双曲示例要求绝对值不超过一。']:
+          ['这些运算保存有限十进制数位。数位整数与位数同时参与结果解释，不能只看列表中的数字。','零会规范为非负，数位表最高端多余的零会被清理。输入包含近似标记时，后续算式会继续保留它。'],
+        exercise:operation==='NEG'?'把输入改为 −1.25 和 0。预测 sign、not 和 make 每一步的输出，再单步核对。':operation==='SHR'?'把输入改为 0.1，核对结果是否为 0.05。再连续右移一次，并追踪数位整数和小数位数。':operation==='SHL'?'把输入改为 0.09，追踪 9+9 产生的进位，解释为什么结果为 0.18。':'修改示例末尾的输入参数。运行前先写出预期的符号、数位整数和小数位数，再与运行结果核对。'};
+    }
+    const list=example.category==='丘奇列表',math=example.category==='高等数学',polynomial=/^(多项式|符号求导|定积分|生成导函数|生成原函数)/.test(example.name);
+    return {basics:[...syntax,list?'丘奇列表把元素编码成连续嵌套的组合函数调用。把组合函数与末尾初值传给列表，就能执行右折叠。':'丘奇自然数 n 保存重复执行函数的次数。将迭代函数 f 和初值 x 传给它，结果包含 n 次 f 的作用。',math?'高等数学仍通过相同的变量、抽象和应用构造。原函数、指数、上下限等输入都是程序接收的 λ 参数。':'TRUE、FALSE 和有序对负责分支与状态选择。没有额外的条件语句时，选择器自身就决定了计算哪个参数。'],
+      foundation:'0 = λf x.x\n1 = λf x.f x\n2 = λf x.f (f x)\nTRUE = λa b.a\nFALSE = λa b.b\nPAIR = λa b k.k a b\nADD = λm n f x.m f (n f x)\nMUL = λm n f.m (n f)',
+      symbols:Object.entries(definitions).map(([name,[source,meaning]])=>({name,source,meaning})),steps:arithmeticSteps[example.name]??(polynomial?polynomialProcess(example):commonSteps),boundaries:polynomial?['编码器要求原函数是自然数系数多项式，利用 f(1) 是系数和的性质恢复系数。任意其他函数不满足这个前提。','积分后的系数使用有理数对保存，因此能表示 1/2 等分数。定积分端点需为自然数且下限不大于上限。']:[list?'空表不会调用组合函数，直接返回末尾初值。因此求和、乘积与首项选择需要分别指定合适的初值。':'丘奇自然数减法截断在零。需要负数或小数时，应使用对应的数据编码。','递归示例先判断终止条件。正规序可以先丢弃不用的分支，应用序可能展开不会结束的参数。'],
+      exercise:list?'把输入列表换为空表、单元素表，再换一个包含零的表。根据组合函数的两个参数判断结果。':'修改末尾的一个输入，先按本篇的状态更新或替换规则手算一轮，再用单步按钮核对。'};
+  }
+  const API={describe};root.LambdaGuideDetails=API;
+  if(typeof module!=='undefined'&&module.exports)module.exports=API;
+})(typeof globalThis!=='undefined'?globalThis:window);
+
+</script><script>
+(function(root){
+  'use strict';
   const P=root.LambdaPresets||require('./presets.js');
+  const Details=root.LambdaGuideDetails||require('./guide-details.js');
   const lessons={
     '恒等函数 I':[
       'I = λx.x',
@@ -2251,7 +2461,7 @@
     COSH:['双曲余弦使用偶次泰勒多项式，从常数项 1 开始，各项相加。因为只有偶次幂，正负输入的结果相同。','cosh(0.5)\n≈1+0.5²/2+0.5⁴/24+0.5⁶/720+…\n→ ≈1.127'],
     TANH:['先计算双曲正弦和双曲余弦，再做小数除法。这里继承双曲多项式的输入范围和工作精度。','tanh(0.5)=sinh(0.5)/cosh(0.5)\n≈0.521/1.127\n→ ≈0.462']
   };
-  function lesson(example){
+  function lesson(example,precision=6){
     if(example.decimalOperation){
       const [method,walk]=decimalLessons[example.decimalOperation];
       const notes=example.category==='高等小数'&&['SIN','COS','TAN'].includes(example.decimalOperation)
@@ -2263,11 +2473,11 @@
       let walkthrough=walk;
       if(example.name.startsWith('带符号除法'))walkthrough='−7.5÷2 → 对齐整数单位 75÷20\n→ 长除法得到 3.75\n→ 两个输入符号不同，结果 −3.75';
       if(example.name.startsWith('倒数'))walkthrough='1÷0.4 → 同比例变成 10÷4\n→ 商为 2.5';
-      return {core:`${example.decimalOperation} (${example.operands.join(') (')})`,principle:[method,notes],walkthrough};
+      return {...Details.describe(example,precision),principle:[method,notes],walkthrough};
     }
     const entry=lessons[example.name];
     if(!entry)throw new Error(`Missing explanation for ${example.name}`);
-    return {core:entry[0],principle:entry[1],walkthrough:entry[2]};
+    return {...Details.describe(example,precision),core:entry[0],principle:entry[1],walkthrough:entry[2]};
   }
   function init(api){
     const $=id=>document.getElementById(id),category=$('guide-category'),search=$('guide-search'),select=$('guide-example');
@@ -2276,16 +2486,30 @@
       const option=document.createElement('option');option.value=name;option.textContent=name;category.append(option);
     }
     function render(){
-      const example=P.examples[selected],doc=lesson(example);
+      const example=P.examples[selected],doc=lesson(example,api.precision());
       $('guide-title').textContent=example.name;
       $('guide-purpose').textContent=example.description??'从下面的关键表达式开始，跟随参数替换理解计算。';
       $('guide-encoding').textContent=example.encoding==='decimal'
         ?'数据表示使用符号、低位在前的十进制数位列表、小数位数和近似标记。公式与过程使用数值及辅助函数名作简写。'
         :'数字按丘奇自然数表示；列表、有序对与布尔值也由 λ 函数编码。公式与过程使用辅助函数名作简写。';
       $('guide-core').textContent=doc.core;
-      const paragraphs=doc.principle.map(text=>{const p=document.createElement('p');p.textContent=text;return p;});
-      $('guide-principle').replaceChildren(...paragraphs);
+      const paragraphs=values=>values.map(text=>{const p=document.createElement('p');p.textContent=text;return p;});
+      $('guide-basics').replaceChildren(...paragraphs(doc.basics));
+      $('guide-foundation').textContent=doc.foundation;
+      $('guide-symbols').replaceChildren(...doc.symbols.map(symbol=>{
+        const item=document.createElement('div'),details=document.createElement('details'),title=document.createElement('summary'),explanation=document.createElement('p'),pre=document.createElement('pre'),code=document.createElement('code');
+        title.textContent=symbol.name;explanation.textContent=symbol.meaning;code.textContent=`${symbol.name} = ${symbol.source}`;
+        pre.append(code);details.append(title,explanation,pre);item.append(details);return item;
+      }));
+      $('guide-principle').replaceChildren(...paragraphs(doc.principle));
       $('guide-walkthrough').textContent=doc.walkthrough;
+      $('guide-steps').replaceChildren(...doc.steps.map(([title,explanation,expression])=>{
+        const item=document.createElement('li'),heading=document.createElement('h4'),text=document.createElement('p');
+        heading.textContent=title;text.textContent=explanation;item.append(heading,text);
+        if(expression){const pre=document.createElement('pre'),code=document.createElement('code');code.textContent=expression;pre.append(code);item.append(pre);}
+        return item;
+      }));
+      $('guide-boundaries').replaceChildren(...paragraphs(doc.boundaries));$('guide-exercise').textContent=doc.exercise;
       const parameters=P.parametersFor(example);
       $('guide-parameters').textContent=parameters.length?`完整表达式末尾的参数依次为${parameters.join('、')}。`:'函数的参数顺序见关键表达式，完整表达式包含示例的输入数据。';
       $('guide-expression').textContent=P.inputSourceFor(example,api.precision());
@@ -2295,8 +2519,8 @@
     function filter(){
       const query=search.value.trim().toLowerCase();
       filtered=P.examples.flatMap((example,index)=>{
-        const doc=lesson(example),name=example.category||'入门';
-        return (!category.value||category.value===name)&&`${name} ${example.name} ${example.description??''} ${doc.core} ${doc.principle.join(' ')}`.toLowerCase().includes(query)?[index]:[];
+        const name=example.category||'入门';
+        return (!category.value||category.value===name)&&`${name} ${example.name} ${example.description??''}`.toLowerCase().includes(query)?[index]:[];
       });
       if(!filtered.includes(selected))selected=filtered[0]??selected;
       const options=filtered.map(index=>{const option=document.createElement('option');option.value=index;option.textContent=P.examples[index].name;return option;});
@@ -2351,7 +2575,7 @@
   'use strict';
   const C=root.LambdaCore || require('./core.js');
   const LIMITS={count:Infinity,nodes:Infinity,nameChars:Infinity};
-  const validName=name=>typeof name==='string'&&/^[A-Za-z][A-Za-z0-9_']{0,31}$/.test(name);
+  const validName=C.validName;
   function names(t,out=new Set()) {
     if(t.type==='var')out.add(t.name);
     else if(t.type==='abs'){out.add(t.param);names(t.body,out);}
@@ -2362,9 +2586,9 @@
     const seen=new Set();let nodes=0,nameChars=0;
     for(const fn of functions) {
       if(fn.source!==undefined&&typeof fn.source!=='string')throw new C.LambdaError('函数原始定义需为文本。');
-      if(fn.encodings!==undefined&&(!Array.isArray(fn.encodings)||fn.encodings.some(name=>typeof name!=='string'||!/^[\p{L}][\p{L}\p{N}_']*$/u.test(name))))throw new C.LambdaError('函数编码标记不合法。');
-      if(fn.sourceFree!==undefined&&(!Array.isArray(fn.sourceFree)||fn.sourceFree.some(name=>typeof name!=='string'||!/^[A-Za-z][A-Za-z0-9_']*$/.test(name))))throw new C.LambdaError('函数原文变量标记不合法。');
-      if(!validName(fn.name))throw new C.LambdaError('函数名需以英文字母开头，最多 32 字符，可含数字、下划线和单引号。');
+      if(fn.encodings!==undefined&&(!Array.isArray(fn.encodings)||fn.encodings.some(name=>!C.validName(name))))throw new C.LambdaError('函数编码标记不合法。');
+      if(fn.sourceFree!==undefined&&(!Array.isArray(fn.sourceFree)||fn.sourceFree.some(name=>!C.validName(name))))throw new C.LambdaError('函数原文变量标记不合法。');
+      if(!validName(fn.name))throw new C.LambdaError('函数名不能为空，也不能含空白或 λ、点、括号等语法符号；不限制首字符。');
       if(seen.has(fn.name))throw new C.LambdaError(`函数「${fn.name}」已存在，请换一个名字。`);
       seen.add(fn.name);nodes+=C.inspect(fn.term).nodes;
       const stack=[fn.term];while(stack.length){const t=stack.pop();if(t.type==='var')nameChars+=t.name.length;else if(t.type==='abs'){nameChars+=t.param.length;stack.push(t.body);}else stack.push(t.fn,t.arg);}
@@ -2385,7 +2609,7 @@
   }
   function add(functions,name,source,maxChars=C.LIMITS.chars,numberEncoding='church',precision=6,dataEncodings=null,prepared=null) {
     name=name.trim();
-    if(!validName(name))throw new C.LambdaError('函数名需以英文字母开头，最多 32 字符，可含数字、下划线和单引号。');
+    if(!validName(name))throw new C.LambdaError('函数名不能为空，也不能含空白或 λ、点、括号等语法符号；不限制首字符。');
     if(functions.some(f=>f.name===name))throw new C.LambdaError(`函数「${name}」已存在，请换一个名字。`);
     const compiled=prepared??(dataEncodings!==null?(root.LambdaDataEncoding||require('./data-encoding.js')).parse(source,dataEncodings,maxChars,numberEncoding):null);
     const parsed=compiled?compiled.term:numberEncoding==='decimal'?C.parseInput(source,maxChars):C.parse(source,maxChars);
@@ -2426,7 +2650,7 @@
     function walk(t,depth) {
       ++count;
       if(!object(t))fail('表达式结构不完整。');
-      const name=n=>{if(typeof n!=='string'||n.length>C.LIMITS.nameChars||!/^[A-Za-z][A-Za-z0-9_']*$/.test(n))fail('变量名不合法。');return n;};
+      const name=n=>{if(!C.validName(n))fail('变量名不合法。');return n;};
       if(t.type==='var')return C.V(name(t.name));
       if(t.type==='abs')return C.L(name(t.param),walk(t.body,depth+1));
       if(t.type==='app')return C.A(walk(t.fn,depth+1),walk(t.arg,depth+1));
@@ -2460,7 +2684,7 @@
     const s=raw.session;if(!object(s)||!Number.isSafeInteger(s.steps)||s.steps<0||typeof s.dirty!=='boolean')fail('归约状态不合法。');
     const original=s.original===null?null:ast(s.original);if(!original&&s.steps!==0)fail('没有起始表达式，无法恢复归约。');
     const encodings=s.encodings??[];
-    if(!Array.isArray(encodings)||encodings.some(name=>typeof name!=='string'||!(/^[\p{L}][\p{L}\p{N}_']*$/u.test(name))))fail('表达式编码标记不合法。');
+    if(!Array.isArray(encodings)||encodings.some(name=>!C.validName(name)))fail('表达式编码标记不合法。');
     const getChoice=(choice,allowOrder)=>{
       if(choice===null||allowOrder&&Trace.isOrder(choice))return choice;
       if(!Array.isArray(choice)||choice.some(part=>!['body','fn','arg'].includes(part)))fail('归约路径不合法。');
@@ -3147,6 +3371,7 @@
   let valueJob=null,valueSource=null,normalForm=null;
   let interpretedSource=null,interpretedTerm=null;
   let repeatedTerm=null;
+  let labPan=null;
   const state={ term:null, original:null, history:Trace.create(), dirty:false, running:false, timer:null,
     mode:'free', level:0, completed:new Set(), halt:'', scale:1, autoFit:true, model:null, speed:600, strategy:'normal', direction:'left',numberEncoding:'church',numberFormats:{},decimalPlaces:6,fast:false,encodings:null,encodingBusy:false };
   let toastTimer,workspace,viewer,dataEditor,formatEditor,guide,conversionController=null,compilingDefinitions=null,preparationTimer=null,historySource=null,renderedCount=0,diagramTerm=null,diagramRoute=null;
@@ -3191,7 +3416,7 @@
   function capture() {
     return {...dataEditor.capture(),draft:input.value,completed:[...state.completed],mode:state.mode,level:state.level,
       session:{original:state.original,steps:Math.max(0,state.history.length-1),dirty:state.dirty,halt:state.halt,...(state.encodings===null?{}:{encodings:state.encodings}),...(state.history.choices.length?{choices:state.history.choices}:{})},
-      view:{speed:state.speed,strategy:state.strategy,direction:state.direction,numberEncoding:state.numberEncoding,numberFormats:state.numberFormats,inputFormatDraft:formatEditor.capture(),guideExample:guide.capture(),decimalPlaces:state.decimalPlaces,...(palette===Palette.defaults?{}:{palette}),scale:state.scale,autoFit:state.autoFit,panX:$('diagram-viewport').scrollLeft,panY:$('diagram-viewport').scrollTop,historyOpen:$('history-details').open,helpOpen:!$('help-panel').hidden,hintOpen:!$('hint').hidden},
+      view:{speed:state.speed,strategy:state.strategy,direction:state.direction,numberEncoding:state.numberEncoding,numberFormats:state.numberFormats,inputFormatDraft:formatEditor.capture(),guideExample:guide.capture(),decimalPlaces:state.decimalPlaces,...(palette===Palette.defaults?{}:{palette}),scale:state.scale,autoFit:state.autoFit,panX:labPan?.x??$('diagram-viewport').scrollLeft,panY:labPan?.y??$('diagram-viewport').scrollTop,historyOpen:$('history-details').open,helpOpen:!$('help-panel').hidden,hintOpen:!$('hint').hidden},
       selection:{start:input.selectionStart,end:input.selectionEnd},error:$('error-message').hidden?'':$('error-message').textContent};
   }
   function applySnapshot(s) {
@@ -3204,6 +3429,7 @@
     revealAnswer(false);
     state.original=s.session.original;state.term=s.term;state.history=s.trace??Trace.create(s.session.original);state.dirty=s.session.dirty;state.halt=s.session.halt;
     state.scale=s.view.scale;state.autoFit=s.view.autoFit;state.speed=s.view.speed;state.strategy=s.view.strategy??'normal';state.direction=s.view.direction??'left';renderSpeed();
+    labPan=s.mode==='guide'?{x:s.view.panX,y:s.view.panY}:null;
     state.numberEncoding=s.view.numberEncoding??'church';state.numberFormats=s.view.numberFormats??{};state.decimalPlaces=s.view.decimalPlaces??6;
     state.encodings=s.session.encodings??null;dataEditor.restore(s);formatEditor.restore(s.view.inputFormatDraft);
     guide.restore(s.view.guideExample);
@@ -3272,6 +3498,7 @@
     }
   }
   function renderDiagram(redex, duration, undone) {
+    if(state.mode==='guide')return;
     const mount=$('diagram-mount');
     const route=state.dirty?null:redex?.path??null;
     diagramView.setEnabled(!state.dirty);
@@ -3283,7 +3510,7 @@
       ?state.history.peek(historyIndex).change:null;
     diagramHistory=state.history;diagramHistoryIndex=historyIndex;
     if(!change&&state.term&&diagramTerm===state.term&&diagramPalette===palette&&(route===diagramRoute||(route&&diagramRoute&&route.length===diagramRoute.length&&route.every((part,i)=>part===diagramRoute[i])))){
-      applyScale();return;
+      applyScale();restoreLabPan();return;
     }
     diagramTerm=state.term;diagramRoute=route;diagramPalette=palette;
     const anchor=state.autoFit?null:viewer?.anchor();
@@ -3295,9 +3522,14 @@
     applyScale();
     viewer?.restore(anchor);
     diagramView.transitionFrom(previous,duration,change,reverse);
+    restoreLabPan();
+  }
+  function restoreLabPan(){
+    if(!labPan)return;
+    $('diagram-viewport').scrollLeft=labPan.x;$('diagram-viewport').scrollTop=labPan.y;labPan=null;
   }
   function applyScale() {
-    if(!state.model) return;
+    if(!state.model||state.mode==='guide') return;
     const viewport=$('diagram-viewport'),m=state.model;
     if(state.autoFit) state.scale=Math.min(2.2,(viewport.clientWidth-48)/m.width,(viewport.clientHeight-48)/m.height);
     state.scale=Math.max(.02,Math.min(16,state.scale));
@@ -3541,7 +3773,8 @@
       // The preview is only a hint: confirm with an actual attempt before stopping.
       if(state.running&&!C.hasRedex(state.term)&&C.step(state.term,state.strategy,state.direction)===null)stop();
       else if(repeatedTerm?.(state.term,result)){
-        stop();state.halt='检测到重复归约循环，自动运行已停止。可以回退、单步或调整归约顺序。';
+        const growth=repeatedTerm.reason==='growth';
+        stop();state.halt=growth?'检测到递归展开无限增长，自动运行已停止。可以回退、单步或调整归约顺序。':'检测到重复归约循环，自动运行已停止。可以回退、单步或调整归约顺序。';
       }
       if(display)render(180); return true;
     } catch(e) {stop();state.halt=e.message;if(display)render();return false;}
@@ -3617,6 +3850,14 @@
     $('progress-text').textContent=state.mode==='challenge'?`${state.completed.size} / ${P.levels.length} 关已完成`:state.mode==='guide'?`${P.examples.length} 个示例原理`:'探索 · 输入 · 归约';
   }
   function renderMode() {
+    const reading=state.mode==='guide';
+    if(reading&&!$('lab-screen').hidden){
+      viewer?.cancelZoom();diagramView.cancelTransition();
+      labPan??={x:$('diagram-viewport').scrollLeft,y:$('diagram-viewport').scrollTop};
+    }
+    $('lab-screen').hidden=reading;document.querySelector('.save-bar').hidden=reading;
+    document.querySelector('.intro').hidden=reading;
+    document.body.classList.toggle('guide-reading',reading);
     const challenge=state.mode==='challenge';$('challenge-panel').hidden=!challenge;
     $('guide-panel').hidden=state.mode!=='guide';
     for(const [id,mode] of [['mode-free','free'],['mode-challenge','challenge'],['mode-guide','guide']]){
@@ -3761,9 +4002,10 @@
   $('mode-free').addEventListener('click',()=>{stop();state.mode='free';renderMode();render();save();});
   $('mode-challenge').addEventListener('click',()=>selectLevel(state.level));
   $('mode-guide').addEventListener('click',()=>{
-    stop();cancelRewind();cancelConversion();if(valueJob)clearValue();
+    stop();cancelRewind();cancelConversion();historyJob?.abort();if(valueJob)clearValue();
     state.mode='guide';renderMode();render();save();
   });
+  $('guide-back').addEventListener('click',()=>{state.mode='free';renderMode();render();save();$('mode-guide').focus();});
   $('stage-select').addEventListener('change',()=>{
     const stage=P.stages.find(s=>String(s.id)===$('stage-select').value);
     selectLevel(P.levels.findIndex(l=>l.id===stage.levelIds[0]));
@@ -3791,9 +4033,9 @@
     compileSource:async(source,signal)=>{const compiled=await E.compile(source,dataEditor.entries(),state.numberEncoding,{signal,numberFormats:state.numberFormats});dataEditor.remember(compiled.mappings);return compiled;},
     currentExpression:()=>state.term&&!state.dirty?C.format(state.term):input.value,
     insertFunction:name=>{const start=input.selectionStart,end=input.selectionEnd;
-      const before=start&&/[A-Za-z0-9_']/.test(input.value[start-1])?' ':'';
-      const after=end<input.value.length&&/[A-Za-z0-9_']/.test(input.value[end])?' ':'';
-      insert(before+name+after);
+      const before=start&&!/[\sλ\\.(\[]/.test(input.value[start-1])?' ':'';
+      const after=end<input.value.length&&!/[\s.)\],]/.test(input.value[end])?' ':'';
+      insert(before+C.formatName(name)+after);
     }});
   workspace.restoreInitial().then(restored=>{
     if(!restored){renderMode();convert();workspace.persist();}

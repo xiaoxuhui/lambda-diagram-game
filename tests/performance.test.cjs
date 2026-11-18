@@ -62,7 +62,75 @@ test('shared normalization reuses a complete result under binders without captur
   assert.equal(result.fn.arg,result.arg);
   assert.equal(C.hasRedex(result),false);
   await assert.rejects(Lazy.normalize(C.parse('(λx.x x) (λx.x x)'),{signal:AbortSignal.timeout(1000)}),/重复求值循环/);
-  await assert.rejects(Lazy.normalize(C.parse('(λx.f (x x)) (λx.f (x x))'),{signal:AbortSignal.timeout(30)}),/取消/);
+  await assert.rejects(Lazy.normalize(C.parse('(λx.f (x x)) (λx.f (x x))'),{signal:AbortSignal.timeout(1000)}),/无限增长/);
+});
+
+test('recursive expansion is stopped under neutral heads, duplicated branches and function spines',async()=>{
+  for(const source of [
+    '(λx.f (f (x x))) (λx.f (f (x x)))',
+    '(λx.f (x x) (x x)) (λx.f (x x) (x x))',
+    '(λx.x x x) (λx.x x x)',
+    '(λx.λn.f (x x)) (λx.λn.f (x x))'
+  ]){
+    await assert.rejects(Lazy.normalize(C.parse(source),{signal:AbortSignal.timeout(1000)}),/循环|无限增长/,source);
+  }
+});
+
+test('structural growth detection preserves manual steps and distinguishes a repeated state',()=>{
+  for(const source of [
+    '(λx.f (f (x x))) (λx.f (f (x x)))',
+    '(λx.f (x x) (x x)) (λx.f (x x) (x x))',
+    '(λx.x x x) (λx.x x x)',
+    '(λx.λn.f (x x)) (λx.λn.f (x x))'
+  ]){
+    const term=C.parse(source),guard=C.cycleCheck(term),change=C.step(term);
+    assert.equal(guard(change.term,change),true);assert.equal(guard.reason,'growth');
+    assert.ok(C.step(change.term));
+    assert.equal(C.normalize(term,20).status,'cycle');
+  }
+  const omega=C.parse('(λx.x x) (λx.x x)'),guard=C.cycleCheck(omega),change=C.step(omega);
+  assert.equal(guard(change.term,change),true);assert.equal(guard.reason,'cycle');
+});
+
+test('finite duplication, discarded recursive bodies and substantial output are not mistaken for divergence',async()=>{
+  for(const source of [
+    '(λd.f d d) ((λx.x) y)',
+    '(λi.f (i y) (i y)) (λx.x)',
+    '((λx.λk.k (x x)) (λx.λk.k (x x))) (λz.y)',
+    '(λx.y) ((λx.f (x x)) (λx.f (x x)))',
+    '(λm n.n m) 2 10'
+  ]){
+    const term=C.parse(source),expected=C.normalize(term,20000);
+    assert.equal(expected.status,'normal',source);
+    assert.ok(C.equal(await Lazy.normalize(term,{signal:AbortSignal.timeout(5000)}),expected.term),source);
+  }
+  let body=C.V('z');for(let i=0;i<2000;i++)body=C.A(C.V('f'),body);
+  const term=C.A(C.L('x',C.V('x')),C.L('z',body));
+  assert.ok(C.equal(await Lazy.normalize(term),term.arg));
+  const P=require('../src/presets.js');
+  for(const factorial of [P.advanced.factorial,P.advanced.recursiveFactorial]){
+    const term=C.parse(`(${factorial}) 3`);
+    assert.equal(C.churchNumber(await Lazy.normalize(term)),6);
+    assert.equal(C.normalize(term,20000).status,'normal');
+  }
+});
+
+test('growth guard does not reject terminating randomly generated terms',async()=>{
+  let seed=7319;const random=n=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed%n;};
+  const names=['x','y','z'];
+  function term(depth){if(!depth||random(4)===0)return C.V(names[random(3)]);return random(2)?C.L(names[random(3)],term(depth-1)):C.A(term(depth-1),term(depth-1));}
+  for(let i=0;i<300;i++){
+    const original=term(5),reference=before.normalize(original,100);
+    if(reference.status!=='normal')continue;
+    const result=C.normalize(original,100);
+    assert.equal(result.status,'normal',C.format(original));assert.ok(C.equal(result.term,reference.term));
+    assert.ok(C.equal(await Lazy.normalize(original,{signal:AbortSignal.timeout(1000)}),reference.term),C.format(original));
+  }
+});
+
+test('cancellation remains available when recursive arguments change on every call',async()=>{
+  const term=C.parse('(λf.(λx.f (x x)) (λx.f (x x))) (λr n.r ((λn f x.f (n f x)) n)) 0');
+  await assert.rejects(Lazy.normalize(term,{signal:AbortSignal.timeout(25)}),/取消/);
 });
 test('seeded differential reductions and alpha equality match the previous engine',()=>{
   let seed=9173;const random=n=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed%n;},names=['x','y','z'];

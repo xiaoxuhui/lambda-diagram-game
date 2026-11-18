@@ -5,7 +5,17 @@
   function normalize(term,{signal,onProgress}={}){
     const stack=[{kind:'quote'}],names=C.freeVars(term),normalForms=new WeakMap();
     let job={term,environment:null},value,nextName=0,steps=0;
-    let lastCall=null;
+    // Track unfinished demands, including calls whose result is still being
+    // normalized under a neutral head or lambda. Repeating one is productive
+    // growth as well as a possible black hole; neither has a finite normal form.
+    const activeCalls=new WeakMap();
+    function enter(call){
+      let argumentsFor=activeCalls.get(call.closure);
+      if(!argumentsFor){argumentsFor=new WeakSet();activeCalls.set(call.closure,argumentsFor);}
+      if(argumentsFor.has(call.argument))throw new C.LambdaError('检测到重复求值循环或递归展开无限增长，求值已停止。');
+      argumentsFor.add(call.argument);
+    }
+    function leave(call){activeCalls.get(call.closure).delete(call.argument);}
     function fresh(){
       let name;
       do{name='v'+nextName++;}while(names.has(name));
@@ -45,20 +55,27 @@
       switch(frame.kind){
         case 'remember':frame.source.value=value;frame.source.term=null;frame.source.environment=null;break;
         case 'apply':
+          // Provenance belongs to normalization of the result, not to a later
+          // application of a returned function (which may discard its body).
+          while(value.origin)value=value.target;
           if(value.term){
-            const continuation=stack.at(-1);
-            if(lastCall?.closure===value&&lastCall.argument===frame.argument&&lastCall.continuation===continuation)
-              throw new C.LambdaError('检测到重复求值循环，求值已停止。');
-            lastCall={closure:value,argument:frame.argument,continuation};
+            const call={closure:value,argument:frame.argument};enter(call);
+            stack.push({kind:'finishCall',call});
             steps++;
-            // A tail call proceeds directly, without retaining a thunk for its result.
             job={term:value.term.body,environment:{name:value.term.param,argument:frame.argument,parent:value.environment}};
           }else deliver({fn:value,arg:frame.argument});
           break;
+        case 'finishCall':
+          leave(frame.call);deliver({origin:frame.call,target:value});break;
+        case 'leaveOrigin':leave(frame.call);break;
         case 'quote': {
           const normal=normalForms.get(value);
           if(normal){deliver(normal);break;}
           stack.push({kind:'rememberForm',source:value});
+          if(value.origin){
+            enter(value.origin);stack.push({kind:'leaveOrigin',call:value.origin},{kind:'quote'});
+            deliver(value.target);break;
+          }
           if(value.term){
             const name=fresh(),argument={value:{name}};
             stack.push({kind:'abstract',name},{kind:'quote'});

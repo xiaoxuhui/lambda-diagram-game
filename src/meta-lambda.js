@@ -62,8 +62,11 @@
     return params.reduceRight((term,param)=>L(param,term),body);
   }
   function encodeName(name){
-    const body=[...name].reduceRight((tail,character)=>
-      A(A(V('c'),numeral(alphabet.indexOf(character))),tail),V('n'));
+    const codes=[...name].every(character=>alphabet.includes(character))
+      ?[...name].map(character=>alphabet.indexOf(character))
+      :[alphabet.length,...new TextEncoder().encode(name)];
+    const body=codes.reduceRight((tail,code)=>
+      A(A(V('c'),numeral(code)),tail),V('n'));
     return L('c',L('n',body));
   }
   function quote(term){
@@ -113,13 +116,17 @@
   function readName(term){
     if(term.type!=='abs'||term.body.type!=='abs'||term.param===term.body.param)return null;
     const cons=term.param,nil=term.body.param;
-    let name='',body=term.body.body;
+    const codes=[];let body=term.body.body;
     while(body.type==='app'&&body.fn.type==='app'&&body.fn.fn.type==='var'&&body.fn.fn.name===cons){
       const code=C.churchNumber(body.fn.arg);
-      if(code===null||code>=alphabet.length)return null;
-      name+=alphabet[code];body=body.arg;
+      if(code===null||code>255)return null;
+      codes.push(code);body=body.arg;
     }
-    return body.type==='var'&&body.name===nil&&/^[A-Za-z][A-Za-z0-9_']*$/.test(name)?name:null;
+    if(body.type!=='var'||body.name!==nil)return null;
+    let name;
+    if(codes[0]===alphabet.length){try{name=new TextDecoder('utf-8',{fatal:true}).decode(Uint8Array.from(codes.slice(1)));}catch{return null;}}
+    else {if(codes.some(code=>code>=alphabet.length))return null;name=codes.map(code=>alphabet[code]).join('');}
+    return C.validName(name)?name:null;
   }
   function readTerm(term){
     if(term.type!=='abs')return null;
