@@ -32,6 +32,23 @@ test('parameter wires disappear, move or split according to free occurrences',()
   }
 });
 test('large numeral emits every line without compression',()=>{const m=D.svg(C.parse('1024'));assert.equal(m.model.leaves.length,1025);assert.equal(m.model.lines.length,4099);assert.equal((m.markup.match(/<line /g)||[]).length,4099);});
+
+test('unfolded wires grow from the selected function while surrounding wires keep their origins',()=>{
+  const F=require('../src/function-reduction.js'),reducer=F.create([{name:'fn',term:C.parse('λx.g (x x)')}]);
+  for(const source of ['fn','keep (fn arg)','λg.fn']){
+    const term=C.parse(source),change=reducer.step(term),before=D.layout(term),after=D.layout(change.term);
+    const {lineOrigins,labelOrigins}=D.reductionOrigins(before,after,change);
+    const selected=before.lines.findIndex(line=>line.kind==='variable'&&line.name==='fn');
+    assert.equal(lineOrigins.length,after.lines.length);assert.ok(lineOrigins.every(index=>Number.isInteger(index)&&index>=0&&index<before.lines.length));
+    assert.ok(lineOrigins.filter(index=>index===selected).length>1,'function wire splits into the expanded structure');
+    for(const name of ['keep','arg']){
+      const oldIndex=before.lines.findIndex(line=>line.kind==='variable'&&line.name===name);
+      const newIndex=after.lines.findIndex(line=>line.kind==='variable'&&line.name===name);
+      if(oldIndex>=0)assert.equal(lineOrigins[newIndex],oldIndex);
+    }
+    assert.ok(labelOrigins.every(index=>index===undefined||(index>=0&&index<before.labels.length)));
+  }
+});
 test('long free-variable labels stay complete',()=>assert.ok(D.svg(C.parse('variableName')).markup.includes('>variableName</text>')));
 test('identity has one horizontal binder and one bound wire', () => {
   const m=model('λx.x'); assert.equal(m.binders.length,1); assert.equal(m.leaves.length,1);

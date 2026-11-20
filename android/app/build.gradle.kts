@@ -11,8 +11,8 @@ android {
         applicationId = "com.xiaoxuhui.lambda"
         minSdk = 24
         targetSdk = 34
-        versionCode = 7
-        versionName = "0.3.8"
+        versionCode = 8
+        versionName = "0.3.9"
 
         // 应用为单语言中文工具，去掉无用资源以减小体积
         resourceConfigurations += listOf("zh", "en")

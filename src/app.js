@@ -173,7 +173,7 @@
     mount.style.opacity=state.dirty?'0.35':'1';
     applyScale();
     viewer?.restore(anchor);
-    diagramView.transitionFrom(previous,duration,change?.kind==='unfold'?null:change,reverse);
+    diagramView.transitionFrom(previous,duration,change,reverse);
     restoreLabPan();
   }
   function restoreLabPan(){

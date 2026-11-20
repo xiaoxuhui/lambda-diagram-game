@@ -67,6 +67,18 @@
     let redex=oldRoot;
     for(const part of change.path)redex=redex[part];
     const lineOrigins=new Array(after.lines.length),labelOrigins=new Array(after.labels.length);
+    if(change.kind==='unfold'){
+      const pending=[{from:oldRoot,to:newRoot,expanding:false}];
+      while(pending.length){
+        const {from,to,expanding}=pending.pop(),inside=expanding||from===redex;
+        const count=to.fn?3:1;
+        for(let i=0;i<count;i++)lineOrigins[to.firstLine+i]=inside?redex.firstLine:from.firstLine+i;
+        if(to.label!==undefined)labelOrigins[to.label]=inside?redex.label:from.label;
+        if(to.fn)pending.push({from:inside?redex:from.fn,to:to.fn,expanding:inside},{from:inside?redex:from.arg,to:to.arg,expanding:inside});
+        if(to.body)pending.push({from:inside?redex:from.body,to:to.body,expanding:inside});
+      }
+      return {lineOrigins,labelOrigins};
+    }
     const stack=[{from:oldRoot,to:newRoot}];
     while(stack.length){
       let {from,to,substituting}=stack.pop();
