@@ -1,12 +1,21 @@
-const assert=require('node:assert/strict'),path=require('node:path'),fs=require('node:fs'),C=require('../src/core.js'),P=require('../src/presets.js'),D=require('../src/decimal.js');
+const assert=require('node:assert/strict'),path=require('node:path'),fs=require('node:fs'),C=require('../src/core.js'),P=require('../src/presets.js'),D=require('../src/decimal.js'),G=require('../src/guide.js');
 let pw;try{pw=require('playwright');}catch{pw=require(path.resolve(path.dirname(process.execPath),'../node_modules/playwright'));}
 process.env.PORT='0';const server=require('../scripts/serve.cjs');
 (async()=>{
  if(!server.listening)await new Promise(r=>server.once('listening',r));
  const browser=await pw.chromium.launch({headless:true}),base=`http://127.0.0.1:${server.address().port}`,errors=[];let passed=0;
  const check=async(name,fn)=>{await fn();console.log(`PASS C${++passed} ${name}`);};
+ const runUntilNormal=async page=>{
+  const started=Date.now();await page.locator('#fast-run').click();
+  for(;;){
+   await page.waitForFunction(()=>['已到正规形','已暂停'].includes(document.getElementById('state-badge').textContent),null,{timeout:30000});
+   if(await page.locator('#state-badge').textContent()==='已到正规形')return;
+   assert.match(await page.locator('#run-status').textContent(),/观察窗口/, 'Only the timed growth safeguard may be continued');
+   assert.ok(Date.now()-started<180000,'Known finite challenge should finish');await page.locator('#fast-run').click();
+  }
+ };
  const finish=async page=>{
-  await page.locator('#fast-run').click();await page.waitForFunction(()=>document.getElementById('state-badge').textContent==='已到正规形',null,{timeout:180000});
+  await runUntilNormal(page);
   await page.locator('#check-answer').click();assert.match(await page.locator('#challenge-feedback').textContent(),/完成/);
  };
  try{
@@ -25,7 +34,7 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
   });
   for(const level of P.levels)await check(`desktop level ${level.id} reduces and advances through real controls`,async()=>{
    assert.equal(await page.locator('#level-title').textContent(),level.name);
-   assert.ok(await page.locator('#challenge-target').isHidden());assert.ok(await page.locator('#hint').isVisible());assert.equal(await page.locator('#target-expression').textContent(),'');assert.equal(await page.locator('#target-label').textContent(),'');assert.equal(await page.locator('#hint').textContent(),level.hint);
+   assert.ok(await page.locator('#challenge-target').isHidden());assert.ok(await page.locator('#hint').isVisible());assert.equal(await page.locator('#target-expression').textContent(),'');assert.equal(await page.locator('#target-label').textContent(),'');assert.equal(await page.locator('#hint').textContent(),G.catalog().text(level.hint));
    assert.equal(await page.locator('#number-encoding').inputValue(),level.encoding??'church');
    if(level.decimalPlaces!==undefined)assert.equal(await page.locator('#decimal-places').inputValue(),String(level.decimalPlaces));
    await finish(page);assert.ok(await page.locator('#challenge-target').isHidden());assert.equal(await page.locator('#progress-text').textContent(),`${level.id} / 30 关已完成`);
@@ -33,6 +42,7 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
   });
   await check('all thirty records and final stage survive refresh and saved-state restore',async()=>{
    assert.match(await page.locator('#challenge-feedback').textContent(),/30 关全部完成/);assert.ok(await page.locator('#next-level').isHidden());await page.locator('#save-state').click();await page.reload();
+   await page.waitForFunction(()=>document.getElementById('progress-text').textContent==='30 / 30 关已完成');
    assert.equal(await page.locator('#progress-text').textContent(),'30 / 30 关已完成');assert.equal(await page.locator('#stage-select').inputValue(),'6');assert.equal(await page.locator('#level-title').textContent(),P.levels[29].name);
    assert.equal(await page.locator('#level-list button.completed').count(),5);await page.locator('#check-answer').click();assert.match(await page.locator('#challenge-feedback').textContent(),/30 关全部完成/);
    fs.mkdirSync(path.join(__dirname,'artifacts'),{recursive:true});await page.locator('#challenge-panel').screenshot({path:path.join(__dirname,'artifacts','challenges-desktop.png')});
@@ -48,8 +58,8 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
    await phone.locator('#challenge-panel').screenshot({path:path.join(__dirname,'artifacts','challenges-mobile.png')});
   });
   await check('mobile approximate decimal cannot pass exact division target',async()=>{
-   await phone.locator('#stage-select').selectOption('5');await phone.locator('#level-list button').nth(3).click();await phone.locator('#decimal-places').fill('2');await phone.locator('#expression').fill(D.expression('DIV',['1_decimal','8_decimal'],2));await phone.locator('#convert').click();await phone.locator('#fast-run').click();await phone.waitForFunction(()=>document.getElementById('state-badge').textContent==='已到正规形',null,{timeout:180000});
-   assert.equal(await phone.locator('#decoded').textContent(),'小数 ≈ 0.12');await phone.locator('#check-answer').click();assert.match(await phone.locator('#challenge-feedback').textContent(),/还不是/);
+   await phone.locator('#stage-select').selectOption('5');await phone.locator('#level-list button').nth(3).click();await phone.locator('#decimal-places').fill('2');await phone.locator('#expression').fill(D.expression('DIV',['1_decimal','8_decimal'],2));await phone.locator('#convert').click();await runUntilNormal(phone);
+   assert.equal(await phone.locator('#decoded').textContent(),'小数 0.12');await phone.locator('#check-answer').click();assert.match(await phone.locator('#challenge-feedback').textContent(),/还不是/);
   });await mobile.close();
   await check('legacy five-level progress restores and continues into stage two',async()=>{
    const ctx=await browser.newContext(),p=await ctx.newPage();p.on('pageerror',e=>errors.push(e.message));

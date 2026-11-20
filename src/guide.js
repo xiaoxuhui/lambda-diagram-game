@@ -3,6 +3,8 @@
   const P=root.LambdaPresets||require('./presets.js');
   const Details=root.LambdaGuideDetails||require('./guide-details.js');
   const Advanced=root.LambdaGuideAdvanced||require('./guide-advanced.js');
+  const Names=root.LambdaGuideNames||(typeof require==='function'?require('./guide-names.js'):null);
+  const Pairs=root.LambdaGuidePairs||require('./guide-pairs.js');
   const lessons={
     '恒等函数 I':[
       'I = λx.x',
@@ -110,7 +112,7 @@
       'C(4,2) = C(3,1) + C(3,2)\n= 3 + 3 = 6'
     ],
     '斐波那契 · F(5) → 5':[
-      'F(0)=0，F(1)=1\nF(n)=F(n−1)+F(n−2)',
+      'fibonacci = Y (λrecur n.ISZERO n 0 (ISZERO (PRED n) 1 (ADD (recur (PRED n)) (recur (PRED (PRED n))))))',
       ['函数先判断 n 是否为 0，再判断 n 的前驱是否为 0，从而识别两个起始值。其他情况递归计算前两项并相加。','这个示例直接使用递归定义，同一子问题可能被多次计算。较大输入可以使用快速求值复用被共享的参数。'],
       'F(5)=F(4)+F(3)\nF(4)=2+1=3，F(3)=1+1=2\nF(5)=3+2=5'
     ],
@@ -225,12 +227,12 @@
       '累计值 [] → [1] → [2,1] → [3,2,1]'
     ],
     '丘奇列表 · 折叠求和 → 6':[
-      '[1,2,3] ADD 0',
+      'sumlist = λlist.list ADD 0',
       ['丘奇列表本身就是右折叠，列表的第一个参数决定如何把一个元素与后缀结果组合，第二个参数是空表的结果。','这里用 ADD 作为组合函数，用 0 作为末尾初值，所以所有元素逐项相加。'],
       'ADD 1 (ADD 2 (ADD 3 0))\n→ ADD 1 (ADD 2 3) → 6'
     ],
     '丘奇列表 · 折叠乘积 → 6':[
-      '[1,2,3] MUL 1',
+      'productlist = λlist.list MUL 1',
       ['把右折叠的组合函数换成 MUL，就能计算乘积。末尾初值需要是乘法单位元 1。','因此空列表的乘积为 1；只要列表中出现 0，最终乘积就是 0。'],
       'MUL 1 (MUL 2 (MUL 3 1))\n→ 1×2×3×1 → 6'
     ],
@@ -308,15 +310,42 @@
     COSH:['双曲余弦使用偶次泰勒多项式，从常数项 1 开始，各项相加。因为只有偶次幂，正负输入的结果相同。','cosh(0.5)\n≈1+0.5²/2+0.5⁴/24+0.5⁶/720+…\n→ ≈1.127'],
     TANH:['先计算双曲正弦和双曲余弦，再做小数除法。这里继承双曲多项式的输入范围和工作精度。','tanh(0.5)=sinh(0.5)/cosh(0.5)\n≈0.521/1.127\n→ ≈0.462']
   };
-  function lesson(example,precision=6){
+  function rawLesson(example,precision=6){
+    if(example.metaInterpreter){
+      const C=root.LambdaCore||require('./core.js'),Meta=root.LambdaMeta||require('./meta-lambda.js');
+      const input=C.parse(example.metaInput),stages=Meta.stages(input);
+      const meanings={bound:'绑定变量节点，保存从当前位置向外数的绑定深度。',freeTerm:'自由变量节点，保存自由变量环境中的下标。',abs:'抽象节点，保存函数体语法。',app:'应用节点，保存函数与参数的语法。',get:'按丘奇下标读取Scott环境中的值。',cons:'把一个值压入环境，供变量下标读取。',nil:'空环境。',closure:'解释器中的函数闭包，保存函数体的求值过程。',neutral:'不能继续执行的自由变量或中性应用。',evalTerm:'按环境解释四类语法节点。',reify:'把闭包和中性值还原成已归约的语法数据。',normalize:'先解释语法，再还原为语法正规形。',decode:'把语法数据还原为普通λ表达式；绑定变量查局部环境，自由变量查输入环境。'};
+      return {
+        core:'interpret = '+Meta.mainSource,
+        symbols:Meta.definitions.map(definition=>({...definition,meaning:meanings[definition.name]??'供主函数使用的丘奇运算或不动点定义。'})),featured:['normalize','decode','evalTerm','reify'],
+        inputs:[{name:'freeenv',value:'[y]',encoding:'Scott值环境',role:'保存自由变量y本身，供输出还原时读取'},{name:'input',value:example.metaInput,encoding:'编码后的四分支语法树',role:'生成器先编码这个普通λ表达式，随后交给主函数'}],
+        basics:['先区分表达式和表达式的语法数据。λx.x是函数；“抽象节点，里面是绑定变量0”则是描述这个函数的数据。','绑定变量用距离最近绑定的下标表示，所以改名不会改变它所指的绑定。自由变量单独放进值环境，避免被新λ意外捕获。'],
+        foundation:'bound = λi b f l a.b i\nfreeTerm = λi b f l a.f i\nabs = λbody b f l a.l body\napp = λp q b f l a.a p q',
+        principle:['生成器遍历输入的变量、抽象、应用，把它们编码成四种λ构造器。这里只转换语法，不先算出答案。','主函数先用normalize在语法数据上执行解释，再用decode把结果还原成可继续应用的普通λ式。最后的还原也在λ程序中执行，页面无需把语法节点另行拼成表达式。'],
+        overview:'普通表达式先编码；主函数执行解释；λ解码器输出普通表达式。示例的自由变量y在整个过程中保持自由。',
+        flow:{columns:['阶段','传递的内容','负责什么'],rows:[['输入编码',example.metaInput,'生成器转换语法节点，不执行β求值'],['主函数','normalize input','用λ环境解释器计算语法正规形'],['输出还原','decode freeenv nil 结果语法','在λ程序内部重建变量、函数和应用'],['最终结果','λz.y','普通表达式，可接着应用其他参数']]},
+        steps:[
+          ['先编码输入','本例把两个抽象、一次应用和变量分别编码。绑定变量用下标，自由变量y用自由环境下标0。',C.format(stages.encoded)],
+          ['把编码交给主函数','自由环境含y这个真实变量值。主函数的参数顺序是环境、编码后的输入。','interpret freeenv input → decode freeenv nil (normalize input)'],
+          ['主函数执行解释','evalTerm按环境解释语法。进入抽象时构造闭包，应用闭包时把实参压入环境；变量通过下标查回对应值。','normalize = λterm.reify (evalTerm nil term) 0'],
+          ['把结果语法还原成普通λ式','decode处理绑定、自由、抽象、应用四个分支。抽象分支真的生成λ，应用分支真的应用两个已还原的子式。','decode = '+Meta.definitions.find(definition=>definition.name==='decode').source],
+          ['读取最终结果','结果是一个返回自由变量y的函数。绑定变量名称可以改变，y的自由身份保持不变。','(λx.λy.x) y → λz.y']
+        ],
+        walkthrough:'输入表达式 → 编码后的语法 → normalize → decode → 普通λ表达式',
+        encodingText:'语法树使用四分支λ编码，运行环境使用Scott列表；最后输出普通λ表达式，不附带解释器结果标记。',
+        parameterNote:'生成器负责输入语法编码，主函数与输出解码由生成的λ程序执行。可用自由变量、当前数字编码和自定义函数作为原始输入。',
+        boundaries:['使用从左到右正规序执行。原输入没有正规形时，解释器也不会凭空得到结果；现有暂停和取消功能仍可使用。','自由变量来自输入环境；不能从一个不含自由变量的闭合λ式中凭空生成一个新的自由变量。'],
+        exercise:'把输入改为 (λx.x) (λy.y)，重新生成并运行；输出应直接是恒等函数。'
+      };
+    }
     if(example.decimalOperation){
       const [method,walk]=decimalLessons[example.decimalOperation];
       const notes=example.category==='高等小数'&&['SIN','COS','TAN'].includes(example.decimalOperation)
-        ?'角度单位为弧度，当前示例输入范围为 −1000 到 1000。π 和多项式系数也采用有限小数近似。'
+        ?'角度单位为弧度，当前示例输入范围为 −1000 到 1000。π、级数项数和工作精度随输出位数参数计算。'
         :['SINH','COSH','TANH'].includes(example.decimalOperation)
-          ?'当前双曲函数示例输入范围为 −1 到 1。运算使用有限泰勒多项式和截断工作精度，结果带近似标记。'
-          :example.decimalOperation==='SQRT'?'输入需为非负数，负输入会返回实数平方根定义域错误。结果采用有限小数近似。'
-            :example.decimalOperation==='DIV'?'小数位数由设置决定。截断后余数非零会显示“≈”，除数为零会返回错误。':'数位采用有限列表保存，精确四则与移位不会依赖 JavaScript 浮点数。';
+          ?'当前双曲函数示例输入范围为 −1 到 1。级数项数和工作精度随输出位数参数变化；近似标记仅在内部记录。'
+          :example.decimalOperation==='SQRT'?'输入需为非负数，负输入会返回实数平方根定义域错误。按输出位数参数进行牛顿迭代和截断。'
+            :example.decimalOperation==='DIV'?'小数位数由设置决定。结果按位数截断，近似标记仅在内部使用；除数为零返回错误。':'数位采用有限列表保存，精确四则与移位不会依赖 JavaScript 浮点数。';
       let walkthrough=walk;
       if(example.name.startsWith('带符号除法'))walkthrough='−7.5÷2 → 对齐整数单位 75÷20\n→ 长除法得到 3.75\n→ 两个输入符号不同，结果 −3.75';
       if(example.name.startsWith('倒数'))walkthrough='1÷0.4 → 同比例变成 10÷4\n→ 商为 2.5';
@@ -324,10 +353,36 @@
     }
     const entry=lessons[example.name];
     if(!entry)throw new Error(`Missing explanation for ${example.name}`);
-    return {...Details.describe(example,precision),core:entry[0],principle:entry[1],walkthrough:entry[2],...Advanced.describe(example,precision)};
+    return Pairs.describe(example,{...Details.describe(example,precision),core:entry[0],principle:entry[1],walkthrough:entry[2],...Advanced.describe(example,precision)});
   }
+  const namedLessons=new Map();
+  function catalog(){return Names?.catalog();}
+  function lesson(example,precision=6){const key=example.name+'\0'+precision;if(!namedLessons.has(key)){const raw={...rawLesson(example,precision),purpose:example.description??''};namedLessons.set(key,catalog()?.normalize(raw,example.name)??raw);}return namedLessons.get(key);}
+  function titleFor(example){return lesson(example).displayTitle??example.name;}
   function init(api){
     const $=id=>document.getElementById(id),category=$('guide-category'),search=$('guide-search'),select=$('guide-example');
+    function workedTable(spec,label){
+      const wrapper=document.createElement('div'),table=document.createElement('table'),head=document.createElement('thead'),body=document.createElement('tbody'),titles=document.createElement('tr');
+      wrapper.className='guide-table-scroll';table.className='guide-worked-table';table.setAttribute('aria-label',label);
+      for(const title of spec.columns){const cell=document.createElement('th');cell.scope='col';cell.textContent=title;titles.append(cell);}head.append(titles);
+      for(const values of spec.rows){const row=document.createElement('tr');for(const value of values){const cell=document.createElement('td');cell.textContent=String(value);row.append(cell);}body.append(row);}
+      table.append(head,body);wrapper.append(table);return wrapper;
+    }
+    const flow=document.createElement('section');flow.id='guide-flow-section';flow.hidden=true;
+    flow.innerHTML='<h3>这一篇的目标与数据流</h3><p id="guide-overview"></p><div id="guide-flow"></div>';
+    $('guide-purpose').after(flow);
+    $('guide-purpose').after($('guide-source-section'));
+    const completeProgram=document.createElement('details'),completeTitle=document.createElement('summary'),shortProgram=document.createElement('pre'),shortCode=document.createElement('code');
+    completeProgram.id='guide-complete-expression';completeTitle.textContent='展开完整可运行的 λ 表达式';shortCode.id='guide-expression-short';shortProgram.append(shortCode);
+    const completePre=$('guide-expression').parentElement;completePre.before(shortProgram,completeProgram);completeProgram.append(completeTitle,completePre);
+    $('guide-source-section').querySelector('h3').textContent='示例写法';
+    $('guide-source-section').querySelector('p').textContent='讲解用函数名和数字简写，下方可查各函数定义；载入自由实验时使用完整可运行表达式。';
+    const coreHeading=$('guide-core-section').querySelector('h3');coreHeading.textContent='本篇函数定义与辅助函数';
+    const namingNote=document.createElement('p');namingNote.id='guide-naming-note';coreHeading.after(namingNote);
+    const pairSection=document.createElement('section');pairSection.id='guide-pair-section';pairSection.hidden=true;
+    pairSection.innerHTML='<h3>序对计算结果</h3><div id="guide-pair-expressions"></div>';
+    $('guide-core-section').after(pairSection);
+    const pairLink=document.createElement('a');pairLink.href='#guide-pair-section';pairLink.textContent='序对完整表达式';document.querySelector('.guide-toc').append(pairLink);
     const inputs=document.createElement('section');inputs.id='guide-input-section';
     inputs.innerHTML='<h3>输入参数：按什么顺序，传什么数据</h3><p>下表按完整表达式的参数顺序排列。数值相同但编码不同，仍是不同的 λ 数据。</p><div class="guide-table-scroll"><table id="guide-inputs"><thead><tr><th>参数</th><th>示例写法</th><th>编码</th><th>作用</th></tr></thead><tbody></tbody></table></div><p id="guide-parameter-note"></p><pre id="guide-call-box"><code id="guide-call"></code></pre>';
     $('guide-core-section').before(inputs);
@@ -339,10 +394,12 @@
     }
     function render(){
       const example=P.examples[selected],doc=lesson(example,api.precision());
-      $('guide-title').textContent=example.name;
-      $('guide-purpose').textContent=example.description??'从下面的关键表达式开始，跟随参数替换理解计算。';
+      $('guide-title').textContent=doc.displayTitle??example.name;
+      $('guide-purpose').textContent=doc.purpose||'从下面的关键表达式开始，跟随参数替换理解计算。';
+      flow.hidden=!doc.flow;$('guide-overview').textContent=doc.overview??'';
+      $('guide-flow').replaceChildren(...(doc.flow?[workedTable(doc.flow,'本篇从输入到结果的数据流')]:[]));
       $('guide-encoding').textContent=doc.encodingText??(example.encoding==='decimal'
-        ?'数据表示使用符号、低位在前的十进制数位列表、小数位数和近似标记。公式与过程使用数值及辅助函数名作简写。'
+        ?'小数表示使用正负标记、按书写顺序排列的丘奇数位列表、小数位数。例如0.125的数位表是[0,1,2,5]，位数是3。'
         :'数字按丘奇自然数表示；列表、有序对与布尔值也由 λ 函数编码。公式与过程使用辅助函数名作简写。');
       inputs.hidden=!doc.inputs?.length;
       inputLink.hidden=inputs.hidden;
@@ -354,15 +411,27 @@
       $('guide-parameter-note').textContent=doc.parameterNote??'讲解中的辅助函数名是完整表达式内部的局部绑定；不需要先把它们保存到函数库。';
       $('guide-call-box').hidden=!doc.compact;$('guide-call').textContent=doc.compact?'按下方局部定义书写的调用：\n'+doc.compact:'';
       $('guide-core').textContent=doc.core;
+      pairSection.hidden=!doc.pairExamples?.length;pairLink.hidden=pairSection.hidden;
+      $('guide-pair-expressions').replaceChildren(...(doc.pairExamples??[]).map(example=>{
+        const block=document.createElement('div'),title=document.createElement('h4'),text=document.createElement('p'),pre=document.createElement('pre'),code=document.createElement('code'),result=document.createElement('p');
+        const resultPre=document.createElement('pre'),resultCode=document.createElement('code');resultPre.className='guide-pair-result';resultCode.textContent=example.expected;resultPre.append(resultCode);
+        const compactPre=document.createElement('pre'),compactCode=document.createElement('code'),complete=document.createElement('details'),summary=document.createElement('summary');
+        compactCode.className='guide-pair-compact';compactCode.textContent=example.compactSource;compactPre.append(compactCode);complete.className='guide-pair-complete';summary.textContent='展开完整 λ 表达式与归约结果';complete.append(summary,pre,resultPre);
+        block.className='guide-pair-expression';title.textContent=example.label;text.textContent=example.explanation;code.className='guide-pair-source';code.textContent=example.source;pre.append(code);result.textContent='归约结果：'+example.expectedLabel;
+        block.append(title,result,compactPre,text,complete);return block;
+      }));
       const paragraphs=values=>values.map(text=>{const p=document.createElement('p');p.textContent=text;return p;});
-      $('guide-basics').replaceChildren(...paragraphs(doc.basics));
-      $('guide-foundation').textContent=doc.foundation;
+      $('guide-basics').replaceChildren(...paragraphs(doc.basics.filter(text=>example===P.examples[0]||!text.startsWith('λx.body')&&!text.startsWith('f a b 按')&&!text.startsWith('箭头 →'))));
+      const coreLines=new Set(doc.core.split('\n'));
+      $('guide-foundation').textContent=doc.foundation.split('\n').filter(line=>!coreLines.has(line)).join('\n');
+      $('guide-naming-note').textContent=doc.namingNote??'';
       const symbolItem=symbol=>{
         const item=document.createElement('div'),details=document.createElement('details'),title=document.createElement('summary'),explanation=document.createElement('p'),pre=document.createElement('pre'),code=document.createElement('code');
         title.textContent=symbol.name+'：'+symbol.meaning.split('。')[0];explanation.textContent=symbol.meaning;code.textContent=`${symbol.name} = ${symbol.source}`;
         pre.append(code);details.append(title,explanation,pre);item.append(details);return item;
       };
-      const keyNames=doc.featured??doc.symbols.slice(-5).map(symbol=>symbol.name),keySymbols=doc.symbols.filter(symbol=>keyNames.includes(symbol.name)),others=doc.symbols.filter(symbol=>!keyNames.includes(symbol.name));
+      const uniqueSymbols=doc.symbols.filter(symbol=>!coreLines.has(symbol.name+' = '+symbol.source));
+      const keyNames=doc.featured??uniqueSymbols.slice(-5).map(symbol=>symbol.name),keySymbols=uniqueSymbols.filter(symbol=>keyNames.includes(symbol.name)),others=uniqueSymbols.filter(symbol=>!keyNames.includes(symbol.name));
       $('guide-symbols').replaceChildren(...keySymbols.map(symbolItem));
       if(others.length){const details=document.createElement('details'),summary=document.createElement('summary');
         details.id='guide-all-symbols';summary.textContent=`其余 ${others.length} 个辅助函数：中文说明与完整 λ 定义`;
@@ -370,16 +439,18 @@
       }
       $('guide-principle').replaceChildren(...paragraphs(doc.principle));
       $('guide-walkthrough').textContent=doc.walkthrough;
-      $('guide-steps').replaceChildren(...doc.steps.map(([title,explanation,expression])=>{
+      $('guide-steps').replaceChildren(...doc.steps.map(([title,explanation,expression,calculation])=>{
         const item=document.createElement('li'),heading=document.createElement('h4'),text=document.createElement('p');
         heading.textContent=title;text.textContent=explanation;item.append(heading,text);
         if(expression){const pre=document.createElement('pre'),code=document.createElement('code');code.textContent=expression;pre.append(code);item.append(pre);}
+        if(calculation)item.append(workedTable(calculation,title+'的计算表'));
         return item;
       }));
       $('guide-boundaries').replaceChildren(...paragraphs(doc.boundaries));$('guide-exercise').textContent=doc.exercise;
-      const parameters=P.parametersFor(example);
+      const parameters=P.parametersFor(example,api.precision());
       $('guide-parameters').textContent=parameters.length?`完整表达式末尾的参数依次为${parameters.join('、')}。`:'函数的参数顺序见关键表达式，完整表达式包含示例的输入数据。';
       $('guide-expression').textContent=P.inputSourceFor(example,api.precision());
+      shortCode.textContent=doc.compact??doc.walkthrough.split('\n')[0];completeProgram.open=false;
       const index=filtered.indexOf(selected);
       $('guide-previous').disabled=index<=0;$('guide-next').disabled=index>=filtered.length-1;
     }
@@ -387,10 +458,10 @@
       const query=search.value.trim().toLowerCase();
       filtered=P.examples.flatMap((example,index)=>{
         const name=example.category||'入门';
-        return (!category.value||category.value===name)&&`${name} ${example.name} ${example.description??''}`.toLowerCase().includes(query)?[index]:[];
+        return (!category.value||category.value===name)&&`${name} ${example.name} ${titleFor(example)} ${example.description??''}`.toLowerCase().includes(query)?[index]:[];
       });
       if(!filtered.includes(selected))selected=filtered[0]??selected;
-      const options=filtered.map(index=>{const option=document.createElement('option');option.value=index;option.textContent=P.examples[index].name;return option;});
+      const options=filtered.map(index=>{const option=document.createElement('option');option.value=index;option.textContent=titleFor(P.examples[index]);return option;});
       select.replaceChildren(...options);select.value=selected;
       $('guide-count').textContent=`找到 ${filtered.length} / ${P.examples.length} 个示例`;
       const empty=!filtered.length;
@@ -408,6 +479,6 @@
       selected=Math.max(0,P.examples.findIndex(example=>example.name===name));category.value='';search.value='';filter();
     }};
   }
-  const API={lesson,init};root.LambdaGuide=API;
+  const API={lesson,rawLesson,catalog,titleFor,init};root.LambdaGuide=API;
   if(typeof module!=='undefined'&&module.exports)module.exports=API;
 })(typeof globalThis!=='undefined'?globalThis:window);

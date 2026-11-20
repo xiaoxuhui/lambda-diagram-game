@@ -11,7 +11,7 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
    const runResult=async(text)=>{await page.locator('#fast-run').click();await page.waitForFunction(()=>document.getElementById('state-badge').textContent==='已到正规形',null,{timeout:180000});assert.equal(await page.locator('#decoded').textContent(),text);};
    const run=(number,kind='Church 数')=>runResult(`${kind} ${number}`);
    await check(`${width}px higher mathematics contains combinations and all choices render`,async()=>{
-    assert.equal(await page.locator('#examples optgroup').count(),9);assert.equal(await page.locator('#examples optgroup[label="高等数学"] option').count(),22);
+    assert.equal(await page.locator('#examples optgroup').count(),9);assert.equal(await page.locator('#examples optgroup[label="高等数学"] option').count(),23);
     const combo=page.locator('#examples option').filter({hasText:'组合数'});assert.equal(await combo.evaluate(el=>el.parentElement.label),'高等数学');
     for(const e of P.examples.filter(e=>e.category==='高等数学')){await select(e.name);assert.equal(await page.locator('#expression').inputValue(),e.term);assert.ok(await page.locator('#error-message').isHidden());assert.ok(await page.locator('#diagram-mount line').count()>0);assert.ok((await page.locator('#example-info').textContent()).includes(e.description));}
     assert.equal(await page.locator('#function-count').textContent(),'0 个函数');
@@ -62,7 +62,7 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
    });await context.close();
   }
   await check('offline bundle contains and renders the higher mathematics group',async()=>{
-   const context=await browser.newContext(),page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));await page.goto(base+'/dist/lambda-lab.html');assert.equal(await page.locator('#examples optgroup[label="高等数学"] option').count(),22);await page.locator('#examples').selectOption(String(P.examples.findIndex(e=>e.name.includes('符号求导并求值'))));assert.ok(await page.locator('#example-info').isVisible());assert.ok(await page.locator('#diagram-mount line').count()>0);await context.close();
+   const context=await browser.newContext(),page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));await page.goto(base+'/dist/lambda-lab.html');assert.equal(await page.locator('#examples optgroup[label="高等数学"] option').count(),23);await page.locator('#examples').selectOption(String(P.examples.findIndex(e=>e.name.includes('符号求导并求值'))));assert.ok(await page.locator('#example-info').isVisible());assert.ok(await page.locator('#diagram-mount line').count()>0);await context.close();
   });assert.deepEqual(errors,[]);console.log(`Higher mathematics: ${passed} passed, 0 failed; Chromium ${browser.version()}; page errors 0.`);
  }finally{await browser.close();server.close();}
 })().catch(e=>{console.error(e);server.close();process.exitCode=1;});

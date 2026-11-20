@@ -7,11 +7,12 @@
     not:'布尔取反。把真假选择器收到的两个分支交换。',and:'逻辑与。第一个条件为真时取第二个条件，否则返回假。',or:'逻辑或。第一个条件为真时返回真，否则取第二个条件。',xor:'异或。两个符号不同时返回真，用来决定乘除法的负号。',
     pair:'有序对。保存两个值，等待选择器取出其中一个。',fst:'向有序对传入真，取出第一项。',snd:'向有序对传入假，取出第二项。',
     nil:'空数位表。选择列表的结束分支。',cons:'数位表节点。把首位和剩余表一起传给非空分支。',head:'选择数位表首位，空表返回数位零。',tail:'选择数位表的剩余部分，空表返回空表。',empty:'判断数位表是否为空。非空分支返回假，结束分支返回真。',
+    churchdigits:'把Scott工作表按当前顺序转换成丘奇列表。',forwarddigits:'遍历原工作数位表并反转为书写顺序，同时消耗位数标记；不足的整数位补0，最后转成丘奇列表。',fromexternal:'把公开的书写顺序丘奇数位表转为低位在前的Scott工作表，并转换符号。',toexternal:'移除工作标记与近似位，恢复正负标记、书写顺序的丘奇数位列表和小数位数。',
     add:'丘奇自然数加法。把两段函数迭代串联。',mul:'丘奇自然数乘法。重复调用另一段迭代。',succ:'丘奇后继。增加一次函数作用。',pred:'丘奇前驱。用延迟状态略去第一次函数作用，零的前驱仍为零。',sub:'对第一个自然数重复取前驱，次数由第二个自然数决定。',zero:'自然数零判断。零次迭代保留真，正次数迭代返回假。',lt:'自然数严格小于。检查第二个数减第一个数是否为正。',eq:'自然数相等。检查两个方向的截断减法是否都为零。',
     y:'不动点组合子。把函数自身传回递归体，提供递归调用。',trim:'删除数位表最高端的多余零。非零数字保持原次序。',reverse:'用累积表反转数位顺序，供从高位开始的长除法使用。',pad:'在低位端添加指定数量的零，相当于把数位整数乘以十的幂。',cmp:'比较两个低位在前的数位表。从更高位的比较结果决定大小，相同时才比较当前位。相等返回零，小于返回一，大于返回二。',
     plus:'带进位的逐位加法。计算当前两位与进位之和，达到十时减十并向下一位传一。',minus:'带借位的逐位减法。当前位不足时先加十，再向下一位借一。',table:'保存零到九的标准丘奇数位。',forceDigit:'把计算得到的数位取回零到九的标准表示，减少悬挂计算。',forceList:'逐位整理数位表后再交给后续函数。',split:'把一个自然数按十拆成商和余数，分别作为进位和当前数位。',timesdigit:'数位整数乘以一个数位。每位乘积加旧进位后，再按十拆分。',times:'逐位竖式乘法。计算部分乘积、按位补零，再累加。',
     divstep:'对一个部分余数重复减去除数，返回当前商位和新余数。',longdiv:'从高位到低位带入被除数的各位，每次调用部分除法，累计商和余数。',
-    sign:'从小数记录取出符号。真表示负，假表示非负。',digits:'从小数记录取出低位在前的十进制数位表。',scale:'从小数记录取出小数位数。它是一个丘奇自然数。',approx:'从小数记录取出近似标记。真表示结果经过截断或近似。',
+    sign:'从内部工作记录取出符号。内部真表示负，假表示非负；公开记录的正负标记方向相反。',digits:'从内部工作记录取出低位在前的十进制数位表；公开数位表按书写顺序排列。',scale:'从小数记录取出小数位数。它是一个丘奇自然数。',approx:'从小数记录取出近似标记。真表示结果经过截断或近似。',
     make:'构造小数记录。整理数位表，并把零的符号规范为非负，然后封装标记、符号、数位、位数和近似标记。',compose:'函数复合。先执行右侧函数，再把结果交给左侧函数。',maxScale:'选择两个输入中较大的小数位数。',alignAt:'把两个数位整数补零到指定小数位数，再交给后续函数。',align:'先决定公共小数位数，再执行补零对齐。',negate:'取出小数的五个字段，翻转符号，再调用小数构造函数。',sumAligned:'处理对齐后的带符号相加。同号做加法，异号先比较绝对值再相减。',
     dadd:'组合对齐、符号判断和逐位加减，得到带符号小数和。',dsub:'翻转第二个数的符号，再调用小数加法。',dmul:'数位整数做竖式乘法，小数位数相加，符号做异或。',ddiv:'检查除数、对齐输入、生成指定数量的小数位，再用长除法构造商。',error:'构造除数为零的错误记录。',dneg:'使用取负函数。',
     one:'列表小数编码的常数一。',half:'列表小数编码的常数二分之一。',cut:'按指定工作位数截断小数，丢弃低端的多余数位。',forceNat:'把自然数计算结果整理成标准迭代表示。',force:'依次整理小数的符号、数位、位数和近似标记。',dshl:'把数位表加上自身，小数位数保持不变，得到两倍。',dshr:'数位整数乘五，小数位数加一，得到精确的一半。',work:'整理中间小数，并截断到四位工作精度。',estimate:'把结果截断到三位小数并设置近似标记。',powerBy:'保存累计乘积，按自然数指数逐次乘入底数。',dpow:'把累计乘积初始化为一，交给重复乘法。',dabs:'把符号设为非负，并重新构造小数。',domain:'构造实数平方根定义域错误。',rangeError:'构造双曲示例输入范围错误。',angleError:'构造角度输入范围错误。',nonnegativeLess:'对齐两个非负小数的数位，再比较它们的大小。',
@@ -70,7 +71,7 @@
       ['读出数值','记录中的 t 表示负数。列表从高位读回为 125，再按位数 2 放置小数点，得到 −1.25。','绝对值 = 125 / 10²\n符号为负 → −1.25']
     ],
     SHL:[
-      ['读出原数据','输入 −1.25 的符号为真，数位表为 [5,2,1]，小数位数为 2。函数把这几个字段交给内部处理函数。','a → (i, t, [5,2,1], 2, f)'],
+      ['转为内部工作数据','外部 −1.25 是负标记false、数位表[1,2,5]和位数2。fromexternal反转数位，换成内部负标记true，交给后续函数计算。','λk.k false [1,2,5] 2\n→ 内部 (i, t, [5,2,1], 2, f)'],
       ['最低位相加并产生进位','plus 的第三个参数是进位。首位 5+5+0=10，达到十，因此当前位保留 0，下一位收到进位 1。','5 + 5 + 0 = 10\n当前数位 0，向下一位传 1'],
       ['继续处理更高位','第二位计算 2+2+1=5，进位归零。第三位计算 1+1+0=2，得到低位在前的 [0,5,2]。','2+2+1=5\n1+1+0=2\n新数位表 [0,5,2]'],
       ['保持小数位数和符号','数位整数变成 250，小数位数仍为 2，绝对值因此变成 2.50。原负号继续传给 make。','make t [0,5,2] 2 f\n→ −250/10² = −2.50\n页面省去末尾零，显示 −2.5'],
@@ -100,21 +101,21 @@
     TANH:[['限制工作区间','当前程序仅接受绝对值不超过一的输入。'],['计算两个多项式','分别执行双曲正弦与双曲余弦的工作多项式。'],['求商','将双曲正弦作为分子、双曲余弦作为分母执行 ddiv。'],['显示近似结果','输出继承多项式近似和工作精度的截断，带近似标记。']]
   };
   function decimalDefinitions(example,precision){
-    const bindings=[];let term=D.program(example.decimalOperation,precision);
+    const bindings=[];let term=D.genericProgram(example.decimalOperation);
+    const parameterized=D.precisionOperations.has(example.decimalOperation);
+    if(parameterized)term=term.body;
     while(term.type==='app'&&term.fn.type==='abs'){
       bindings.push({name:term.fn.param,term:term.arg});term=term.fn.body;
     }
-    const key='d'+example.decimalOperation.toLowerCase(),registry=new Map(bindings.map(item=>[item.name,item.term]));
-    let main=registry.get(key);
-    while(main?.type==='var'&&registry.has(main.name))main=registry.get(main.name);
-    return {core:`${names[example.decimalOperation]} = ${C.format(main)}`,symbols:bindings.map(item=>({name:item.name,meaning:meanings[item.name]??'此辅助值参与下面所示的局部 λ 定义，完整表达式按相同名称绑定它。',source:C.format(item.term)}))};
+    const main=parameterized?C.L('requested',term):term;
+    return {core:`decimal${example.decimalOperation.toLowerCase()} = ${C.format(main)}`,symbols:bindings.map(item=>({name:item.name,meaning:meanings[item.name]??'此辅助值参与下面所示的局部 λ 定义，完整表达式按相同名称绑定它。',source:C.format(item.term)}))};
   }
   function describe(example,precision=6){
     if(example.decimalOperation){
       const operation=example.decimalOperation,definitions=decimalDefinitions(example,precision);
       return {...definitions,
-        basics:[...syntax,'小数是一个可读取字段的函数。它把五个字段交给读取者 k，顺序是类型标记、符号、数位表、小数位数和近似标记。','符号真表示负，假表示非负。数位表是低位在前的 Scott 列表，选择非空分支可以直接取得首位与剩余表。小数位数 p 表示数位整数要除以 10ᵖ。','后面所有短函数名都来自实际运行程序。点击辅助函数名可以查看它的作用与真实 λ 定义。'],
-        foundation:'t = λx y.x\nf = λx y.y\ncons = λhead rest next end.next head rest\nnil = λnext end.end\n1.25 = λk.k i f (cons 5 (cons 2 (cons 1 nil))) 2 f',
+        basics:[...syntax,'输入和最终输出的小数只有三项：正负标记、丘奇数位列表、小数位数。不含ID或近似位。true表示正，false表示负；零统一为正。','数位按书写顺序保存。例如0.125 = λk.k true [0,1,2,5] 3；1.25的数位表为[1,2,5]，位数为2。外部数位表是丘奇列表，保留小数点前的0。','fromexternal 在纯λ运算内部把数位反转成工作记录；内部Scott数位表按低位在前排列，近似位只参与运算。toexternal 在最后恢复书写顺序和三项输出，补足小数点前的0，丢掉工作标记。'],
+        foundation:'1.25 的完整编码：\n'+C.format(D.encodeLiteral('1.25'))+'\n−1.25 的完整编码：\n'+C.format(D.encodeLiteral('-1.25')),
         steps:decimalSteps[operation]??decimalProcesses[operation],
         boundaries:operation==='DIV'?['当前完整表达式的除法小数位数为 '+precision+'。例如 1÷8 至少保留三位才会完整得到 0.125。','除数为零时返回错误；用尽指定小数位后仍有余数时，输出带近似标记。']:
           ['SIN','COS','TAN','SQRT','SINH','COSH','TANH'].includes(operation)?['这里的多项式系数、π 和中间小数都采用有限精度，结果用近似标记表示。数学公式与实际截断结果可能有差别。','平方根要求输入非负。三角函数输入为弧度且绝对值不超过一千；双曲示例要求绝对值不超过一。']:

@@ -7,7 +7,7 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
  const check=async(name,fn)=>{await fn();console.log(`PASS D${++passed} ${name}`);};
  try{
   for(const width of [1280,390]){
-   const context=await browser.newContext({viewport:{width,height:950},hasTouch:true}),page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));await page.goto(base);
+   const context=await browser.newContext({viewport:{width,height:950},hasTouch:true}),page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));await page.goto(base);await page.locator('#growth-window').selectOption('0');
    const source=async(s)=>{await page.locator('#expression').fill(s);await page.locator('#convert').click();assert.ok(await page.locator('#error-message').isHidden(),s);};
    const operation=async(op,a,b)=>source(expression(op,[a,b],Number(await page.locator('#decimal-places').inputValue())));
    const fast=async(result)=>{await page.locator('#fast-run').click();await page.waitForFunction(()=>document.getElementById('state-badge').textContent==='已到正规形',null,{timeout:240000});assert.equal(await page.locator('#decoded').textContent(),result);};
@@ -23,15 +23,15 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
     await operation('SUB','1','2');await fast('小数 -1');await operation('MUL','0.2','0.3');await fast('小数 0.06');
    });
    await check(`${width}px long division marks exact versus truncated results`,async()=>{
-    await page.locator('#decimal-places').fill('3');await page.locator('#examples').selectOption({label:'列表小数除法 · 1 ÷ 8 → 0.125'});assert.equal(await page.locator('#expression').inputValue(),expression('DIV',['1','8'],3));await fast('小数 0.125');
-    const before=await page.locator('#expression').inputValue();await page.locator('#decimal-places').fill('2');assert.equal(await page.locator('#expression').inputValue(),before);await operation('DIV','1','3');await fast('小数 ≈ 0.33');await page.locator('#save-state').click();await page.reload();assert.equal(await page.locator('#decoded').textContent(),'小数 ≈ 0.33');assert.equal(await page.locator('#decimal-places').inputValue(),'2');
+    await page.locator('#decimal-places').fill('3');await page.locator('#examples').selectOption({label:'列表小数除法 · 1 ÷ 8 → 0.125'});assert.ok(C.equal(E.parse(await page.locator('#expression').inputValue()).term,E.parse(expression('DIV',['1','8'],3)).term),'selected short-name program preserves the division expression');await fast('小数 0.125');
+    const before=await page.locator('#expression').inputValue();await page.locator('#decimal-places').fill('2');assert.equal(await page.locator('#expression').inputValue(),before);await operation('DIV','1','3');await fast('小数 0.33');await page.locator('#save-state').click();await page.reload();await page.waitForFunction(()=>document.getElementById('decoded').textContent==='小数 0.33');assert.equal(await page.locator('#decimal-places').inputValue(),'2');
    });
    await check(`${width}px zero division reports an error and invalid precision is rejected`,async()=>{
     await operation('DIV','1','0');await fast('错误：除数不能为0');await page.locator('#decimal-places').fill('-1');await page.locator('#convert').click();assert.ok(await page.locator('#error-message').isVisible());await page.locator('#decimal-places').fill('2');
    });
    await check(`${width}px decimal function source, state and defaults survive reload`,async()=>{
     const definition='λx.'+expression('ADD',['x','0.1']);assert.ok(definition.length>1500);
-    await page.locator('#function-name').fill('INC');await page.locator('#function-source').fill(definition);await page.locator('#function-add').click();assert.ok(await page.locator('#function-error').isHidden());await source('INC 0.2_decimal');await fast('小数 0.3');await page.locator('#save-state').click();await page.reload();assert.equal(await page.locator('#number-encoding').inputValue(),'decimal');assert.equal(await page.locator('#decoded').textContent(),'小数 0.3');
+    await page.locator('#function-name').fill('INC');await page.locator('#function-source').fill(definition);await page.locator('#function-add').click();assert.ok(await page.locator('#function-error').isHidden());await source('INC 0.2_decimal');await fast('小数 0.3');await page.locator('#save-state').click();await page.reload();await page.waitForFunction(()=>document.getElementById('decoded').textContent==='小数 0.3');assert.equal(await page.locator('#number-encoding').inputValue(),'decimal');
     await page.getByRole('button',{name:'编辑函数 INC',exact:true}).click();assert.equal(await page.locator('#function-source').inputValue(),definition);await page.locator('#function-cancel').click();
    });
    await check(`${width}px former builtin names are free and custom DEC_ADD runs`,async()=>{
@@ -40,7 +40,7 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
    });
    await check(`${width}px long complete source and function definition survive reload without truncation`,async()=>{
     const text=expression('ADD',['0.1','0.2'])+' '.repeat(12000);await source(text);assert.equal(await page.locator('#char-count').textContent(),`${text.length} 字符`);await fast('小数 0.3');
-    await page.locator('#function-name').fill('LONG');await page.locator('#function-source').fill(text);await page.locator('#function-add').click();assert.ok(await page.locator('#function-error').isHidden());await page.locator('#save-state').click();await page.reload();assert.equal(await page.locator('#expression').inputValue(),text);assert.equal(await page.locator('#decoded').textContent(),'小数 0.3');
+    await page.locator('#function-name').fill('LONG');await page.locator('#function-source').fill(text);await page.locator('#function-add').click();assert.ok(await page.locator('#function-error').isHidden());await page.locator('#save-state').click();await page.reload();await page.waitForFunction(()=>document.getElementById('decoded').textContent==='小数 0.3');assert.equal(await page.locator('#expression').inputValue(),text);
     await page.getByRole('button',{name:'编辑函数 LONG',exact:true}).click();assert.equal(await page.locator('#function-source').inputValue(),text);await page.locator('#function-cancel').click();
    });
    await check(`${width}px Church compatibility remains explicit and controls fit`,async()=>{
@@ -58,9 +58,9 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
    await page.locator('#expression').fill('-0.25_decimal');await page.locator('#convert').click();assert.equal(await page.locator('#decoded').textContent(),'小数 -0.25');await context.close();
   });
   await check('decimal presets do not accidentally call an old custom ADD function',async()=>{
-   const context=await browser.newContext(),page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));await page.goto(base);
+   const context=await browser.newContext(),page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));await page.goto(base);await page.locator('#growth-window').selectOption('0');
    for(const name of ['ADD','SUB','MUL','DIV','DEC_ADD','DEC_SUB','DEC_MUL','DEC_DIV']){await page.locator('#function-name').fill(name);await page.locator('#function-source').fill('λa b.a');await page.locator('#function-add').click();}
-   await page.locator('#examples').selectOption({label:'列表小数加法 · 0.1 + 0.2 → 0.3'});const text=await page.locator('#expression').inputValue();assert.ok(text.length>1500);assert.equal(text,expression('ADD',['0.1','0.2']));assert.equal(C.freeVars(E.parse(text).term).size,0);await page.locator('#fast-run').click();await page.waitForFunction(()=>document.getElementById('state-badge').textContent==='已到正规形',null,{timeout:120000});assert.equal(await page.locator('#decoded').textContent(),'小数 0.3');assert.equal(await page.locator('#function-count').textContent(),'8 个函数');await context.close();
+   await page.locator('#examples').selectOption({label:'列表小数加法 · 0.1 + 0.2 → 0.3'});const text=await page.locator('#expression').inputValue();assert.ok(text.length>1500);assert.ok(C.equal(E.parse(text).term,E.parse(expression('ADD',['0.1','0.2'])).term));assert.equal(C.freeVars(E.parse(text).term).size,0);await page.locator('#fast-run').click();await page.waitForFunction(()=>document.getElementById('state-badge').textContent==='已到正规形',null,{timeout:120000});assert.equal(await page.locator('#decoded').textContent(),'小数 0.3');assert.equal(await page.locator('#function-count').textContent(),'8 个函数');await context.close();
   });assert.deepEqual(errors,[]);console.log(`Decimal browser: ${passed} passed, 0 failed; Chromium ${browser.version()}; page errors 0.`);
  }finally{await browser.close();server.close();}
 })().catch(e=>{console.error(e);server.close();process.exitCode=1;});

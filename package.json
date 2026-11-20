@@ -1,6 +1,6 @@
 {
   "name": "lambda-diagram-game",
-  "version": "0.3.3",
+  "version": "0.3.6",
   "private": true,
   "description": "离线 Lambda 演算与 John Tromp 图示小游戏",
   "license": "MIT",
@@ -10,6 +10,7 @@
   "scripts": {
     "test": "node --test tests/*.test.cjs tests/android-shell.test.mjs",
     "test:android": "node --test tests/android-shell.test.mjs",
+    "test:save-protection": "node tests/save-protection-browser.cjs",
     "sync:android": "node scripts/sync-android-assets.mjs",
     "check:android": "node scripts/sync-android-assets.mjs --check",
     "test:android-bridge": "node tests/android-bridge-browser.cjs",

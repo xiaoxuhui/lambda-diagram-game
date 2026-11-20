@@ -90,7 +90,7 @@
           const negative=value.startsWith('-')&&!/^-0+$/.test(value);
           const magnitude=C.parse(value.replace(/^-/, ''));
           encodings.add(encoding);
-          return C.L('k',C.A(C.A(C.A(C.V('k'),integerTag),negative?TRUE:FALSE),magnitude));
+          return C.L('k',C.A(C.A(C.V('k'),negative?FALSE:TRUE),magnitude));
         }
         if(!/^[0-9]+$/.test(value))throw new C.LambdaError('这个编码需要非负整数；负整数可用 _int，负小数可用 _decimal。');
         if(encoding==='bool'){
@@ -147,17 +147,19 @@
   }
   const TRUE=C.parse('λx y.x'),FALSE=C.parse('λx y.y'),integerTag=C.parse('λa b c d.d');
   const label=name=>isBuiltin(name)?builtinLabels[name]:`${name}（自定义）`;
-  function readBuiltin(term,encoding){
+  function readBuiltin(term,encoding,{legacyOnly=false}={}){
     if(encoding==='bool')return C.equal(term,TRUE)?'丘奇布尔 TRUE（1）':C.equal(term,FALSE)?'丘奇布尔 FALSE（0）':null;
     if(encoding==='int'){
       if(term.type!=='abs')return null;
       const {body}=term;
-      if(body.type!=='app'||body.fn.type!=='app'||body.fn.fn.type!=='app')return null;
-      const {fn:head,arg:tag}=body.fn.fn;
-      if(head.type!=='var'||head.name!==term.param||!C.equal(tag,integerTag))return null;
-      const negative=C.equal(body.fn.arg,TRUE);
+      if(body.type!=='app'||body.fn.type!=='app')return null;
+      const direct=body.fn.fn.type==='var'&&body.fn.fn.name===term.param;
+      const legacy=!direct&&body.fn.fn.type==='app'&&body.fn.fn.fn.type==='var'&&body.fn.fn.fn.name===term.param&&C.equal(body.fn.fn.arg,integerTag);
+      if(!direct&&!legacy)return null;
+      if(direct&&legacyOnly)return null;
+      const negative=C.equal(body.fn.arg,direct?FALSE:TRUE);
       const magnitude=C.churchNumber(body.arg);
-      if(magnitude===null||(!negative&&!C.equal(body.fn.arg,FALSE)))return null;
+      if(magnitude===null||(!negative&&!C.equal(body.fn.arg,direct?TRUE:FALSE)))return null;
       return `丘奇整数 ${negative&&magnitude!==0?'-':''}${magnitude}`;
     }
     return encoding==='list'?readChurchList(term,true):null;

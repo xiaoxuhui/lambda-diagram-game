@@ -51,6 +51,9 @@
 .guide-toc a{color:#356d50;font-size:12px;text-underline-offset:4px}
 .guide-panel article>section{scroll-margin-top:18px}
 .guide-table-scroll{max-width:100%;overflow:auto}
+#guide-flow-section{margin:18px 0;padding:12px 15px;background:#f5f8f1;border-left:3px solid #769c77;border-radius:4px}
+#guide-flow-section h3{margin-top:0}#guide-flow-section p{margin:8px 0 12px}
+.guide-panel .guide-worked-table{margin:10px 0}
 .guide-panel table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:13px;line-height:1.8;color:#365441}
 .guide-panel th,.guide-panel td{text-align:left;vertical-align:top;padding:10px 9px;border-bottom:1px solid #dce5d6;overflow-wrap:anywhere}
 .guide-panel th{background:#f5f7f1}.guide-panel th:first-child{width:14%}.guide-panel th:nth-child(2){width:25%}.guide-panel th:nth-child(3){width:19%}

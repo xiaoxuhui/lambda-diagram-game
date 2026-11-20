@@ -124,52 +124,9 @@
       ['解释返回数据','得到的候选是一个丘奇自然数。整数向下取整意味着选择最后一个未超过目标的候选；没有生成负数或小数答案。',meaning]
     ],boundaries:key==='QUOT'?['除数零返回除零错误，不进入搜索。','被除数小于正除数时商为零；例如 1÷2 在这里是零，列表小数除法才能返回 0.5。']:['根运算的固定次数必须大于零；对数类底数至少为二，目标至少为一。无效输入按该函数约定返回 I，I 不是数值答案。','搜索依赖对应运算的单调性。正整数底数和上述参数范围是本例的前提。'],exercise:'根据本篇的参数顺序改一个输入，列出 candidate、op(candidate)、previous，再判断是哪一次返回。'};
   }
-  const polyMeaning={
-    t:'真选择器，pair 的第一项是分子或状态下标。',f:'假选择器，pair 的第二项是分母或累计列表。',pair:'有序对。系数用 pair 分子 分母；迭代状态也用相同结构，但字段含义随用途变化。',nil:'丘奇空列表，直接返回折叠初值。',cons:'丘奇列表头插，折叠时调用 c 当前系数 (尾表 c 初值)。',
-    add:'丘奇自然数加法。',mul:'丘奇自然数乘法。',succ:'丘奇后继，增加一次迭代。',pred:'丘奇前驱，零保持零。',sub:'自然数截断减法。',zero:'自然数零判断。',
-    rmul:'有理数 a 乘自然数 n。a t 取分子、a f 取分母，结果为 (分子×n)/分母；乘零直接返回 0/1。',rdiv:'有理数 a 除以正自然数 n。分子保留，分母乘 n；没有做宿主语言除法。',radd:'有理数通分相加，分子为 a分子×b分母+b分子×a分母，分母为两分母乘积。零分子分支可以直接返回另一项。',rsub:'有理数通分相减；分子的减法仍是自然数截断减法，因此定积分例子要求端点按顺序、系数非负。',
-    diff:'从常数项开始向左折叠，状态为(当前次数,导数系数表)。次数零丢掉常数项，其他项把系数乘次数后头插。',integ:'从常数项开始向左折叠，状态为(当前次数,原函数系数表)。把系数除以次数加一后头插；初始尾表含积分常数 0/1。',fold:'把丘奇列表的右折叠改接为从最高次到常数项更新累计值，让 Horner 法按正确顺序执行。',evalpoly:'Horner 求值。累计值从 0/1 开始，每读到一个降序系数就计算“累计值×x+系数”。',
-    divmod:'对丘奇数做除法并把商、余数交给 emit。内部用基数减一格的标记链控制何时把余数归零、商加一。',encodepoly:'输入原丘奇函数。先取系数和 f(1)，以 f(1)+1 为基数，从 f(基数) 的余数逐项提取系数；零多项式单独处理。'
-  };
+  const PolyGuide=root.LambdaGuidePolynomial||require('./guide-polynomial.js');
   function unpack(program){const bindings=[];let main=typeof program==='string'?C.parse(program):program;while(main.type==='app'&&main.fn.type==='abs'){bindings.push({name:main.fn.param,term:main.arg});main=main.fn.body;}return {bindings,main};}
-  function polynomial(example){
-    const kind=example.name.startsWith('多项式')?'EVAL':example.name.startsWith('符号求导')?'DERIVATIVE':example.name.startsWith('定积分')?'DEFINITE':example.name.startsWith('生成导函数')?'DIFF':'INTEGRATE';
-    const linear=['DEFINITE','INTEGRATE'].includes(kind),evaluation=kind==='EVAL';
-    const formula=evaluation?'2x²+3x+1':linear?'2x':'x²+3x';
-    const {bindings,main}=unpack(M.churchProgram(kind));
-    const originalSource=M.churchFunction(evaluation?[1,3,2]:linear?[0,2]:[0,3,1]);
-    const inputs=[input('function','f(x)='+formula,'丘奇多项式函数 λx.…','输入原函数；实际 λ 写法见第1步，不要预先输入导函数或原函数')];
-    if(['EVAL','DERIVATIVE'].includes(kind))inputs.push(natural('x',2,'求值时的代入点'));
-    if(kind==='DEFINITE')inputs.push(natural('a',0,'积分下限'),natural('b',3,'积分上限'));
-    const steps=[
-      ['明确函数输入与内部数据的区别','原函数接收丘奇 x 并用丘奇加乘算 f(x)。后面的求导、积分程序不能靠函数名猜系数，所以把 encodepoly 放在主函数内部，先生成系数表。下方是可替换到完整程序末尾的原函数 λ 写法，add、mul 已在它内部定义。','原函数 f(x)='+formula+'\n'+originalSource+'\n内部输出：降序系数表，每个系数保存为 pair 分子 分母'],
-      ['为什么 f(1) 能给出基数','自然数系数 aᵢ 都非负，所以 f(1)=Σaᵢ 至少等于每一个系数。选 b=f(1)+1 后，所有系数都小于 b，没有进位混淆。',evaluation?'f(1)=2+3+1=6 → b=7\nf(7)=2×49+3×7+1=120':linear?'f(1)=2 → b=3\nf(3)=6':'f(1)=1+3=4 → b=5\nf(5)=25+15=40'],
-      ['除以基数，实际抽出系数','divmod 返回商和余数，先得到常数项，随后得到一次项、二次项。每个余数都头插到列表，因此最终列表按最高次到常数项排列。',evaluation?'120÷7=(商17,余1)\n17÷7=(商2,余3)\n2÷7=(商0,余2)\n→ [2/1,3/1,1/1]':linear?'6÷3=(商2,余0)\n2÷3=(商0,余2)\n→ [2/1,0/1]':'40÷5=(商8,余0)\n8÷5=(商1,余3)\n1÷5=(商0,余1)\n→ [1/1,3/1,0/1]'],
-      ['有理数也是函数，不是小数文本','例如 1/2 保存为 pair 1 2 = λk.k 1 2；t 取分子，f 取分母。rdiv a n 只需把分母乘 n，因此积分得到的分数不会先变成有限小数。','rdiv (pair 1 1) 2 → pair 1 (mul 1 2) → pair 1 2']
-    ];
-    if(evaluation)steps.push(
-      ['把降序系数接到 Horner 更新','fold 依次传入 2/1、3/1、1/1，更新 g=λr a.radd (rmul r x) a。这样不需要每项单独算幂。','从 0/1 开始\n0×2+2=2\n2×2+3=7\n7×2+1=15'],
-      ['辨认输出形状','主函数返回有理数 pair 15 1。页面读取分子、分母后显示 15；它不是丘奇自然数 15 的同一个 λ 结构。','pair 15 1 → λk.k 15 1']
-    );
-    else if(!linear)steps.push(
-      ['把导数规则落实为列表状态','diff 使用右折叠，所以从常数项开始，状态第一项 i 就是当前原次数。i=0 不把常数加入结果；随后系数乘 i，次数自然降低一。','(i=0,[])：读 0/1，略去 → (1,[])\n读 3/1：rmul (3/1) 1=3/1 → (2,[3/1])\n读 1/1：rmul (1/1) 2=2/1 → (3,[2/1,3/1])'],
-      [kind==='DIFF'?'返回导函数的系数数据':'再把导数代入 x=2',kind==='DIFF'?'[2/1,3/1] 代表 2x+3。这是可交给多项式求值程序的系数数据，不是已经算好的某个函数值。':'DERIVATIVE 在 diff 后调用 evalpoly，使用刚刚得到的导数系数表，不会把原来的 f(2) 当成导数。',kind==='DIFF'?'系数表 [2/1,3/1] → 2x+3':'0×2+2=2\n2×2+3=7\n→ pair 7 1']
-    );
-    else steps.push(
-      ['把积分规则落实为列表状态','integ 同样从常数项向左折叠。次数 i 的系数除以 i+1；结果表初值为 [0/1]，代表积分常数 C=0。','初值 (0,[0/1])\n读常数 0/1：除以1 → (1,[0/1,0/1])\n读一次项 2/1：除以2 → (2,[2/2,0/1,0/1])'],
-      ['解释新系数为什么对应原函数','列表长度多了一项，次数从一变二。2/2 精确代表一，页面约分后读作 x²；系数结构本身不必先约分。','F(x)=(2/2)x²+0x+0 = x²\nF′(x)=2x，回到原输入']
-    );
-    if(kind==='DEFINITE')steps.push(
-      ['分别代入上下限','同一个新生成的原函数被送入两次 evalpoly。上下限顺序是先 a 后 b，但做差是上限值减下限值。','F(3)=0×3+2/2 → (2/2)×3+0=3 → 3×3+0=9\nF(0)=0\n准确有理数分别可保留为 18/2 和 0/1'],
-      ['对端点结果通分相减','rsub 读取两个有理数的分子、分母，计算上限减下限。积分区间非负且原系数非负，保证分子差不会需要负数编码。','18/2−0/1 = (18×1−0×2)/(2×1) = 18/2 → 页面约分为9']
-    );
-    return {core:'主函数 = '+C.format(main),symbols:bindings.map(({name,term})=>({name,source:C.format(term),meaning:polyMeaning[name]})),inputs,steps,
-      encodingText:'输入是原丘奇函数；程序内部把它编码为降序系数表。系数和求值结果采用有理数有序对，不能与列表小数记录混用。',
-      foundation:'有理数 a/b = λk.k a b\n降序表 [a₂,a₁,a₀] = λc n.c a₂ (c a₁ (c a₀ n))\nHorner 更新 = λr a.radd (rmul r x) a\n主函数中的 encodepoly 先把原函数转为上述列表',
-      basics:['原函数、导函数和在某一点的函数值是三件不同的事。本例主函数接收原函数，内部生成系数数据，再按所选操作返回函数数据或一个有理数。','系数表按次数降序保存，但求导与积分的右折叠先访问常数项，因此状态中的 i 可从零逐次增加。','λfunction.… 中的 function 就是末尾传入的原 λx.…。encodepoly、diff、integ、evalpoly 都在同一个完整 λ 程序里。'],
-      boundaries:['抽取系数的方法只适用于自然数系数多项式。负系数或分数系数输入不满足 f(1) 的基数证明；虽然积分后的内部系数可以是分数，也不能反推输入编码器支持任意分数系数函数。','零多项式在系数和为零时单独编码成 [0/1]，避免把基数一用于逐位提取。定积分要求自然数下限不大于上限。','实际没有输入任意函数就自动做通用符号分析；这里依赖上述多项式前提。较大系数或次数会使 f(b) 的丘奇表示很大。'],
-      exercise:kind==='DEFINITE'?'把原输入改为丘奇函数 λx.x，保留下限 0、上限 3；先写出内部原函数的分数系数，再算两个端点。':'把原输入改为丘奇函数 λx.x，逐步写出 f(1)、基数、系数表，再按本篇操作计算。'};
-  }
+  function polynomial(example){return PolyGuide.describe(example,unpack);}
   const decimalInputRoles={ADD:['第一个加数','第二个加数'],SUB:['被减数','减数'],MUL:['第一个因数','第二个因数'],DIV:['被除数','除数'],NEG:['要取负的数'],ABS:['要取绝对值的数'],POW:['底数','指数，决定乘法次数'],SHL:['要翻倍的小数'],SHR:['要减半的小数'],SQRT:['非负的根号内数'],SIN:['弧度角'],COS:['弧度角'],TAN:['弧度角'],SINH:['自变量'],COSH:['自变量'],TANH:['自变量']};
   const decimalSteps={
     ADD:[
@@ -196,7 +153,7 @@
       ['回到本例的小数记录','数位乘积六，位数二，符号非负、近似为假；小数点是记录的位数字段决定的。','make f [6] 2 f → 6/100 → 0.06']
     ],
     ABS:[
-      ['读出输入四个有效字段','−2.75 的符号为真，低位在前的数位为 [5,7,2]，位数二，近似标记为假。','a=λk.k i t [5,7,2] 2 f'],
+      ['转为内部工作数据','外部 −2.75 是负标记false、数位[2,7,5]和位数2。转换后内部负标记为真，低位在前的数位是[5,7,2]，近似标记为假。','λk.k false [2,7,5] 2\n→ 内部 λk.k i t [5,7,2] 2 f'],
       ['解释字段选择器','digits a 把选择器 λtag s d p e.d 传给记录，得到数位表；scale 与 approx 按同样方法返回位数和近似标记。','digits a → [5,7,2]\nscale a → 2\napprox a → f'],
       ['把主函数代入','绝对值不是像 NEG 一样取反，而是无论原符号是什么，都把新符号指定为假。','dabs a = make f (digits a) (scale a) (approx a)\n→ make f [5,7,2] 2 f'],
       ['构造相同绝对值的非负记录','make 整理数位并打包。275 和位数二都未改变，所以只是去掉负号。','λk.k i f [5,7,2] 2 f → 2.75'],
@@ -261,20 +218,47 @@
     return steps;
   }
   function decimal(example,precision){
+    const D=root.LambdaDecimal||require('./decimal.js');
     const op=example.decimalOperation;if(!op)return null;
     const inputs=example.operands.map((value,index)=>{
       const encoding=example.operandEncodings?.[index]??'decimal';
       return input(index===0?'a':op==='POW'?'n':'b',`${value}_${encoding}`,encoding==='church'?'丘奇自然数':'列表小数',decimalInputRoles[op][index]);
     });
+    const parameterized=D.precisionOperations.has(op);
+    if(parameterized)inputs.unshift(input('requested',`${precision}_church`,'丘奇自然数','最终输出需要的小数位数；0表示只留整数部分'));
+    const operationSteps=op==='DIV'?[
+      ['读取输出位数与输入','第一个参数是丘奇自然数位数，后面是被除数和除数。公开小数值只有正负标记、丘奇数位列表、位数三项。','decimaldiv requested a b'],
+      ['转为内部工作记录','fromexternal 将书写顺序的丘奇表反转成低位在前的Scott工作表，并将外部正标记换成内部负标记。这里保留内部近似位以跟踪截断。','fromexternal a；fromexternal b'],
+      ['对齐与长除','对齐两个输入的小数位数。长除法从高位到低位带入数位，每次求商位和余数。','部分被除数 = 旧余数×10 + 下一位'],
+      ['生成指定数量的小数位','整数部分处理后继续带入零，直到生成 requested 位。余数归零后补零不会改变数值。','1÷8：requested=2 → 0.12；requested=5 → 0.125'],
+      ['只输出三项','toexternal 去掉内部ID和近似位，将Scott工作表恢复成书写顺序的丘奇列表，补足整数位的0。数值按要求截断，页面不向数值塞入额外字段。','0.125 = λk.k true [0,1,2,5] 3']
+    ]:['SIN','COS','TAN','SINH','COSH','TANH'].includes(op)?[
+      ['读取位数与角度','第一个参数指定输出小数位数，第二个参数是列表小数。三角函数使用弧度；双曲函数保留当前示例的输入范围。',`decimal${op.toLowerCase()} requested x`],
+      ['由精度决定工作量','工作位数为 requested+6，展开次数为 requested+3。增加输出位数时，同时提高中间精度和展开项数。','workplaces = add requested 6'],
+      ['递推计算级数项','正弦和双曲正弦从x开始，余弦和双曲余弦从1开始。三角级数交替变号，双曲级数各项为正。','正弦项：tₖ₊₁ = −tₖ×x² / ((2k+2)(2k+3))\n余弦项：tₖ₊₁ = −tₖ×x² / ((2k+1)(2k+2))\n双曲级数使用相同分母，去掉负号'],
+      ['先缩小角度，再恢复函数关系','小角度直接计算级数；大角度先消去周期并利用对称性。π使用同一工作精度动态计算，不再使用固定的8位常量。','π = 16 atan(1/5) − 4 atan(1/239)\ncos(x)=sin(x+π/2)；tan(x)=sin(x)/cos(x)'],
+      ['按请求截断并输出三项','最后截到 requested 位。近似标记只在工作记录中使用，输出是正负标记、丘奇数位列表、小数位数。','requested=2 → 保留2位；requested=6 → 保留6位']
+    ]:op==='SQRT'?[
+      ['读取位数与被开方数','第一个参数指定输出小数位数。负输入返回定义域错误，零直接返回零。','decimalsqrt requested x'],
+      ['选择初值','取输入与1中较大者，避免从零作除数。','current = max(x,1)'],
+      ['同一个牛顿更新反复执行','每次用输入除以当前估计，再取平均。中间除法和截断使用 requested+6 位。','next = (current + x/current)/2'],
+      ['结束条件','估计仍下降时继续；工作精度下不再下降时返回当前估计。','next < current → 继续；否则结束'],
+      ['按请求输出','最后截到 requested 位，再去掉内部工作标记并转换成三项公开小数。','sqrt(2)：2位→1.41；6位→1.414213']
+    ]:null;
     return {inputs,
-      encodingText:'先按下表区分列表小数与丘奇次数。小数记录的“符号、数位、小数位数、近似位”共同决定数值，数位表与后面的丘奇列表使用不同的读取方式。',
+      encodingText:'公开小数是 λk.k 正负标记 丘奇数位列表 位数，数位按书写顺序排列。例如0.125 = λk.k true [0,1,2,5] 3。true为正，false为负；不含ID和近似位。内部计算完成后恢复这个顺序。',
       featured:{ADD:['dadd','align','sumAligned','plus','make'],SUB:['dsub','negate','sumAligned','minus','cmp'],MUL:['dmul','times','timesdigit','split'],DIV:['ddiv','longdiv','divstep','align'],NEG:['negate','sign','not','make'],ABS:['dabs','digits','make'],POW:['dpow','powerBy','force'],SHL:['dshl','plus'],SHR:['dshr','timesdigit','succ'],SQRT:['dsqrt','nonnegativeLess','work','estimate'],SIN:['dsin','sinAngle','smallSin','sinSeries','work'],COS:['dcos','cosAngle','smallSin','cosSeries','work'],TAN:['dtan','sinAngle','cosAngle','ddiv'],SINH:['dsinh','sinhSeries','withinRange','work'],COSH:['dcosh','coshSeries','withinRange','work'],TANH:['dtanh','sinhSeries','coshSeries','ddiv']}[op],
       ...(op==='DIV'?{steps:division(example,precision)}:decimalSteps[op]?{steps:decimalSteps[op]}:['SIN','COS','TAN','SINH','COSH','TANH'].includes(op)?{steps:seriesSteps(op)}:{}),
       ...(op==='POW'?{parameterNote:'末尾第一个参数用 _decimal，第二个参数必须用 _church。两种编码不能互换。'}:{}),
       ...(['SIN','COS','TAN'].includes(op)?{boundaries:['输入按弧度解释，绝对值不得超过1000。本实现先缩减周期再算有限多项式。','π 取有限小数3.14159265，系数为有限小数；中间四位截断，输出三位截断。页面设置的除法位数不会覆盖这些算法内部的固定工作精度。','接近余弦为零的位置时，正切的误差会被分母放大；截断余弦为零则返回除零错误。']}:
         ['SINH','COSH','TANH'].includes(op)?{boundaries:['当前有限多项式仅接受 −1 到1。超出范围返回错误，不代表数学上的双曲函数没有定义。','中间四位、输出三位都是截断，不是四舍五入；有限多项式没有对所有输入提供“三位正确”的误差保证。']}:
         op==='SQRT'?{boundaries:['负数返回实数平方根定义域错误；零直接返回零。','除法和中间估计采用四位工作精度，结束条件是估计不再严格下降。最终截成三位近似，不是任意精度平方根算法。']}:{}),
-      ...(['SIN','COS','TAN','SINH','COSH','TANH'].includes(op)?{exercise:'先把输入改为零，用定义预测结果；再比较正负0.5，说明奇偶对称性。接着沿本篇的 Horner 层次手算一轮，标出在哪一步丢弃了小数位。'}:{})
+      ...(['SIN','COS','TAN','SINH','COSH','TANH'].includes(op)?{exercise:'保持输入不变，分别传入2_church和6_church，比较输出位数与级数项数；再比较正负输入的对称性。'}:{}),
+      ...(operationSteps?{steps:operationSteps,boundaries:[
+        'requested 是输出小数位数，必须为丘奇自然数；输出按位数截断，不是四舍五入。位数没有固定上限，更多位数需要更多归约。',
+        ['SIN','COS','TAN'].includes(op)?'三角函数输入为弧度，绝对值不超过1000；正切在分母为零时返回错误。':['SINH','COSH','TANH'].includes(op)?'双曲示例保留 −1 到1 的输入范围。':op==='SQRT'?'实数平方根要求输入非负。':'除数不得为零。',
+        '近似标记只在运算内部使用；最终数值不携带ID或近似字段。'
+      ],parameterNote:'参数从左到右：输出小数位数（_church），然后是列表小数输入（_decimal）。内部 requested 由这个位数参数绑定。'}:{})
     };
   }
   function listLesson(example){

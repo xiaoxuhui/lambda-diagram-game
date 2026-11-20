@@ -1,10 +1,12 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
+import buildGuideNames from './build-guide-names.cjs';
 const base = fileURLToPath(new URL('../', import.meta.url));
+buildGuideNames();
 let html = await readFile(base+'index.html', 'utf8');
 const css = await readFile(base+'src/style.css', 'utf8');
 html = html.replace('<link rel="stylesheet" href="src/style.css">', `<style>\n${css}\n</style>`);
-for (const name of ['core','trace','run-guard','lazy-eval','meta-lambda','decimal','data-encoding','palette','diagram','diagram-view','polynomial','presets','guide-advanced','guide-details','guide','challenges','library','snapshot','download','default-state','workspace-tools','viewport','encoding-table','data-encoding-editor','input-format-editor','app']) {
+for (const name of ['core','trace','run-guard','lazy-eval','meta-lambda','decimal','data-encoding','palette','diagram','diagram-view','polynomial','guide-name-data','guide-names','presets','guide-polynomial','guide-advanced','guide-details','guide-pairs','guide','challenges','library','snapshot','download','default-state','workspace-tools','viewport','encoding-table','data-encoding-editor','input-format-editor','app']) {
   const js = await readFile(base+`src/${name}.js`, 'utf8');
   html = html.replace(`<script src="src/${name}.js"></script>`, `<script>\n${js}\n</script>`);
 }

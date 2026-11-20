@@ -40,33 +40,60 @@
   ['ddiv','λprecision a b.empty (digits b) error (align a b (λx z p.longdiv (reverse (pad x precision)) z nil nil (λq rem.make (xor (sign a) (sign b)) q precision (or (or (approx a) (approx b)) (not (empty rem))))))']
  ];
  const cache=new Map();
- function program(operation,precision=6){
+ const precisionOperations=new Set(['DIV','SQRT','SIN','COS','TAN','SINH','COSH','TANH']);
+ function genericProgram(operation,internal=false){
   if(!operations.has(operation))throw new C.LambdaError('未知小数运算。');
-  if(!Number.isSafeInteger(precision)||precision<0)throw new C.LambdaError('除法小数位数需为非负整数。');
-  const key=operation+precision;if(cache.has(key))return cache.get(key);
-  let body=operation==='DIV'?`ddiv ${precision}`:`d${operation.toLowerCase()}`;
+  const key=operation+(internal?':internal':':public');if(cache.has(key))return cache.get(key);
+  let body=operation==='DIV'?'ddiv requested':`d${operation.toLowerCase()}`;
+  if(!internal){
+   if(['ADD','SUB','MUL','DIV'].includes(operation))body=`λa b.toexternal ((${body}) (fromexternal a) (fromexternal b))`;
+   else if(operation==='POW')body=`λa n.toexternal ((${body}) (fromexternal a) n)`;
+   else body=`λa.toexternal ((${body}) (fromexternal a))`;
+  }
   const needed=new Set(C.freeVars(C.parse(body,Infinity)));
   for(let j=bindings.length-1;j>=0;j--){const d=bindings[j];if(!needed.has(d.name))continue;body=`(λ${d.name}.${body}) (${d.source})`;needed.delete(d.name);for(const name of d.free)needed.add(name);}
+  const parameterized=precisionOperations.has(operation);if(parameterized)needed.delete('requested');
   if(needed.size)throw new Error('Unbound decimal program: '+[...needed]);
-  const term=C.parse(body,Infinity);cache.set(key,term);return term;
+  let term=C.parse(body,Infinity);if(parameterized)term=C.L('requested',term);cache.set(key,term);return term;
+ }
+ function program(operation,precision=6,internal=false){
+  if(!Number.isSafeInteger(precision)||precision<0)throw new C.LambdaError('输出小数位数需为非负整数。');
+  const term=genericProgram(operation,internal);return precisionOperations.has(operation)?C.A(term,C.parse(String(precision))):term;
  }
  const digitTerms=Array.from({length:10},(_,n)=>C.parse(String(n))),nil=C.parse('λc n.n'),identity=C.parse('λx.x'),truth=C.parse('λx y.x'),falsity=C.parse('λx y.y');
- function encodeLiteral(text){
+ function encodeInternal(text){
   const match=/^(-?)(\d+)(?:\.(\d+))?$/.exec(String(text));if(!match)throw new C.LambdaError('请填写整数或小数，例如 -12.375。');
   let fraction=(match[3]||'').replace(/0+$/,''),raw=(match[2]+fraction).replace(/^0+/,'');
   let list=nil;for(const digit of raw)list=C.L('c',C.L('n',C.A(C.A(C.V('c'),digitTerms[Number(digit)]),list)));
   const sign=raw&&match[1]?truth:falsity,scale=C.parse(String(fraction.length));
   return C.L('k',[identity,sign,list,scale,falsity].reduce((a,b)=>C.A(a,b),C.V('k')));
  }
+ function encodeLiteral(text){
+  const match=/^(-?)(\d+)(?:\.(\d+))?$/.exec(String(text));if(!match)throw new C.LambdaError('请填写整数或小数，例如 -12.375。');
+  const integer=match[2].replace(/^0+(?=\d)/,''),fraction=(match[3]||'').replace(/0+$/,''),raw=integer+fraction;
+  const positive=match[1]&&/[1-9]/.test(raw)?falsity:truth;
+  return C.L('k',[positive,C.churchList([...raw].map(digit=>digitTerms[Number(digit)])),C.parse(String(fraction.length))].reduce((a,b)=>C.A(a,b),C.V('k')));
+ }
  const isVar=(t,name)=>t?.type==='var'&&t.name===name;
  function nat(t){const n=C.churchNumber(t);return n!==null?n:t?.type==='abs'&&t.body.type==='abs'&&C.equal(t,digitTerms[0])?0:null;}
- function read(term){
+ function read(term,{legacyOnly=false,digitsOrder='forward'}={}){
   if(term?.type!=='abs')return null;const args=[];let body=term.body;
   while(body.type==='app'){args.unshift(body.arg);body=body.fn;}
   if(!isVar(body,term.param))return null;
   if(args.length===2&&C.equal(args[0],C.parse('λa b c.a'))){
    const error=['除数不能为0','实数平方根要求输入非负','双曲示例的输入范围是 −1 到 1','三角示例的角度范围是 −1000 到 1000 弧度'][nat(args[1])];
    if(error)return {error};
+  }
+  if(args.length===3&&!legacyOnly){
+   const positive=C.equal(args[0],truth),negative=C.equal(args[0],falsity),places=nat(args[2]);
+   if((!positive&&!negative)||places===null)return null;
+   const list=args[1];if(list.type!=='abs'||list.body.type!=='abs'||list.param===list.body.param)return null;
+   const digits=[];let current=list.body.body;
+   while(!isVar(current,list.body.param)){
+    if(current.type!=='app'||current.fn.type!=='app'||!isVar(current.fn.fn,list.param))return null;
+    const digit=nat(current.fn.arg);if(digit===null||digit>9)return null;digits.push(digit);current=current.arg;
+   }
+   return {negative:negative&&digits.some(digit=>digit!==0),digits:digitsOrder==='reverse'?digits:digits.reverse(),places,approximate:false};
   }
   if(args.length!==5||!C.equal(args[0],identity))return null;
   const negative=C.equal(args[1],truth),positive=C.equal(args[1],falsity),approximate=C.equal(args[4],truth),exact=C.equal(args[4],falsity),places=nat(args[3]);
@@ -88,7 +115,10 @@
   return (value.approximate?'≈ ':'')+(value.negative&&!/^0(?:\.0*)?$/.test(text)?'-':'')+text;
  }
  function expression(operation,args=[],precision=6){
-  return `(${C.format(program(operation,precision))})`+args.map(arg=>` (${arg})`).join('');
+  if(!Number.isSafeInteger(precision)||precision<0)throw new C.LambdaError('输出小数位数需为非负整数。');
+  const explicit=args.some(arg=>/-?[0-9](?:_[^\s()]+)/.test(String(arg)));
+  const places=explicit?`${precision}_church`:C.format(C.parse(String(precision)));
+  return `(${C.format(genericProgram(operation))})`+(precisionOperations.has(operation)?` (${places})`:'')+args.map(arg=>` (${arg})`).join('');
  }
  const shiftExpressions=new WeakMap();
  function isShiftExpression(term){
@@ -101,14 +131,18 @@
   return result;
  }
  // Fixed decimal coefficients and working precision are part of the Lambda algorithms.
- const literal=text=>`(${C.format(encodeLiteral(text))})`;
- const series=(coefficients,odd)=>{
-  const terms=coefficients.map(literal);
-  let body=odd?'dmul x v0':'v0';
-  for(let i=0;i<terms.length-1;i++)body=`work (dadd ${terms[i]} (dmul z v${i+1})) (λv${i}.${body})`;
-  return `λx.work (dmul x x) (λz.(λv${terms.length-1}.${body}) ${terms.at(-1)})`;
+ const literal=text=>`(${C.format(encodeInternal(text))})`;
+ const series=(odd,alternating)=>{
+  const initial=odd?'x':'one',factor=odd?'mul (mul 2 k) (succ (mul 2 k))':'mul (pred (mul 2 k)) (mul 2 k)';
+  return `λx.work (dmul x x) (λz.(add requested 3)
+    (λstate.state (λindex term total.empty (digits term) state ((λk.work (ddiv workplaces (dmul term z) (fromnat (${factor})))
+      (λnext.(λvalue.work (dadd total value) (λsum.λemit.emit k value sum)) (${alternating?'negate next':'next'}))) (succ index))))
+    (λemit.emit 0 ${initial} ${initial}) (λindex term total.total))`;
  };
  definitions.push(
+  ['workplaces','add requested 6'],
+  ['digitnext','y (λr ds.ds (λh rest.eq h 9 (cons 0 (r rest)) (cons (succ h) rest)) (cons 1 nil))'],
+  ['fromnat','λn.make f (n digitnext nil) 0 f'],
   ['dneg','negate'],
   ['one',literal('1')],
   ['half',literal('0.5')],
@@ -118,8 +152,8 @@
   ['dshl','λa.a (λtag s ds p e.make s (plus ds ds 0) p e)'],
   // Dividing a finite decimal by 2 multiplies its digits by 5 and adds one place.
   ['dshr','λa.a (λtag s ds p e.make s (timesdigit ds 5 0) (succ p) e)'],
-  ['work','λa k.force a (λvalue.force (cut 4 value) k)'],
-  ['estimate','λa.(cut 3 a) (λtag s ds p e.λk.k tag s ds p t)'],
+  ['work','λa k.force a (λvalue.force (cut workplaces value) k)'],
+  ['estimate','λa.(cut requested a) (λtag s ds p e.λk.k tag s ds p t)'],
   ['powerBy','y (λr a n acc.zero n acc (force (dmul a acc) (λnext.r a (pred n) next)))'],
   ['dpow','λa n.powerBy a n one'],
   ['dabs','λa.make f (digits a) (scale a) (approx a)'],
@@ -127,32 +161,51 @@
   ['rangeError','λk.k (λa b c.a) 2'],
   ['angleError','λk.k (λa b c.a) 3'],
   ['nonnegativeLess','λa b.align a b (λx z p.eq (cmp x z) 1)'],
-  ['dsqrt','λa.sign a domain (empty (digits a) a (estimate ((y (λr current.force (ddiv 4 a current) (λratio.work (dmul half (dadd current ratio)) (λnext.empty (digits next) next (nonnegativeLess next current (r next) current))))) (nonnegativeLess a one one a))))'],
-  ['sinSeries',series(['1','-0.166667','0.008333','-0.000198'],true)],
-  ['cosSeries',series(['1','-0.5','0.041667','-0.001389','0.000025'],false)],
-  ['sinhSeries',series(['1','0.166667','0.008333','0.000198'],true)],
-  ['coshSeries',series(['1','0.5','0.041667','0.001389','0.000025'],false)],
+  ['dsqrt','λa.sign a domain (empty (digits a) a (estimate ((y (λr current.force (ddiv workplaces a current) (λratio.work (dmul half (dadd current ratio)) (λnext.empty (digits next) next (nonnegativeLess next current (r next) current))))) (nonnegativeLess a one one a))))'],
+  ['sinSeries',series(true,true)],
+  ['cosSeries',series(false,true)],
+  ['sinhSeries',series(true,false)],
+  ['coshSeries',series(false,false)],
   ['withinRange','λop x.nonnegativeLess one (dabs x) rangeError (op x)'],
-  ['pi',literal('3.14159265')],
-  ['halfPi',literal('1.570796325')],
-  ['quarterPi',literal('0.7853981625')],
-  ['period',literal('6.28318530')],
+  ['atanSmall',`λx.work (dmul x x) (λz.workplaces (λstate.state (λindex power total.empty (digits power) state ((λk.work (dmul power z)
+    (λnext.work (ddiv workplaces next (fromnat (succ (mul 2 k))))
+      (λpart.work (dsub total part) (λsum.λemit.emit k (negate next) sum)))) (succ index))))
+    (λemit.emit 0 x x) (λindex power total.total))`],
+  ['pi',`dsub (dmul ${literal('16')} (atanSmall ${literal('0.2')})) (dmul ${literal('4')} (atanSmall (ddiv workplaces one ${literal('239')})))`],
+  ['halfPi',`ddiv workplaces pi ${literal('2')}`],
+  ['quarterPi',`ddiv workplaces pi ${literal('4')}`],
+  ['period',`dmul pi ${literal('2')}`],
   ['smallSin','λx.nonnegativeLess quarterPi x (cosSeries (dsub halfPi x)) (sinSeries x)'],
   ['halfWave','λx.nonnegativeLess halfPi x (smallSin (dsub pi x)) (smallSin x)'],
   ['fullWave','λx.nonnegativeLess pi x (negate (halfWave (dsub x pi))) (halfWave x)'],
   ['sinAngle',`λx.(λa.(λvalue.sign x (negate value) value)
-    (nonnegativeLess a period (fullWave a)
-      (force (ddiv 0 a period) (λturns.force (dmul turns period) (λcycles.fullWave (dsub a cycles)))))) (dabs x)`],
-  ['cosAngle','λx.force (dadd x halfPi) sinAngle'],
+    (nonnegativeLess a ${literal('0.75')} (sinSeries a)
+      (nonnegativeLess a period (fullWave a)
+        (force (ddiv 0 a period) (λturns.force (dmul turns period) (λcycles.fullWave (dsub a cycles))))))) (dabs x)`],
+  ['cosAngle',`λx.nonnegativeLess (dabs x) ${literal('0.75')} (cosSeries x) (force (dadd x halfPi) sinAngle)`],
   ['withinAngle',`λop x.nonnegativeLess ${literal('1000')} (dabs x) angleError (op x)`],
   ['dsin','withinAngle (λx.estimate (sinAngle x))'],
   ['dcos','withinAngle (λx.estimate (cosAngle x))'],
   ['dsinh','withinRange (λx.estimate (sinhSeries x))'],
   ['dcosh','withinRange (λx.estimate (coshSeries x))'],
-  ['dtan','withinAngle (λx.force (sinAngle x) (λs.force (cosAngle x) (λc.(λvalue.empty (digits value) error (estimate (ddiv 4 s c))) (cut 4 c))))'],
-  ['dtanh','withinRange (λx.force (sinhSeries x) (λs.force (coshSeries x) (λc.estimate (ddiv 4 s c))))']
+  ['dtan','withinAngle (λx.force (sinAngle x) (λs.force (cosAngle x) (λc.(λvalue.empty (digits value) error (estimate (ddiv workplaces s c))) (cut workplaces c))))'],
+  ['dtanh','withinRange (λx.force (sinhSeries x) (λs.force (coshSeries x) (λc.estimate (ddiv workplaces s c))))']
  );
- const bindings=definitions.map(([name,source])=>({name,source,free:C.freeVars(C.parse(source))}));
+ definitions.push(
+  ['churchdigits','λds c n.(y (λr xs.xs (λh rest.c h (r rest)) n)) ds'],
+  ['forwarddigits',`λds p.
+    (y (λwalk xs marks acc.xs
+      (λh rest.walk rest (marks (λtail.tail) (λc n.n)) (cons h acc))
+      ((y (λpad need zs.need (λtail.pad tail (cons 0 zs)) (churchdigits zs))) marks acc)))
+    ds ((succ p) (λtail c n.c tail) (λc n.n)) nil`],
+  ['fromexternal',`λa.a (λfirst second.(first t t i)
+    ((first t f i) (λk.k first second) (λds p e.make second ds p e))
+    (λp.make (not first) (reverse (second cons nil)) p f))`],
+  ['toexternal',`λa.a (λtag value.(tag t f i)
+    (λk.k tag value)
+    (λds p e.λk.k (not value) (forwarddigits ds p) p))`]
+ );
+ const bindings=definitions.map(([name,source])=>{try{return {name,source,free:C.freeVars(C.parse(source))};}catch(error){error.message=name+': '+error.message;throw error;}});
  const operations=new Set(['ADD','SUB','MUL','DIV','NEG','ABS','POW','SQRT','SHL','SHR','SIN','COS','TAN','SINH','COSH','TANH']);
- const API={encodeLiteral,read,format,program,expression,isShiftExpression};root.LambdaDecimal=API;if(typeof module!=='undefined'&&module.exports)module.exports=API;
+ const API={encodeLiteral,encodeInternal,read,format,program,genericProgram,precisionOperations,internalProgram:(operation,precision)=>program(operation,precision,true),expression,isShiftExpression};root.LambdaDecimal=API;if(typeof module!=='undefined'&&module.exports)module.exports=API;
 })(typeof globalThis!=='undefined'?globalThis:window);

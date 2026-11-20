@@ -24,7 +24,7 @@ test('single-bit decimal shifts compose with Church numerals and preserve long e
   [D.expression('ADD',['0.'+'9'.repeat(160)+'_decimal',tiny+'_decimal']),'1'],
   [D.expression('ADD',['1_decimal','-'+tiny+'_decimal']),'0.'+'9'.repeat(160)]
  ]){
-  const value=await Lazy.normalize(E.parse(source).term,{signal:AbortSignal.timeout(15000)});
+  const value=await Lazy.normalize(E.parse(source).term,{signal:AbortSignal.timeout(15000),onPause:()=>true});
   assert.equal(D.format(D.read(value)),expected);
  }
 });
@@ -32,7 +32,7 @@ test('digit multiplication keeps the decimal position and sign',()=>{
  for(const [a,b,want] of [['0.2','0.3','0.06'],['-1.2','0.5','-0.6'],['-2','-3','6'],['0','123.45','0'],['1.5','1.5','2.25']])assert.equal(calculate('MUL',a,b),want,`${a}*${b}`);
 });
 test('long division reports exactness, truncation, signs and division by zero',()=>{
- for(const [a,b,p,want] of [['1','8',3,'0.125'],['1','3',3,'≈ 0.333'],['-1','8',3,'-0.125'],['1.2','0.3',2,'4'],['0','7',2,'0'],['1','0',2,'除数不能为0'],['2','3',0,'≈ 0']])assert.equal(calculate('DIV',a,b,p),want,`${a}/${b}`);
+ for(const [a,b,p,want] of [['1','8',3,'0.125'],['1','3',3,'0.333'],['-1','8',3,'-0.125'],['1.2','0.3',2,'4'],['0','7',2,'0'],['1','0',2,'除数不能为0'],['2','3',0,'0']])assert.equal(calculate('DIV',a,b,p),want,`${a}/${b}`);
  assert.throws(()=>D.program('DIV',-1));
 });
 test('default editor parser uses decimal lists while the explicit Church parser stays compatible',()=>{

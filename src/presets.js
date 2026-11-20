@@ -1,6 +1,6 @@
 (function(root) {
   'use strict';
-  const M=root.LambdaPolynomial||require('./polynomial.js'),D=root.LambdaDecimal||require('./decimal.js');
+  const M=root.LambdaPolynomial||require('./polynomial.js'),D=root.LambdaDecimal||require('./decimal.js'),Meta=root.LambdaMeta||require('./meta-lambda.js');
   const I='λx.x', TRUE='λx.λy.x', FALSE='λx.λy.y';
   const TWO='λf.λx.f (f x)', THREE='λf.λx.f (f (f x))', FIVE='λf.λx.f (f (f (f (f x))))';
   const ADD='λm.λn.λf.λx.m f (n f x)', SUCC='λn.λf.λx.f (n f x)';
@@ -85,15 +85,15 @@
     { name:'等比求和 · 1 + 2 + 4 + 8 → 15', category:'高等数学', term:`(${GEOMETRIC_SUM}) 2 4`, expected:'15', description:'参数 2 是公比，4 是项数。从首项 1 开始，一边乘公比一边累加，得到 15；项数为 0 时结果为 0。' },
     { name:'二项式系数和 · C(3,0) + … + C(3,3) → 8', category:'高等数学', term:`(${BINOMIAL}) 1 1 3`, expected:'8', description:`把二项式展开中的 a、b 都设为 1，实际计算第 3 行系数和 1 + 3 + 3 + 1 = 8。${recursiveHint}` },
     { name:'二项式展开 · (1 + 2)³ → 27', category:'高等数学', term:`(${BINOMIAL}) 1 2 3`, expected:'27', description:`逐项计算 Σ C(n,k) a^(n−k) b^k。这里 a=1、b=2、n=3，四项为 1、6、12、8，总和 27。${recursiveHint}` },
-    { name:'多项式 · 2x² + 3x + 1，x=2 → 15', category:'高等数学',term:M.churchExpression('EVAL',M.churchFunction([1,3,2]),'2'),expected:'15',expectedType:'rational',parameters:['原丘奇函数 f(x)=2x² + 3x + 1','代入值 2'],description:'把原函数作为第一个参数传入，程序内部完成丘奇多项式编码和求值。可以将末尾的 λx.… 换成已保存的多项式函数名。' },
-    { name:'符号求导并求值 · (x² + 3x)′，x=2 → 7', category:'高等数学',term:M.churchExpression('DERIVATIVE',M.churchFunction([0,3,1]),'2'),expected:'7',expectedType:'rational',parameters:['原丘奇函数 f(x)=x² + 3x','代入值 2'],description:'原式：x² + 3x。程序直接接收普通丘奇多项式函数，在内部编码、生成导函数，再代入求值。参数中的数字按丘奇自然数解释。' },
-    { name:'定积分 · ∫₀³ 2x dx → 9', category:'高等数学',term:M.churchExpression('DEFINITE',M.churchFunction([0,2]),'0','3'),expected:'9',expectedType:'rational',parameters:['原丘奇函数 f(x)=2x','积分下限 0','积分上限 3'],description:'原式：2x。积分函数内部包含编码程序，直接接收原丘奇函数、下限和上限，生成原函数后计算端点差。输入函数需为自然数系数多项式，端点需为自然数且下限≤上限。' },
-    { name:'生成导函数 · x² + 3x → 2x + 3', category:'高等数学',term:M.churchExpression('DIFF',M.churchFunction([0,3,1])),expected:'2x + 3',expectedType:'polynomial',parameters:['原丘奇函数 f(x)=x² + 3x'],description:'原式：x² + 3x。把普通丘奇函数 λx.… 作为末尾参数传入，求导函数内部完成编码和求导，生成导函数 2x + 3。输入函数需为自然数系数多项式。' },
-    { name:'生成原函数 · 2x → x²（C=0）', category:'高等数学',term:M.churchExpression('INTEGRATE',M.churchFunction([0,2])),expected:'x²',expectedType:'polynomial',parameters:['原丘奇函数 f(x)=2x'],description:'原式：2x。把普通丘奇函数 λx.… 作为末尾参数传入，积分函数内部完成编码和积分，生成原函数 x²，积分常数取 0。输入函数需为自然数系数多项式。' },
+    { name:'多项式 · 2x² + 3x + 1，x=2 → 15', category:'高等数学',term:M.churchExpression('EVAL',M.churchFunction([1,3,2]),'2'),expected:'15',expectedType:'rational',parameters:['输入丘奇函数 f(x)=2x² + 3x + 1','代入值 2'],description:'把待求值的函数作为第一个参数传入，程序内部完成丘奇多项式编码和求值。可以将末尾的 λx.… 换成已保存的多项式函数名。' },
+    { name:'符号求导并求值 · (x² + 3x)′，x=2 → 7', category:'高等数学',term:M.churchExpression('DERIVATIVE',M.churchFunction([0,3,1]),'2'),expected:'7',expectedType:'rational',parameters:['输入丘奇函数 f(x)=x² + 3x','代入值 2'],description:'原式：x² + 3x。程序直接接收普通丘奇多项式函数，在内部编码、生成导函数，再代入求值。参数中的数字按丘奇自然数解释。' },
+    { name:'定积分 · ∫₀³ 2x dx → 9', category:'高等数学',term:M.churchExpression('DEFINITE',M.churchFunction([0,2]),'0','3'),expected:'9',expectedType:'rational',parameters:['输入丘奇函数 f(x)=2x','积分下限 0','积分上限 3'],description:'被积函数 f(x)=2x。积分程序内部先编码输入函数，再生成原函数 F(x)=x²，最后计算 F(上限)−F(下限)。输入函数需为自然数系数多项式，端点需为自然数且下限≤上限。' },
+    { name:'生成导函数 · x² + 3x → 2x + 3', category:'高等数学',term:M.churchExpression('DIFF',M.churchFunction([0,3,1])),expected:'2x + 3',expectedType:'polynomial',parameters:['输入丘奇函数 f(x)=x² + 3x'],description:'原式：x² + 3x。把普通丘奇函数 λx.… 作为末尾参数传入，求导函数内部完成编码和求导，生成导函数 2x + 3。输入函数需为自然数系数多项式。' },
+    { name:'生成原函数 · 2x → x²（C=0）', category:'高等数学',term:M.churchExpression('INTEGRATE',M.churchFunction([0,2])),expected:'x²',expectedType:'polynomial',parameters:['输入丘奇函数 f(x)=2x'],description:'输入被积函数 f(x)=2x，把它的丘奇 λ 函数放到末尾。程序内部编码并积分，返回表示原函数 F(x)=x² 的系数表，积分常数取 0。输入函数需为自然数系数多项式。' },
     { name:'列表小数加法 · 0.1 + 0.2 → 0.3', category:'列表小数四则', encoding:'decimal',term:D.expression('ADD',["0.1","0.2"]),decimalOperation:'ADD',operands:["0.1","0.2"],expected:'0.3',expectedType:'decimal',description:'组合子 B 把「取较大的小数位数」和「补零对齐」接起来。例如 1.2 和 0.03 对齐为 1.20 和 0.03。对齐后同号逐位加，异号用大绝对值减小绝对值。结果保留全部有效位数。' },
     { name:'列表小数减法 · 1 − 2 → −1', category:'列表小数四则', encoding:'decimal',term:D.expression('SUB',["1","2"]),decimalOperation:'SUB',operands:["1","2"],expected:'-1',expectedType:'decimal',description:'默认整数也采用列表编码。先比较绝对值，再逐位借位并确定符号，结果为负数−1。' },
     { name:'列表小数乘法 · 0.2 × 0.3 → 0.06', category:'列表小数四则', encoding:'decimal',term:D.expression('MUL',["0.2","0.3"]),decimalOperation:'MUL',operands:["0.2","0.3"],expected:'0.06',expectedType:'decimal',description:'逐位竖式相乘，小数位数相加，结果为精确0.06。' },
-    { name:'列表小数除法 · 1 ÷ 8 → 0.125', category:'列表小数四则', encoding:'decimal',term:D.expression('DIV',["1","8"]),decimalOperation:'DIV',operands:["1","8"],expected:'0.125',expectedType:'decimal',description:'用十进制长除法生成小数数字。精度至少3位时结果精确为0.125；精度不足会标≈。选择快速运行可保留全部归约步骤。' }
+    { name:'列表小数除法 · 1 ÷ 8 → 0.125', category:'列表小数四则', encoding:'decimal',term:D.expression('DIV',["1","8"]),decimalOperation:'DIV',operands:["1","8"],expected:'0.125',expectedType:'decimal',description:'用十进制长除法生成小数数字。精度至少3位时结果精确为0.125；输出按所给位数截断，近似标记只在内部使用。选择快速运行可保留全部归约步骤。' }
   ];
   const list123=churchList([1,2,3]);
   examples.push(
@@ -137,7 +137,7 @@
     expected,expectedType:'decimal',description
   });
   const angleNote='角度用弧度，可输入 −1000 到 1000。先按周期缩小角度，再用泰勒多项式近似。可点「快速求值」。';
-  const hyperbolicNote='输入范围 −1 到 1。泰勒多项式给出约三位小数，可点「快速求值」。';
+  const hyperbolicNote='输入范围 −1 到 1。级数项数和中间精度随输出位数变化，可点「快速求值」。';
   examples.push(
     advancedDecimal('取负 · −(1.25)','NEG',['1.25'],'-1.25','把符号位翻转，数字列表保持原值，零仍为零。'),
     advancedDecimal('绝对值 · |−2.75|','ABS',['-2.75'],'2.75','清除负号，保留整数和小数数位。'),
@@ -146,14 +146,15 @@
     advancedDecimal('小数二进制右移一位 · 1.25 → 0.625','SHR',['1.25'],'0.625','点击「快速求值」直接显示结果，「运行」逐步归约。只接收一个小数，数位列表乘以 5，小数位数加 1，等于精确除以 2。要移三位，可在整个示例表达式前加 3_church。'),
     advancedDecimal('带符号除法 · −7.5 ÷ 2','DIV',['-7.5','2'],'-3.75','用列表长除法求商，再根据两个输入的符号确定结果正负。'),
     advancedDecimal('倒数 · 1 ÷ 0.4','DIV',['1','0.4'],'2.5','把 1 除以第二个参数，可编辑第二个参数求其他数的倒数。'),
-    advancedDecimal('开根号 · √2','SQRT',['2'],'≈ 1.414','反复取当前估计与「输入除以当前估计」的平均值，得到非负实数平方根的近似值。可点「快速求值」。'),
-    advancedDecimal('正弦 · sin(0.5)','SIN',['0.5'],'≈ 0.479',angleNote),
-    advancedDecimal('余弦 · cos(0.5)','COS',['0.5'],'≈ 0.877',angleNote),
-    advancedDecimal('正切 · tan(0.5)','TAN',['0.5'],'≈ 0.546',angleNote),
-    advancedDecimal('双曲正弦 · sinh(−0.5)','SINH',['-0.5'],'≈ -0.521',hyperbolicNote),
-    advancedDecimal('双曲余弦 · cosh(0.5)','COSH',['0.5'],'≈ 1.127',hyperbolicNote),
-    advancedDecimal('双曲正切 · tanh(0.5)','TANH',['0.5'],'≈ 0.462',hyperbolicNote)
+    advancedDecimal('开根号 · √2','SQRT',['2'],'1.414213','反复取当前估计与「输入除以当前估计」的平均值，得到非负实数平方根的近似值。可点「快速求值」。'),
+    advancedDecimal('正弦 · sin(0.5)','SIN',['0.5'],'0.479425',angleNote),
+    advancedDecimal('余弦 · cos(0.5)','COS',['0.5'],'0.877582',angleNote),
+    advancedDecimal('正切 · tan(0.5)','TAN',['0.5'],'0.546302',angleNote),
+    advancedDecimal('双曲正弦 · sinh(−0.5)','SINH',['-0.5'],'-0.521095',hyperbolicNote),
+    advancedDecimal('双曲余弦 · cosh(0.5)','COSH',['0.5'],'1.127625',hyperbolicNote),
+    advancedDecimal('双曲正切 · tanh(0.5)','TANH',['0.5'],'0.462117',hyperbolicNote)
   );
+  examples.push({name:'λ解释器 · 编码 → 解释 → 还原表达式',category:'高等数学',encoding:'church',metaInterpreter:true,metaInput:'(λx.λy.x) y',term:Meta.compile('(λx.λy.x) y'),expected:'λz.y',description:'先把输入表达式编码成语法数据，再用λ主函数解释，最后由λ解码器还原为普通表达式。本例得到 λz.y，自由变量y保持自由。'});
   const levels = [
     { id:1, name:'原样返回', topic:'恒等函数', description:'让恒等函数接收一个函数，看看它如何把输入原样返回。', start:'(λx.x) (λy.y)', target:I, targetLabel:'I · 恒等函数', hint:'λx.x 会把参数直接返回。点击「单步」，观察 x 被整个参数替换。' },
     { id:2, name:'选择第一个', topic:'布尔值', description:'两个函数交给 TRUE；归约后应只留下第一个。', start:`(${TRUE}) (${I}) (${TRUE})`, target:I, targetLabel:'I · 恒等函数', hint:'λx.λy.x 接收两个参数，只保留第一个。第二个参数可以是任意式。' },
@@ -165,8 +166,8 @@
     { id:8, name:'连续加一', topic:'组合子 B', description:'把两个加一函数串起来，将 1 作为最初输入。', start:`(λf g x.f (g x)) (${SUCC}) (${SUCC}) 1`, target:'3', targetLabel:'Church 数字 3', hint:'B f g x = f (g x)。先计算里面的加一，再计算外面的加一。' },
     { id:9, name:'深入函数内部', topic:'λ 内部归约', description:'外层没有参数可接收，函数体里面仍然可以继续归约。', start:'λz.(λx.x) z', target:I, targetLabel:'I · 恒等函数', hint:'外层 λ 没有参数也能继续归约。先找到 λz 内部的应用，再用它的参数替换绑定变量。' },
     { id:10, name:'保护自由变量', topic:'避免变量捕获', description:'把自由变量 y 传入一个含有 λy 的函数，保留它的自由身份。', start:'(λx.λy.x) y', target:'λz.y', targetLabel:'返回自由变量 y', hint:'先把内部绑定的 y 改名，再替换 x。检查原本自由的 y 是否仍然自由，避免被内部 λ 捕获。' },
-    { id:11, name:'两者都为真', topic:'布尔 AND', description:'计算 TRUE 与 FALSE 的逻辑与，观察两个选择器的配合。', start:`(λp q.p q p) (${TRUE}) (${FALSE})`, target:FALSE, targetLabel:'FALSE · 假', hint:'p 为真时选择 q；p 为假时保留 p。这里只有一个输入为真。' },
-    { id:12, name:'有一个为真', topic:'布尔 OR', description:'计算 FALSE 与 TRUE 的逻辑或，观察第一个选择器选中了哪个分支。', start:`(λp q.p p q) (${FALSE}) (${TRUE})`, target:TRUE, targetLabel:'TRUE · 真', hint:'p 为假时选择 q。先确定被选择的分支，再继续归约该分支。' },
+    { id:11, name:'两者都为真', topic:'布尔逻辑与', description:'计算 TRUE 与 FALSE 的逻辑与，观察两个选择器的配合。', start:`(λp q.p q p) (${TRUE}) (${FALSE})`, target:FALSE, targetLabel:'FALSE · 假', hint:'p 为真时选择 q；p 为假时保留 p。这里只有一个输入为真。' },
+    { id:12, name:'有一个为真', topic:'布尔逻辑或', description:'计算 FALSE 与 TRUE 的逻辑或，观察第一个选择器选中了哪个分支。', start:`(λp q.p p q) (${FALSE}) (${TRUE})`, target:TRUE, targetLabel:'TRUE · 真', hint:'p 为假时选择 q。先确定被选择的分支，再继续归约该分支。' },
     { id:13, name:'布尔取反', topic:'布尔 NOT', description:'对 FALSE 取反，观察最终函数如何选择参数。', start:`(λb.b (${FALSE}) (${TRUE})) (${FALSE})`, target:TRUE, targetLabel:'TRUE · 真', hint:'取反函数把两个候选分支交换了位置。观察 FALSE 会选中哪个分支，再继续归约。' },
     { id:14, name:'取出第一项', topic:'有序对', description:'将 2 和 5 保存在函数里，再取出第一项。', start:`(${PAIR}) 2 5 (${TRUE})`, target:'2', targetLabel:'Church 数字 2', hint:'有序对把两个值交给选择器。TRUE 选择第一项。' },
     { id:15, name:'取出第二项', topic:'有序对', description:'使用另一个选择器，从同一个有序对中取出第二项。', start:`(${PAIR}) 2 5 (${FALSE})`, target:'5', targetLabel:'Church 数字 5', hint:'FALSE 选择第二项。观察有序对如何展开为一次函数调用。' },
@@ -182,19 +183,23 @@
     { id:25, name:'正负相遇', topic:'带符号加法', encoding:'decimal', description:'计算 −1.2 + 0.5，保留正确符号和小数位置。', start:D.expression('ADD',["-1.2","0.5"]),decimalOperation:'ADD',operands:["-1.2","0.5"], target:'-0.7', targetType:'decimal', targetLabel:'精确小数 −0.7', hint:'符号不同的加法等价于绝对值相减；较大的绝对值来自负数。' },
     { id:26, name:'从三个里选两个', topic:'组合数', strategy:'normal', direction:'left', description:'用帕斯卡递推计算 C(3,2)，不计选择顺序。本关预设从左到右正规序。', start:`(${CHOOSE}) 3 2`, target:'3', targetLabel:'Church 数字 3', hint:`C(n,0)=1，C(0,k)=0，其余拆成两个较小的组合数。${recursiveHint}` },
     { id:27, name:'三个数的连乘', topic:'迭代阶乘', description:'用有序对保存当前数字与累积乘积，真正算出 3!。', start:`(${FACTORIAL}) 3`, target:'6', targetLabel:'Church 数字 6', hint:'从 (0,1) 开始：当前数字加一，再让累计乘积乘以这个新数字。重复更新三次，最后取出乘积。' },
-    { id:28, name:'生成导函数', topic:'符号求导', description:'输入原丘奇函数 x² + 3x，在求导程序内部编码并生成导函数。',start:M.churchExpression('DIFF',M.churchFunction([0,3,1])), target:'2x + 3', targetType:'polynomial', targetLabel:'导函数 2x + 3', hint:'原函数是末尾的独立参数。编码得到降序系数 [1,3,0] 后，按原次数乘系数并去掉常数项。' },
-    { id:29, name:'生成原函数', topic:'符号积分', description:'输入原丘奇函数 λx.x，在积分程序内部编码并生成原函数，积分常数取 0。',start:M.churchExpression('INTEGRATE','λx.x'), target:'1/2x²', targetType:'polynomial', targetLabel:'原函数 ½x²（C=0）', hint:'逐项让次数加一、系数除以新次数，最后追加积分常数 0。分数系数使用有理数编码。' },
-    { id:30, name:'最后一关：曲线下面积', topic:'定积分', description:'输入原丘奇函数 2x 和积分上下限，程序内部编码、积分，再计算端点差。',start:M.churchExpression('DEFINITE',M.churchFunction([0,2]),'0','3'), target:'9', targetType:'rational', targetLabel:'有理数 9', hint:'三个末尾参数依次是原函数、下限、上限。先生成原函数系数，再代入端点相减。' }
+    { id:28, name:'生成导函数', topic:'符号求导', description:'输入输入丘奇函数 x² + 3x，在求导程序内部编码并生成导函数。',start:M.churchExpression('DIFF',M.churchFunction([0,3,1])), target:'2x + 3', targetType:'polynomial', targetLabel:'导函数 2x + 3', hint:'输入函数是末尾的独立参数。编码得到降序系数 [1,3,0] 后，按原次数乘系数并去掉常数项。' },
+    { id:29, name:'生成原函数', topic:'符号积分', description:'输入输入丘奇函数 λx.x，在积分程序内部编码并生成原函数，积分常数取 0。',start:M.churchExpression('INTEGRATE','λx.x'), target:'1/2x²', targetType:'polynomial', targetLabel:'原函数 ½x²（C=0）', hint:'逐项让次数加一、系数除以新次数，最后追加积分常数 0。分数系数使用有理数编码。' },
+    { id:30, name:'最后一关：曲线下面积', topic:'定积分', description:'输入输入丘奇函数 2x 和积分上下限，程序内部编码、积分，再计算端点差。',start:M.churchExpression('DEFINITE',M.churchFunction([0,2]),'0','3'), target:'9', targetType:'rational', targetLabel:'有理数 9', hint:'三个末尾参数依次是被积函数、下限、上限。先生成原函数系数，再代入端点相减。' }
   ];
   const stages=['入门五关','函数与绑定','逻辑与数据','自然数进阶','列表小数','高等数学'].map((name,index)=>({id:index+1,name,levelIds:levels.slice(index*5,index*5+5).map(l=>l.id)}));
-  function sourceFor(item,precision=item.decimalPlaces??6){return item.decimalOperation?D.expression(item.decimalOperation,item.operands.map((value,index)=>item.operandEncodings?.[index]==='church'?`${value}_church`:value),precision):item.term??item.start;}
-  function inputSourceFor(item,precision=item.decimalPlaces??6){return item.decimalOperation?D.expression(item.decimalOperation,item.operands.map((value,index)=>`${value}_${item.operandEncodings?.[index]??'decimal'}`),precision):sourceFor(item,precision);}
-  function parametersFor(item){
+  function rawSourceFor(item,precision=item.decimalPlaces??6){return item.decimalOperation?D.expression(item.decimalOperation,item.operands.map((value,index)=>item.operandEncodings?.[index]==='church'?`${value}_church`:value),precision):item.term??item.start;}
+  function rawInputSourceFor(item,precision=item.decimalPlaces??6){return item.decimalOperation?D.expression(item.decimalOperation,item.operands.map((value,index)=>`${value}_${item.operandEncodings?.[index]??'decimal'}`),precision):rawSourceFor(item,precision);}
+  function naming(){return root.LambdaGuideNames||(typeof require==='function'?require('./guide-names.js'):null);}
+  function sourceFor(item,precision=item.decimalPlaces??6){const raw=rawSourceFor(item,precision);return naming()?.catalog().source(raw,item.name)??raw;}
+  function inputSourceFor(item,precision=item.decimalPlaces??6){const raw=rawInputSourceFor(item,precision);return naming()?.catalog().source(raw,item.name)??raw;}
+  function parametersFor(item,precision=item.decimalPlaces??6){
     if(item.parameters)return item.parameters;
     const labels={ADD:['第一个加数','第二个加数'],DIV:['被除数','除数'],POW:['底数','指数'],SQRT:['根号内的数'],SHL:['原小数'],SHR:['原小数']}[item.decimalOperation];
-    return labels?.map((label,index)=>`${label} ${item.operands[index]}_${item.operandEncodings?.[index]??'decimal'}`)??[];
+    const parameters=labels?.map((label,index)=>`${label} ${item.operands[index]}_${item.operandEncodings?.[index]??'decimal'}`)??item.operands?.map((value,index)=>`输入${index+1} ${value}_${item.operandEncodings?.[index]??'decimal'}`)??[];
+    return D.precisionOperations.has(item.decimalOperation)?[`输出小数位数 ${precision}_church`,...parameters]:parameters;
   }
-  const API={ examples, levels, stages, sourceFor, inputSourceFor, parametersFor, I, TRUE, FALSE, churchLists:{encode:churchList,nil:NIL,cons:CONS,head:HEAD,tail:TAIL,isEmpty:EMPTY,length:LENGTH,map:MAP,append:APPEND,reverse:REVERSE,filter:FILTER}, advanced:{factorial:FACTORIAL,recursiveFactorial:RECURSIVE_FACTORIAL,choose:CHOOSE,permutations:PERMUTATIONS,sumPowers,geometricSum:GEOMETRIC_SUM,binomial:BINOMIAL,polynomial:POLYNOMIAL,derivative:DERIVATIVE,integral:INTEGRAL} };
+  const API={ examples, levels, stages, rawSourceFor, rawInputSourceFor, sourceFor, inputSourceFor, parametersFor, I, TRUE, FALSE, churchLists:{encode:churchList,nil:NIL,cons:CONS,head:HEAD,tail:TAIL,isEmpty:EMPTY,length:LENGTH,map:MAP,append:APPEND,reverse:REVERSE,filter:FILTER}, advanced:{factorial:FACTORIAL,recursiveFactorial:RECURSIVE_FACTORIAL,choose:CHOOSE,permutations:PERMUTATIONS,sumPowers,geometricSum:GEOMETRIC_SUM,binomial:BINOMIAL,polynomial:POLYNOMIAL,derivative:DERIVATIVE,integral:INTEGRAL} };
   root.LambdaPresets=API;
   if(typeof module !== 'undefined' && module.exports) module.exports=API;
 })(typeof globalThis !== 'undefined' ? globalThis : window);

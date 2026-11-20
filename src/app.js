@@ -12,7 +12,7 @@
   const Guard=window.LambdaRunGuard;
   let labPan=null;
   const state={ term:null, original:null, history:Trace.create(), dirty:false, running:false, timer:null,
-    mode:'free', level:0, completed:new Set(), halt:'', scale:1, autoFit:true, model:null, speed:600, strategy:'normal', direction:'left',numberEncoding:'church',numberFormats:{},decimalPlaces:6,growthWindowMs:Guard.DEFAULT_MS,fast:false,encodings:null,encodingBusy:false };
+    mode:'free', level:0, completed:new Set(), halt:'', scale:1, autoFit:true, model:null, speed:600, strategy:'normal', direction:'left',numberEncoding:'church',numberFormats:{},decimalPlaces:6,decimalDigitsOrder:'forward',growthWindowMs:Guard.DEFAULT_MS,fast:false,encodings:null,encodingBusy:false };
   let toastTimer,workspace,viewer,dataEditor,formatEditor,guide,conversionController=null,compilingDefinitions=null,preparationTimer=null,historySource=null,renderedCount=0,diagramTerm=null,diagramRoute=null;
   const RUN_PAINT_INTERVAL=120;
   const INLINE_HISTORY_NODES=256;
@@ -20,7 +20,8 @@
   let historyPage=null,shownStart=0,rewindJob=null,historyJob=null,openHistoryEntry=null;
   let lastRunPaint=0,diagramHistoryIndex=-1,diagramHistory=null,diagramPalette=null;
   let palette=Palette.defaults,paletteFrame=null;
-  const decodedTerms=new WeakMap(),TRUE=C.parse(P.TRUE),FALSE=C.parse(P.FALSE),IDENTITY=C.parse(P.I);
+  let decodedTerms=new WeakMap();
+  const TRUE=C.parse(P.TRUE),FALSE=C.parse(P.FALSE),IDENTITY=C.parse(P.I);
   const diagramView=window.LambdaDiagramView.init($('diagram-mount'));
   const paletteEditor=Palette.init($('diagram-palette'),colors=>{
     applyPalette(colors);
@@ -55,7 +56,7 @@
   function capture() {
     return {...dataEditor.capture(),draft:input.value,completed:[...state.completed],mode:state.mode,level:state.level,
       session:{original:state.original,steps:Math.max(0,state.history.length-1),dirty:state.dirty,halt:state.halt,...(state.encodings===null?{}:{encodings:state.encodings}),...(state.history.choices.length?{choices:state.history.choices}:{})},
-      view:{growthWindowMs:state.growthWindowMs,speed:state.speed,strategy:state.strategy,direction:state.direction,numberEncoding:state.numberEncoding,numberFormats:state.numberFormats,inputFormatDraft:formatEditor.capture(),guideExample:guide.capture(),decimalPlaces:state.decimalPlaces,...(palette===Palette.defaults?{}:{palette}),scale:state.scale,autoFit:state.autoFit,panX:labPan?.x??$('diagram-viewport').scrollLeft,panY:labPan?.y??$('diagram-viewport').scrollTop,historyOpen:$('history-details').open,helpOpen:!$('help-panel').hidden,hintOpen:!$('hint').hidden},
+      view:{growthWindowMs:state.growthWindowMs,speed:state.speed,strategy:state.strategy,direction:state.direction,numberEncoding:state.numberEncoding,numberFormats:state.numberFormats,inputFormatDraft:formatEditor.capture(),guideExample:guide.capture(),decimalPlaces:state.decimalPlaces,decimalDigitsOrder:state.decimalDigitsOrder,...(palette===Palette.defaults?{}:{palette}),scale:state.scale,autoFit:state.autoFit,panX:labPan?.x??$('diagram-viewport').scrollLeft,panY:labPan?.y??$('diagram-viewport').scrollTop,historyOpen:$('history-details').open,helpOpen:!$('help-panel').hidden,hintOpen:!$('hint').hidden},
       selection:{start:input.selectionStart,end:input.selectionEnd},error:$('error-message').hidden?'':$('error-message').textContent};
   }
   function applySnapshot(s) {
@@ -71,6 +72,8 @@
     state.growthWindowMs=s.view.growthWindowMs??Guard.DEFAULT_MS;$('growth-window').value=String(state.growthWindowMs);
     labPan=s.mode==='guide'?{x:s.view.panX,y:s.view.panY}:null;
     state.numberEncoding=s.view.numberEncoding??'church';state.numberFormats=s.view.numberFormats??{};state.decimalPlaces=s.view.decimalPlaces??6;
+    state.decimalDigitsOrder=s.view.decimalDigitsOrder??'reverse';
+    decodedTerms=new WeakMap();interpretedSource=null;
     state.encodings=s.session.encodings??null;dataEditor.restore(s);formatEditor.restore(s.view.inputFormatDraft);
     guide.restore(s.view.guideExample);
     applyPalette(s.view.palette??Palette.defaults);paletteEditor.restore(palette);
@@ -110,7 +113,7 @@
     stop(); $('error-message').hidden=true; state.halt='';state.dirty=true;
     $('challenge-feedback').textContent=''; $('next-level').hidden=true;
     try {
-      if(state.numberEncoding==='decimal'&&!$('decimal-places').checkValidity())throw new C.LambdaError('除法小数位数需为非负整数。');
+      if(state.numberEncoding==='decimal'&&!$('decimal-places').checkValidity())throw new C.LambdaError('输出小数位数需为非负整数。');
       const compiled=await E.compile(input.value,dataEditor.entries(),state.numberEncoding,{numberFormats:state.numberFormats,signal:controller.signal,onProgress:literal=>{if(!showedProgress){state.encodingBusy=true;render();showedProgress=true;}encodingProgress.hidden=false;cancelEncoding.hidden=false;encodingProgress.textContent=`正在自动编码 ${literal.number}_${literal.name} · ${literal.steps} 步`;}});
       if(controller.signal.aborted||conversionController!==controller)return false;
       if(compiled.mappings.some(mapping=>!dataEditor.entries().some(entry=>entry.name===mapping.name&&entry.term===mapping.definition)))return false;
@@ -123,6 +126,9 @@
       dataEditor.remember(compiled.mappings);
       const term=parsed===compiled.term?expanded(parsed):parsed;
       viewer?.cancelZoom();
+      workspace?.beginSession();
+      state.decimalDigitsOrder='forward';
+      decodedTerms=new WeakMap();
       state.term=term; state.original=term; state.history=Trace.create(term);state.dirty=false;state.encodingBusy=false;state.encodings=[...new Set([...compiled.encodings,...(workspace?.encodingsFor(parsed)??[])])];
       state.autoFit=true; render(); save(); return true;
     } catch(e) {
@@ -183,9 +189,9 @@
     $('fit').setAttribute('aria-pressed',String(state.autoFit));
   }
   function describeInterpretation(term){
-    const decimal=window.LambdaDecimal.read(term);
+    const decimal=window.LambdaDecimal.read(term,{legacyOnly:state.numberEncoding!=='decimal'&&!state.encodings?.includes('decimal'),digitsOrder:state.decimalDigitsOrder});
     if(decimal)return decimal.error?`错误：${decimal.error}`:`小数 ${window.LambdaDecimal.format(decimal)}`;
-    const integer=E.readBuiltin(term,'int');
+    const integer=E.readBuiltin(term,'int',{legacyOnly:state.numberEncoding!=='int'&&!state.encodings?.includes('int')});
     if(integer!==null)return integer;
     const number=C.churchNumber(term);
     return number===null?E.readChurchList(term)??C.format(term):`丘奇数 ${number}`;
@@ -193,7 +199,7 @@
   function renderInterpretation(source){
     if(source===interpretedSource)return;
     interpretedSource=source;
-    interpretedTerm=source?window.LambdaMeta.readTerm(source):null;
+    interpretedTerm=source?(window.LambdaMeta.readTerm(source)??(state.original&&window.LambdaMeta.isPipeline(state.original)?source:null)):null;
     interpretedDetails.hidden=!interpretedTerm;
     if(!interpretedTerm)interpretedDetails.open=false;
     interpretedExpression.textContent=interpretedTerm&&interpretedDetails.open?C.format(interpretedTerm):'';
@@ -202,11 +208,11 @@
     interpretedExpression.textContent=interpretedTerm&&interpretedDetails.open?C.format(interpretedTerm):'';
   });
   function decode(t, showFreeVariables=true) {
-    const interpreted=window.LambdaMeta.readTerm(t);
+    const interpreted=window.LambdaMeta.readTerm(t)??(state.original&&window.LambdaMeta.isPipeline(state.original)&&!C.hasRedex(t)?t:null);
     if(interpreted)return `解释器结果：${describeInterpretation(interpreted)}`;
     if(decodedTerms.has(t))return decodedTerms.get(t);
-    const decimal=window.LambdaDecimal.read(t);if(decimal){const text=decimal.error?`错误：${decimal.error}`:`小数 ${window.LambdaDecimal.format(decimal)}`;decodedTerms.set(t,text);return text;}
-    const integer=E.readBuiltin(t,'int');
+    const decimal=window.LambdaDecimal.read(t,{legacyOnly:state.numberEncoding!=='decimal'&&!state.encodings?.includes('decimal'),digitsOrder:state.decimalDigitsOrder});if(decimal){const text=decimal.error?`错误：${decimal.error}`:`小数 ${window.LambdaDecimal.format(decimal)}`;decodedTerms.set(t,text);return text;}
+    const integer=E.readBuiltin(t,'int',{legacyOnly:state.numberEncoding!=='int'&&!state.encodings?.includes('int')});
     if(integer!==null){decodedTerms.set(t,integer);return integer;}
     const body=t.type==='abs'?t.body:null;
     if(body?.type==='app'&&body.fn.type==='app'&&body.fn.fn.type==='app'){
@@ -354,10 +360,10 @@
     $('number-encoding').value=state.numberEncoding;$('decimal-places').value=state.decimalPlaces;
     const builtinNotes={
       church:'当前编码：丘奇自然数。直接写3，也可写3_church或3_丘奇数。带后缀的数字使用指定编码，例如0.1_decimal。',
-      decimal:`当前编码：列表小数。直接写0.1或-2，也可写0.1_decimal。用3_church或3_丘奇数指定丘奇数。除法示例生成 ${state.decimalPlaces} 位小数，改位数后请重新选择示例。`,
+      decimal:`当前编码：列表小数。数位按书写顺序排列，例如0.125 = λk.k true [0,1,2,5] 3；true为正，false为负。可写0.1、-2或0.1_decimal。除法、根号和三角函数的第一个参数指定输出小数位数；默认${state.decimalPlaces}位。`,
       list:'当前编码：丘奇列表。123 编码成数位列表 [1, 2, 3]。可以直接写 [12, 3] 或 []。',
       bool:'当前编码：丘奇布尔。0 表示假，1 表示真，也可以写 0_bool 或 1_bool。',
-      int:'当前编码：丘奇整数。可以直接写 -3，或在其他编码下写 -3_int。负小数可以写 -1.25_decimal。'
+      int:'当前编码：丘奇整数。结构为 λk.k 正负标记 绝对值，不含ID；true为正，false为负。可以写-3或-3_int。'
     };
     $('number-note').textContent=builtinNotes[state.numberEncoding]??`当前编码：${state.numberEncoding.slice(7)}。直接写3即可转换，也可写3_${state.numberEncoding.slice(7)}；用3_church或3_丘奇数指定丘奇数。`;
     const ready=state.term&&!state.dirty, redex=state.term?C.findRedex(state.term,[],state.strategy,state.direction):null;
@@ -389,7 +395,7 @@
     $('run-status').textContent=rewindJob?'正在重算上一帧…':state.encodingBusy?'正在自动归约数字编码，完成后显示图示。':!state.term?'输入有效表达式后，就能开始运行。':state.dirty?'输入已改变。重新转换后开始新的归约。':
       state.halt|| (state.running?'自动运行中。高亮线路标记下一次函数替换。':!redex?'已到 β 正规形；可点击单步或运行再次尝试，不能归约时保持当前式。':count?'可以继续单步，或回退查看上一帧。':'准备好了。点击单步，观察一次函数替换。');
     $('current-expression').textContent=state.term?C.format(state.term):'—';
-    $('expression-encoding').textContent=!state.term?'':state.encodings===null?'编码：旧存档保留原表达式':state.encodings.length?`数字来源编码：${state.encodings.map(E.label).join('、')}`:'编码：纯 λ 表达式（无数字字面量）';
+    $('expression-encoding').textContent=!state.term?'':state.encodings===null?'编码：旧存档保留原表达式':state.encodings.length?`数字来源编码：${state.encodings.map(E.label).join('、')}${state.encodings.includes('decimal')&&state.decimalDigitsOrder==='reverse'?'（旧数位顺序，原表达式保留）':''}`:'编码：纯 λ 表达式（无数字字面量）';
     const customNames=state.encodings?.filter(name=>!E.isBuiltin(name))??[];
     const hasCustomData=customNames.length>0;
     for(const name of state.encodings??[])if(E.isBuiltin(name)&&dataEditor.entries().some(entry=>entry.name===name))customNames.push(name);
@@ -471,10 +477,11 @@
     schedule();
   }
   function setSource(source) { input.value=source; changed(); convert(); }
+  const teachingText=text=>window.LambdaGuide.catalog().text(text);
   function revealAnswer(show) {
     const level=P.levels[state.level];$('challenge-target').hidden=!show;
     $('answer-toggle').textContent=show?'收起答案':'查看答案';$('answer-toggle').setAttribute('aria-expanded',String(show));
-    $('target-label').textContent=show?level.targetLabel:'';$('target-expression').textContent=show?level.target:'';
+    $('target-label').textContent=show?teachingText(level.targetLabel):'';$('target-expression').textContent=show?level.target:'';
   }
   function renderLevels() {
     const l=P.levels[state.level],stage=P.stages.find(s=>s.levelIds.includes(l.id));
@@ -493,9 +500,9 @@
       b.className=(index===state.level?'active ':'')+(state.completed.has(level.id)?'completed':'');
       b.setAttribute('aria-pressed',String(index===state.level));b.addEventListener('click',()=>selectLevel(index));list.append(b);
     });
-    $('level-topic').textContent=`CHALLENGE ${String(l.id).padStart(2,'0')} / ${l.topic}`;
-    $('level-title').textContent=l.name; $('level-description').textContent=l.description;
-    revealAnswer(!$('challenge-target').hidden);$('hint').textContent=l.hint;
+    $('level-topic').textContent=`CHALLENGE ${String(l.id).padStart(2,'0')} / ${teachingText(l.topic)}`;
+    $('level-title').textContent=l.name; $('level-description').textContent=teachingText(l.description);
+    revealAnswer(!$('challenge-target').hidden);$('hint').textContent=teachingText(l.hint);
     $('target-kind').textContent=l.targetType?'目标结果（归约至正规形）':'目标正规形';
     $('progress-text').textContent=state.mode==='challenge'?`${state.completed.size} / ${P.levels.length} 关已完成`:state.mode==='guide'?`${P.examples.length} 个示例原理`:'探索 · 输入 · 归约';
   }
@@ -587,21 +594,21 @@
   P.examples.forEach((e,i)=>{
     const category=e.category||'入门';
     if(!exampleGroups.has(category)){const group=document.createElement('optgroup');group.label=category;exampleGroups.set(category,group);$('examples').append(group);}
-    const option=document.createElement('option');option.value=i;option.textContent=e.name;exampleGroups.get(category).append(option);
+    const option=document.createElement('option');option.value=i;option.textContent=window.LambdaGuide.titleFor(e);exampleGroups.get(category).append(option);
   });
   $('examples').addEventListener('change',()=>{
     const value=$('examples').value;if(value==='')return;const example=P.examples[Number(value)];if(!example)return;
     state.numberEncoding=example.encoding||'church';setSource(P.inputSourceFor(example,state.decimalPlaces));$('examples').value='';
-    const truncated=example.decimalOperation==='DIV'&&state.decimalPlaces<(example.expected.split('.')[1]?.length??0);
+    const truncated=window.LambdaDecimal.precisionOperations.has(example.decimalOperation)&&state.decimalPlaces!==6;
     const expected=example.expectedType==='decimal'?(truncated?'按设置的小数位数截断':`小数 ${example.expected}`):example.expectedType==='polynomial'?`多项式：${example.expected}`:example.expectedType==='rational'?`有理数 ${example.expected}`:example.expected===undefined?'':decode(C.parse(example.expected));
-    const info=$('example-info'),parameters=P.parametersFor(example);
+    const info=$('example-info'),parameters=P.parametersFor(example,state.decimalPlaces);
     info.replaceChildren();
     if(parameters.length){
       const guide=document.createElement('strong');
       guide.textContent=`式子末尾从左到右是${parameters.join('、')}。改参数时保留前面的 λ 程序。`;
       info.append(guide,document.createElement('br'));
     }
-    if(example.description)info.append(`${example.description} 预期结果为${example.expectedLabel||expected}。`);
+    if(example.description)info.append(`${window.LambdaGuide.lesson(example).purpose} 预期结果为${example.expectedLabel||expected}。`);
     info.hidden=!info.hasChildNodes();
   });
   $('convert').addEventListener('click',convert);$('step').addEventListener('click',advance);$('run').addEventListener('click',()=>run());

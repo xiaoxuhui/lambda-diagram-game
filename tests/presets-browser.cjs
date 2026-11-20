@@ -1,19 +1,19 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 let pw;try{pw=require('playwright');}catch{pw=require(path.resolve(path.dirname(process.execPath),'../node_modules/playwright'));}
-const P=require('../src/presets.js');process.env.PORT='0';const server=require('../scripts/serve.cjs');
+const P=require('../src/presets.js'),G=require('../src/guide.js');process.env.PORT='0';const server=require('../scripts/serve.cjs');
 (async()=>{
  if(!server.listening)await new Promise(r=>server.once('listening',r));
  const base=`http://127.0.0.1:${server.address().port}`,browser=await pw.chromium.launch({headless:true});let passed=0;const errors=[];
  const check=async(name,fn)=>{await fn();console.log(`PASS A${++passed} ${name}`);};
  try{
   for(const width of [1280,390]){
-   const context=await browser.newContext({viewport:{width,height:900},hasTouch:true}),page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));await page.goto(base);
+   const context=await browser.newContext({viewport:{width,height:900},hasTouch:true}),page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));await page.goto(base);await page.locator('#growth-window').selectOption('0');
    const select=async(fragment)=>{const i=P.examples.findIndex(e=>e.name.includes(fragment));assert.ok(i>=0,fragment);await page.locator('#examples').selectOption(String(i));return P.examples[i];};
    const run=async(number)=>{await page.locator('#speed-ms').fill('1');await page.locator('#run').click();await page.waitForFunction(()=>document.getElementById('state-badge').textContent==='已到正规形',null,{timeout:180000});assert.equal(await page.locator('#decoded').textContent(),`Church 数 ${number}`);};
    await check(`${width}px grouped choices all render complete diagrams and descriptions`,async()=>{
     assert.equal(await page.locator('#examples option').count(),P.examples.length+1);assert.equal(await page.locator('#examples optgroup').count(),9);
-    assert.equal(await page.locator('#examples optgroup[label="高等数学"] option').count(),22);
-    for(const e of P.examples.filter(e=>e.expected!==undefined)){await select(e.name);assert.equal(await page.locator('#expression').inputValue(),P.inputSourceFor(e));assert.ok(await page.locator('#diagram-mount line').count()>0);assert.ok(await page.locator('#error-message').isHidden());assert.ok((await page.locator('#example-info').textContent()).includes(e.description));}
+    assert.equal(await page.locator('#examples optgroup[label="高等数学"] option').count(),23);
+    for(const e of P.examples.filter(e=>e.expected!==undefined)){await select(e.name);assert.equal(await page.locator('#expression').inputValue(),P.inputSourceFor(e));assert.ok(await page.locator('#diagram-mount line').count()>0);assert.ok(await page.locator('#error-message').isHidden());assert.ok((await page.locator('#example-info').textContent()).includes(G.lesson(e).purpose));}
     assert.equal(await page.locator('#function-count').textContent(),'0 个函数');
    });
    await check(`${width}px recursive guidance preserves the player's order and direction`,async()=>{
@@ -46,11 +46,11 @@ const P=require('../src/presets.js');process.env.PORT='0';const server=require('
     const example=await select('正弦 · sin');
     assert.equal(example.category,'高等小数');
     await page.locator('#decimal-value').click();
-    await page.waitForFunction(()=>document.getElementById('decimal-value-result').textContent==='小数 ≈ 0.479');
+    await page.waitForFunction(()=>document.getElementById('decimal-value-result').textContent==='小数 0.479425');
     await page.locator('#expression').fill(P.inputSourceFor(example).replace('0.5_decimal','-0.5_decimal'));
     await page.locator('#convert').click();
     await page.locator('#decimal-value').click();
-    await page.waitForFunction(()=>document.getElementById('decimal-value-result').textContent==='小数 ≈ -0.479');
+    await page.waitForFunction(()=>document.getElementById('decimal-value-result').textContent==='小数 -0.479425');
     assert.equal(await page.locator('#step-count').textContent(),'0');
    });
    await check(`${width}px single-bit decimal shifts can be repeated with Church numerals`,async()=>{

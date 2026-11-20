@@ -25,12 +25,12 @@ test('the generated Lambda program normalizes code and preserves binding',()=>{
   ];
   for(const [source,expected] of cases){
     const encoded=C.parse(M.compile(source));
-    assert.equal(C.freeVars(encoded).size,0,source);
+    assert.deepEqual([...C.freeVars(encoded)].sort(),[...C.freeVars(C.parse(source))].sort(),source);
     assert.equal(M.read(encoded),null,source);
     const result=C.normalize(encoded,4000);
     assert.equal(result.status,'normal',source);
-    const decoded=M.read(result.term);
-    assert.ok(decoded&&C.equal(C.parse(decoded),C.parse(expected)),source);
+    assert.ok(C.equal(result.term,C.parse(expected)),source);
+    assert.equal(M.readTerm(result.term),null,source);
   }
 });
 
@@ -50,20 +50,14 @@ test('factoring dispatch reduces temporary expansion and preserves previously ge
       term=next.term;steps++;peak=Math.max(peak,C.inspect(term).nodes);
     }
     assert.equal(C.hasRedex(term),false);
-    assert.equal(C.churchNumber(M.readTerm(term)),3);
+    assert.equal(C.churchNumber(M.readTerm(term)??term),3);
     return {term,peak,steps};
   }
   const before=evaluate(previous),after=evaluate(M.repair(previous));
   assert.ok(after.peak<before.peak/2,`${before.peak} -> ${after.peak}`);
-  assert.ok(C.equal(M.readTerm(before.term),M.readTerm(after.term)));
-  const marker=after.term.body.fn.arg;
-  let node=marker;const params=[];
-  while(node.type==='abs'){params.push(node.param);node=node.body;}
-  for(const name of params){
-    const pending=[node];let count=0;
-    while(pending.length){const next=pending.pop();if(next.type==='var')count+=next.name===name;else pending.push(next.fn,next.arg);}
-    assert.equal(count,1);
-  }
+  assert.ok(C.equal(M.readTerm(before.term)??before.term,after.term));
+  assert.equal(M.readTerm(after.term),null);
+  assert.equal(C.churchNumber(after.term),3);
 });
 
 test('interpreting a prepared expression preserves its numeric representation',()=>{
@@ -74,7 +68,8 @@ test('interpreting a prepared expression preserves its numeric representation',(
       const next=C.step(interpreted);if(!next)break;interpreted=next.term;
     }
     assert.equal(C.hasRedex(interpreted),false);
-    const decoded=M.readTerm(interpreted);
+    const decoded=interpreted;
+    assert.equal(M.readTerm(interpreted),null);
     assert.ok(decoded&&C.equal(decoded,direct));
     assert.equal(Decimal.format(Decimal.read(decoded)),expected);
   }
@@ -98,7 +93,7 @@ test('a trailing argument and a library function are interpreted inside a pasted
       value=step.term;
     }
     assert.equal(C.findRedex(value),null);
-    assert.equal(C.churchNumber(C.parse(M.read(value))),27);
+    assert.equal(C.churchNumber(value),27);
   }
   assert.equal(M.sourceOf('succ 2'),'succ 2');
 });
@@ -114,5 +109,5 @@ test('the pasted legacy example recovers successor in an empty library',()=>{
     value=step.term;
   }
   assert.equal(C.findRedex(value),null);
-  assert.equal(C.churchNumber(C.parse(M.read(value))),27);
+  assert.equal(C.churchNumber(value),27);
 });

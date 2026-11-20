@@ -47,7 +47,7 @@ test('the original eight choices and five challenges retain their identities',()
 });
 for(const e of P.examples.filter(e=>e.expected!==undefined))test(`example reaches its stated result: ${e.name}`,async()=>{
   const parsed=e.encoding==='decimal'?E.parse(P.inputSourceFor(e)).term:C.parse(e.term);
-  assert.equal(C.freeVars(parsed).size,0,e.name);
+  assert.deepEqual([...C.freeVars(parsed)].sort(),e.metaInterpreter?[...C.freeVars(C.parse(e.metaInput))].sort():[],e.name);
   assert.ok(e.category&&e.description);
   let value;if(e.category==='高等小数')value=await Lazy.normalize(parsed,{signal:AbortSignal.timeout(15000),onPause:()=>true});
   else if(e.encoding==='decimal'){value=parsed;for(let n=0;n<100000;n++){const r=C.step(value);if(!r)break;value=r.term;}assert.equal(C.findRedex(value),null);}
@@ -60,16 +60,16 @@ for(const e of P.examples.filter(e=>e.expected!==undefined))test(`example reache
 test('scientific decimal programs respond to edits, including domain errors',async()=>{
   for(const [op,args,expected] of [
     ['POW',['-2_decimal','4_church'],'16'],
-    ['SQRT',['4_decimal'],'≈ 2'],
-    ['SQRT',['0.00000001_decimal'],'≈ 0'],
+    ['SQRT',['4_decimal'],'2'],
+    ['SQRT',['0.00000001_decimal'],'0.0001'],
     ['SQRT',['-1_decimal'],'实数平方根要求输入非负'],
-    ['SIN',['-0.5_decimal'],'≈ -0.479'],
-    ['SIN',['10_decimal'],'≈ -0.543'],
-    ['COS',['2_decimal'],'≈ -0.416'],
+    ['SIN',['-0.5_decimal'],'-0.479425'],
+    ['SIN',['10_decimal'],'-0.544'],
+    ['COS',['2_decimal'],'-0.416'],
     ['SIN',['1001_decimal'],'三角示例的角度范围是 −1000 到 1000 弧度'],
     ['SINH',['2_decimal'],'双曲示例的输入范围是 −1 到 1']
   ]){
-    const term=E.parse(D.expression(op,args)).term;
+    const term=E.parse(D.expression(op,args,(op==='SIN'&&args[0]==='10_decimal')||(op==='COS'&&args[0]==='2_decimal')?3:6)).term;
     const value=await Lazy.normalize(term,{signal:AbortSignal.timeout(15000),onPause:()=>true});
     assert.equal(D.format(D.read(value)),expected,op+' '+args.join(' '));
   }
@@ -86,7 +86,7 @@ test('Pascal combinations handle edges, symmetry and k greater than n',()=>{
     assert.equal(C.churchNumber(result(`(${P.advanced.choose}) ${n} ${k}`)),expected,`C(${n},${k})`);
 });
 test('higher mathematics includes combinations and genuine symbolic calculus',()=>{
-  const group=P.examples.filter(e=>e.category==='高等数学');assert.equal(group.length,22);
+  const group=P.examples.filter(e=>e.category==='高等数学');assert.equal(group.length,23);
   assert.equal(P.examples[20].category,'高等数学');assert.equal(P.examples[21].name,'斐波那契 · F(5) → 5');
   for(const name of ['排列数','自然数求和','平方和','立方和','等比求和','系数和','二项式展开','多项式','符号求导','定积分','生成导函数','生成原函数','超幂','超超幂','开根号','整数除法','对数','超对数','超根号','超超根号','超超对数'])assert.ok(group.some(e=>e.name.startsWith(name)||e.name.includes(name)),name);
 });

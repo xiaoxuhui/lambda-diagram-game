@@ -54,7 +54,15 @@
     reify:'fix (λquote value depth.value (λbody depth.abs (quote (body (neutral (λd.bound (pred (depth pred d))))) (succ depth))) (λterm.term) depth)',
     evalTerm:'fix (λeval env term.term get (λname env.neutral (λdepth.freeTerm name)) (λbody env.closure (λvalue.eval (cons value env) body)) (λp q env.(eval env p) (λbody.body) (λterm argument.neutral (λdepth.app (term depth) (reify argument depth))) (eval env q)) env)'
   };
-  const program=makeProgram(environmentDefinitions.map(([name,source])=>[name,factoredDefinitions[name]??source]));
+  const evaluatorDefinitions=environmentDefinitions.map(([name,source])=>[name,factoredDefinitions[name]??source]);
+  const taggedProgram=makeProgram(evaluatorDefinitions);
+  const pipelineMarker=C.parse('λa b c d e f g h.h g f e d c b a');
+  const decoderDefinition='λfreeenv.fix (λdecode env term.term (λi.get i env) (λi.get i freeenv) (λbody.λx0.decode (cons x0 env) body) (λp q.(decode env p) (decode env q)))';
+  const pipelineDefinitions=[...evaluatorDefinitions,['decode',decoderDefinition]];
+  const mainSource='λfreeenv input.decode freeenv nil (normalize input)';
+  let pipelineBody=C.parse(mainSource);
+  for(const [name,source] of [...pipelineDefinitions].reverse())pipelineBody=A(L(name,pipelineBody),C.parse(source));
+  const program=A(L('pipelineTag',pipelineBody),pipelineMarker);
 
   function variant(index,fields){
     const params=['boundCase','freeCase','absCase','appCase'];
@@ -69,7 +77,7 @@
       A(A(V('c'),numeral(code)),tail),V('n'));
     return L('c',L('n',body));
   }
-  function quote(term){
+  function quote(term,freeIndices=null){
     const scope=[],pending=[{term}],quoted=[];
     while(pending.length){
       const entry=pending.pop(),node=entry.term;
@@ -77,7 +85,7 @@
       else if(entry.finish==='app'){const arg=quoted.pop();quoted.push(variant(3,[quoted.pop(),arg]));}
       else if(node.type==='var'){
         const index=scope.lastIndexOf(node.name);
-        quoted.push(index<0?variant(1,[encodeName(node.name)]):variant(0,[numeral(scope.length-1-index)]));
+        quoted.push(index<0?variant(1,[freeIndices?numeral(freeIndices.get(node.name)):encodeName(node.name)]):variant(0,[numeral(scope.length-1-index)]));
       }else if(node.type==='abs'){
         scope.push(node.param);pending.push({finish:'abs'},{term:node.body});
       }else pending.push({finish:'app'},{term:node.arg},{term:node.fn});
@@ -86,18 +94,28 @@
   }
   function compileTerm(term,expand=term=>term){
     const restored=unwrap(term);
-    return A(program,quote(restored?expandInput(restored,expand):expand(term)));
+    const input=restored?expandInput(restored,expand):expand(term),names=[...C.freeVars(input)].sort(),indices=new Map(names.map((name,index)=>[name,index]));
+    const used=new Set(names),fresh=base=>{let name=base;while(used.has(name))name+="'";used.add(name);return name;};
+    const next=fresh('next'),end=fresh('end');let freeenv=L(next,L(end,V(end)));
+    for(const name of [...names].reverse())freeenv=L(next,L(end,A(A(V(next),V(name)),freeenv)));
+    return A(A(program,freeenv),quote(input,indices));
   }
 
   function unwrap(term){
     const {head,args}=application(term);
+    if(args.length>=3&&C.equal(args[0],pipelineMarker)&&C.equal(head,program.fn)){
+      const values=readEnvironment(args[1]),original=values&&unquote(args[2],values);
+      if(original)return {term:args.slice(3).reduce(A,original),legacy:false,previous:false,trailing:args.length>3,pipeline:true};
+      return null;
+    }
     if(args.length>=2){
       const oldTag=C.equal(args[0],legacyMarker);
       const legacy=oldTag&&C.equal(head,legacyProgram.fn);
       const previous=oldTag&&C.equal(head,previousProgram.fn);
-      if(!legacy&&!previous&&!(C.equal(args[0],marker)&&C.equal(head,program.fn)))return null;
+      const tagged=C.equal(args[0],marker)&&C.equal(head,taggedProgram.fn);
+      if(!legacy&&!previous&&!tagged)return null;
       const original=unquote(args[1]);
-      if(original)return {term:args.slice(2).reduce(A,original),legacy,previous,trailing:args.length>2};
+      if(original)return {term:args.slice(2).reduce(A,original),legacy,previous,trailing:args.length>2,tagged};
     }
     return null;
   }
@@ -134,7 +152,16 @@
     if(head.type!=='var'||head.name!==term.param||args.length!==2||!C.equal(args[0],marker)&&!C.equal(args[0],legacyMarker))return null;
     return unquote(args[1]);
   }
-  function unquote(term){
+  function readEnvironment(term){
+    const values=[];
+    while(term?.type==='abs'&&term.body.type==='abs'){
+      const body=term.body.body;if(body.type==='var'&&body.name===term.body.param)return values;
+      if(body.type!=='app'||body.fn.type!=='app'||body.fn.fn.type!=='var'||body.fn.fn.name!==term.param)return null;
+      values.push(body.fn.arg);term=body.arg;
+    }
+    return null;
+  }
+  function unquote(term,freeValues=null){
     const pending=[{term,depth:0}],nodes=[],free=new Set();
     while(pending.length){
       const entry=pending.pop();
@@ -153,9 +180,12 @@
         if(value===null||value>=entry.depth)return null;
         nodes.push({type:'bound',index:value});
       }else if(index===1){
-        const name=readName(args[0]);
-        if(name===null)return null;
-        free.add(name);nodes.push(V(name));
+        if(freeValues){
+          const index=C.churchNumber(args[0]);if(index===null||index>=freeValues.length)return null;
+          const value=freeValues[index];for(const name of C.freeVars(value))free.add(name);nodes.push({type:'native',term:value});
+        }else{
+          const name=readName(args[0]);if(name===null)return null;free.add(name);nodes.push(V(name));
+        }
       }else if(index===2){
         pending.push({finish:'abs'},{term:args[0],depth:entry.depth+1});
       }else pending.push({finish:'app'},{term:args[1],depth:entry.depth},{term:args[0],depth:entry.depth});
@@ -171,6 +201,7 @@
       else if(entry.finish==='app'){const arg=result.pop();result.push(A(result.pop(),arg));}
       else if(node.type==='bound')result.push(V(scope[scope.length-1-node.index]));
       else if(node.type==='var')result.push(node);
+      else if(node.type==='native')result.push(node.term);
       else if(node.type==='abs'){
         let name;
         do{name='x'+next++;}while(free.has(name));
@@ -184,12 +215,17 @@
     sourceOf:source=>{const restored=unwrap(C.parse(source));return restored?C.format(restored.term):source;},
     isProgram:term=>{
       const {head,args}=application(term);
-      return args.length===2&&C.equal(args[0],marker)&&C.equal(head,program.fn);
+      return args.length===3&&C.equal(args[0],pipelineMarker)&&C.equal(head,program.fn)||args.length===2&&C.equal(args[0],marker)&&C.equal(head,taggedProgram.fn);
     },
-    needsRepair:term=>{const restored=unwrap(term);return !!(restored&&(restored.legacy||restored.previous||restored.trailing));},
+    isPipeline:term=>{const {head,args}=application(term);return args.length===3&&C.equal(args[0],pipelineMarker)&&C.equal(head,program.fn);},
+    definitions:pipelineDefinitions.map(([name,source])=>({name,source})),mainSource,
+    stages:term=>{const expression=compileTerm(term);return {input:term,freeEnvironment:expression.fn.arg,encoded:expression.arg,expression};},
+    needsRepair:term=>{const restored=unwrap(term);return !!(restored&&(restored.legacy||restored.previous||restored.tagged||restored.trailing));},
     repair:(term,expand=term=>term)=>{
       const restored=unwrap(term);
-      return restored&&(restored.legacy||restored.previous||restored.trailing)?A(program,quote(expandInput(restored,expand))):term;
+      if(!restored)return term;
+      const input=expandInput(restored,expand);
+      return restored.legacy||restored.previous||restored.tagged||restored.trailing||!C.equal(input,restored.term)?compileTerm(input):term;
     }
   };
   root.LambdaMeta=API;

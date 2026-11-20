@@ -117,7 +117,7 @@ test('archives reject malformed or duplicate converters without evaluating user 
 });
 test('decimal examples explicitly annotate operands for the new editor parser',()=>{
   for(const example of P.examples.filter(e=>e.decimalOperation&&e.category!=='高等小数')){
-    const parsed=E.parse(P.inputSourceFor(example));assert.deepEqual(parsed.encodings,['decimal']);
+    const parsed=E.parse(P.inputSourceFor(example));assert.deepEqual(parsed.encodings,D.precisionOperations.has(example.decimalOperation)?['church','decimal']:['decimal']);
     assert.equal(D.format(D.read(normalize(parsed.term))),example.expected);
   }
 });
