@@ -3,6 +3,7 @@
   const C=root.LambdaCore||require('./core.js'),L=root.LambdaLibrary||require('./library.js'),P=root.LambdaPresets||require('./presets.js'),E=root.LambdaDataEncoding||require('./data-encoding.js');
   const Palette=root.LambdaPalette||require('./palette.js');
   const Trace=root.LambdaTrace||require('./trace.js');
+  const F=root.LambdaFunctionReduction||require('./function-reduction.js');
   const Guard=root.LambdaRunGuard||require('./run-guard.js');
   const LEVEL_IDS=new Set(P.levels.map(l=>l.id));
   const MAX_BYTES=2*1024*1024;
@@ -22,7 +23,7 @@
     const term=walk(raw,1);C.inspect(term);return term;
   }
   function validate(raw) {
-    if(!object(raw)||![2,3,4].includes(raw.version))fail('不支持这个存档版本。');
+    if(!object(raw)||![2,3,4,5].includes(raw.version))fail('不支持这个存档版本。');
     if(typeof raw.draft!=='string')fail('草稿缺失或不是文本。');
     if(!Array.isArray(raw.functions))fail('函数库不合法。');
     const functions=raw.functions.map(f=>{
@@ -48,10 +49,17 @@
     if(!Number.isInteger(raw.level)||raw.level<0||raw.level>=P.levels.length)fail('关卡编号不合法。');
     const s=raw.session;if(!object(s)||!Number.isSafeInteger(s.steps)||s.steps<0||typeof s.dirty!=='boolean')fail('归约状态不合法。');
     const original=s.original===null?null:ast(s.original);if(!original&&s.steps!==0)fail('没有起始表达式，无法恢复归约。');
+    const functionDefinitions=s.functionDefinitions===undefined?undefined:(Array.isArray(s.functionDefinitions)?s.functionDefinitions.map(fn=>{
+      if(!object(fn))fail('会话函数定义不合法。');return {name:fn.name,term:ast(fn.term)};
+    }):fail('会话函数库不合法。'));
+    if(functionDefinitions)L.validate(functionDefinitions);
     const encodings=s.encodings??[];
     if(!Array.isArray(encodings)||encodings.some(name=>!C.validName(name)))fail('表达式编码标记不合法。');
     const getChoice=(choice,allowOrder)=>{
       if(choice===null||allowOrder&&Trace.isOrder(choice))return choice;
+      if(allowOrder&&object(choice)&&Object.keys(choice).length===1&&Array.isArray(choice.unfold)&&functionDefinitions){
+        if(choice.unfold.some(part=>!['body','fn','arg'].includes(part)))fail('函数展开路径不合法。');return {unfold:choice.unfold.slice()};
+      }
       if(!Array.isArray(choice)||choice.some(part=>!['body','fn','arg'].includes(part)))fail('归约路径不合法。');
       return choice.slice();
     };
@@ -71,11 +79,13 @@
       });
       version=4;
     }
+    if(functionDefinitions!==undefined)version=5;
     if(typeof s.halt!=='string'||s.halt.length>500)fail('暂停信息不合法。');
     const v=raw.view;if(!object(v)||!Number.isInteger(v.speed)||v.speed<1||v.speed>60000||!Number.isFinite(v.scale)||v.scale<.02||v.scale>16)fail('视图设置不合法。');
     const growthWindowMs=v.growthWindowMs??Guard.DEFAULT_MS;if(![0,1000,3000,10000,30000].includes(growthWindowMs))fail('运行增长观察窗口不合法。');
     const strategy=v.strategy===undefined?'normal':v.strategy;if(!C.STRATEGIES.includes(strategy))fail('归约顺序不合法。');
     const direction=v.direction===undefined?'left':v.direction;if(!C.DIRECTIONS.includes(direction))fail('归约方向不合法。');
+    const unfoldFunctions=v.unfoldFunctions??false;if(typeof unfoldFunctions!=='boolean')fail('函数展开开关不合法。');
     const numberEncoding=v.numberEncoding===undefined?'decimal':v.numberEncoding;if(!E.isBuiltin(numberEncoding)&&!dataEncodings.some(entry=>numberEncoding===`custom:${entry.name}`))fail('数字编码不合法。');
     const numberFormats=v.numberFormats??{};E.validateFormats(dataEncodings,numberFormats);
     const inputFormatDraft=v.inputFormatDraft;
@@ -100,17 +110,18 @@
     const functionSource=functionDraft.syntax==='math'&&draftFunction?.sourceSyntax==='math'&&functionDraft.source===draftFunction.source?C.format(functions.find(fn=>fn.name===editing).term):functionDraft.source;
     return {version,savedAt:typeof raw.savedAt==='string'&&Number.isFinite(Date.parse(raw.savedAt))?raw.savedAt:new Date().toISOString(),draft,
       functions,dataEncodings,encodingDraft:{name:encodingDraft.name,source:encodingDraft.source,...(encodingEditing===null?{}:{editing:encodingEditing})},completed:[...new Set(raw.completed)],mode:raw.mode,level:raw.level,
-      session:{original,steps:s.steps,dirty:s.dirty,halt:s.halt,...(s.encodings===undefined?{}:{encodings:[...new Set(encodings)]}),...(paths===undefined?{}:{paths}),...(choices===undefined?{}:{choices})},view:{growthWindowMs,speed:v.speed,strategy,direction,numberEncoding,decimalPlaces,decimalDigitsOrder,...(v.guideExample===undefined?{}:{guideExample:v.guideExample}),...(v.numberFormats===undefined?{}:{numberFormats:{...numberFormats}}),...(inputFormatDraft===undefined?{}:{inputFormatDraft:{encoding:inputFormatDraft.encoding,text:inputFormatDraft.text}}),...(palette===undefined?{}:{palette}),scale:v.scale,autoFit:v.autoFit,panX,panY,historyOpen:v.historyOpen,helpOpen:v.helpOpen,hintOpen:v.hintOpen},
+      session:{original,...(functionDefinitions===undefined?{}:{functionDefinitions}),steps:s.steps,dirty:s.dirty,halt:s.halt,...(s.encodings===undefined?{}:{encodings:[...new Set(encodings)]}),...(paths===undefined?{}:{paths}),...(choices===undefined?{}:{choices})},view:{growthWindowMs,speed:v.speed,strategy,direction,unfoldFunctions,numberEncoding,decimalPlaces,decimalDigitsOrder,...(v.guideExample===undefined?{}:{guideExample:v.guideExample}),...(v.numberFormats===undefined?{}:{numberFormats:{...numberFormats}}),...(inputFormatDraft===undefined?{}:{inputFormatDraft:{encoding:inputFormatDraft.encoding,text:inputFormatDraft.text}}),...(palette===undefined?{}:{palette}),scale:v.scale,autoFit:v.autoFit,panX,panY,historyOpen:v.historyOpen,helpOpen:v.helpOpen,hintOpen:v.hintOpen},
       selection:{start:Math.min(selection.start,draft.length),end:Math.min(selection.end,draft.length)},error:raw.error||(unconverted?'数学写法已移除。原草稿已保留，请改写为 λ 表达式。':''),functionDraft:{name:functionDraft.name,source:functionSource,...(editing===null?{}:{editing})}};
   }
   function* replay(s,compact) {
     let term=s.session.original,choice=null,next=0;
-    const trace=compact?Trace.create(term):null;
+    const definitions=s.session.functionDefinitions??[],reducer=F.create(definitions);
+    const trace=compact?Trace.create(term,definitions):null;
     const history=!compact&&term?[{term,change:null}]:[];
     for(let i=0;i<s.session.steps;i++){
       if(s.session.paths)choice=s.session.paths[i];
       else if(s.session.choices?.[next]?.[0]===i)choice=s.session.choices[next++][1];
-      const result=Trace.step(term,choice);
+      const result=Trace.step(term,choice,reducer);
       if(!result)fail(Array.isArray(choice)?'归约路径未指向可归约项。':'步数超过实际可归约次数。');
       term=result.term;
       if(trace)trace.append(result,choice);else history.push({term,change:result});
@@ -181,11 +192,25 @@
     }finally{iterator.return();}
   }
   function decodeStartingState(text,{draftOnly=false}={}){
-    const {snapshot,legacy}=parseArchive(text),{original,encodings}=snapshot.session;
+    const {snapshot,legacy}=parseArchive(text),{original,encodings,functionDefinitions}=snapshot.session;
     const term=draftOnly?null:original;
-    return {...snapshot,session:{original:term,encodings,steps:0,dirty:draftOnly||snapshot.session.dirty,halt:''},
-      term,trace:Trace.create(term),hasSession:draftOnly||!legacy};
+    return {...snapshot,session:{original:term,encodings,...(functionDefinitions===undefined?{}:{functionDefinitions}),steps:0,dirty:draftOnly||snapshot.session.dirty,halt:''},
+      term,trace:Trace.create(term,functionDefinitions),hasSession:draftOnly||!legacy};
   }
-  const API={MAX_BYTES,ast,validate,encode,encodeBackup,decode,decodeAsync,decodeStartingState};root.LambdaSnapshot=API;
+  function legacyMirror(snapshot){
+    const projected=JSON.parse(encode(snapshot));
+    if(projected.version!==5)return projected;
+    const definitions=snapshot.session.functionDefinitions??[],names=new Set(definitions.map(fn=>fn.name));
+    let term=snapshot.term??snapshot.session.original;
+    const pending=()=>term&&[...C.freeVars(term)].some(name=>names.has(name));
+    for(let i=0;i<definitions.length&&pending();i++)term=L.expand(term,definitions);
+    const unresolved=!!pending();
+    projected.version=3;
+    projected.session={original:term,steps:0,dirty:snapshot.session.dirty||unresolved,halt:snapshot.session.halt,...(snapshot.session.encodings===undefined?{}:{encodings:snapshot.session.encodings})};
+    projected.view.unfoldFunctions=false;
+    if(unresolved)projected.error='这个会话含有尚未展开的函数，请在支持 v5 存档的新版中继续。';
+    return projected;
+  }
+  const API={MAX_BYTES,ast,validate,encode,encodeBackup,decode,decodeAsync,decodeStartingState,legacyMirror};root.LambdaSnapshot=API;
   if(typeof module!=='undefined'&&module.exports)module.exports=API;
 })(typeof globalThis!=='undefined'?globalThis:window);

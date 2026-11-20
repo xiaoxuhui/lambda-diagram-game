@@ -353,7 +353,8 @@
     }
     const entry=lessons[example.name];
     if(!entry)throw new Error(`Missing explanation for ${example.name}`);
-    return Pairs.describe(example,{...Details.describe(example,precision),core:entry[0],principle:entry[1],walkthrough:entry[2],...Advanced.describe(example,precision)});
+    const compact={'S K K → I':'S K K','组合子 C · 交换参数 → 3':'C TRUE 2 3','组合子 W · 复制参数 → 9':'W MUL 3'}[example.name];
+    return Pairs.describe(example,{...Details.describe(example,precision),core:entry[0],principle:entry[1],walkthrough:entry[2],...(compact?{compact}:{}),...Advanced.describe(example,precision)});
   }
   const namedLessons=new Map();
   function catalog(){return Names?.catalog();}

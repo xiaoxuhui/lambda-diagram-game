@@ -1,17 +1,20 @@
 (function(root){
   'use strict';
   const C=root.LambdaCore||require('./core.js');
+  const F=root.LambdaFunctionReduction||require('./function-reduction.js');
   const RECENT_FRAMES=4;
   const orders=new Map([
     ['normal:right',['normal','right']],
     ['applicative:left',['applicative','left']],
     ['applicative:right',['applicative','right']]
   ]);
-  function step(term,choice){
+  function step(term,choice,reducer){
+    if(choice&&Array.isArray(choice.unfold))return reducer?.unfoldAt(term,choice.unfold)??null;
     if(Array.isArray(choice))return C.stepAt(term,choice);
     return choice==null?C.step(term):C.step(term,...orders.get(choice));
   }
-  function create(original=null){
+  function create(original=null,functionDefinitions=[]){
+    const reducer=F.create(functionDefinitions);
     const initial=original?{term:original,change:null}:null,choices=[];
     let recent=initial?[initial]:[],steps=0;
     const length=()=>initial?steps+1:0;
@@ -34,7 +37,7 @@
       for(let i=0;i<index;i++){
         if(signal?.aborted)throw signal.reason;
         if(choices[next]?.[0]===i)choice=choices[next++][1];
-        const change=step(frame.term,choice);
+        const change=step(frame.term,choice,reducer);
         if(!change)throw new C.LambdaError('无法重算此步归约。');
         frame={term:change.term,change};
         if(keepRecent)keep(frames,frame);

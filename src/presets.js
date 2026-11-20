@@ -1,5 +1,6 @@
 (function(root) {
   'use strict';
+  const C=root.LambdaCore||require('./core.js');
   const M=root.LambdaPolynomial||require('./polynomial.js'),D=root.LambdaDecimal||require('./decimal.js'),Meta=root.LambdaMeta||require('./meta-lambda.js');
   const I='λx.x', TRUE='λx.λy.x', FALSE='λx.λy.y';
   const TWO='λf.λx.f (f x)', THREE='λf.λx.f (f (f x))', FIVE='λf.λx.f (f (f (f (f x))))';
@@ -54,19 +55,20 @@
   const MAP='λf l c n.l (λh r.c (f h) r) n', APPEND='λa b c n.a c (b c n)';
   const REVERSE=`λl.l (λh r a.r ((${CONS}) h a)) (${I}) (${NIL})`;
   const FILTER='λp l c n.l (λh r.p h (c h r) r) n';
+  const SKK=`(λS K.S K K) (λf g x.f x (g x)) (${TRUE})`;
   const listExample=(name,term,expected,description,expectedLabel)=>({name,category:'丘奇列表',encoding:term===NIL?'list':'church',term,expected,description,expectedLabel});
   const examples = [
     { name:'恒等函数 I', term:I },
     { name:'TRUE · 选择第一个', term:TRUE },
     { name:'FALSE / 数字 0', term:FALSE },
     { name:'Church 数字 2', term:TWO },
-    { name:'S K K → I', term:`(λx y z.(x z) (y z)) (${TRUE}) (${TRUE})` },
+    { name:'S K K → I', term:SKK },
     { name:'加法 · 2 + 3', term:`(${ADD}) (${TWO}) (${THREE})` },
     { name:'Ω · 无限循环', term:'(λx.x x) (λx.x x)' },
     { name:'防止变量捕获', term:'(λx.λy.x) y' },
     { name:'组合子 B · 连续加一 → 5', category:'组合子', term:`(λf g x.f (g x)) (${SUCC}) (${SUCC}) 3`, expected:'5', description:'B 把两个函数串起来：先执行 g，再执行 f。把两个加一组合起来，3 变成 5。' },
-    { name:'组合子 C · 交换参数 → 3', category:'组合子', term:`(λf x y.f y x) (${TRUE}) 2 3`, expected:'3', description:'C 交换函数的两个参数。TRUE 原本选择第一个，交换 2 和 3 后返回 3。' },
-    { name:'组合子 W · 复制参数 → 9', category:'组合子', term:`(λf x.f x x) (${MULT}) 3`, expected:'9', description:'W 把一个参数交给函数两次。把乘法和 3 交给它，得到 3 × 3 = 9。' },
+    { name:'组合子 C · 交换参数 → 3', category:'组合子', term:`(λC TRUE.C TRUE 2 3) (λf x y.f y x) (${TRUE})`, expected:'3', description:'C 交换函数的两个参数。TRUE 原本选择第一个，交换 2 和 3 后返回 3。' },
+    { name:'组合子 W · 复制参数 → 9', category:'组合子', term:`(λW MUL.W MUL 3) (λf x.f x x) (${MULT})`, expected:'9', description:'W 把一个参数交给函数两次。把乘法和 3 交给它，得到 3 × 3 = 9。' },
     { name:'乘法 · 2 × 3 → 6', category:'基础数学', term:`(${MULT}) 2 3`, expected:'6', description:'把重复 3 次的函数再重复 2 次，结果是 Church 数 6。' },
     { name:'乘方 · 2⁴ → 16', category:'基础数学', term:`(${POW}) 2 4`, expected:'16', parameters:['底数 2','指数 4'], description:'Church 数也能当函数使用：指数 4 作用在底数 2 上，归约得到 16。' },
     { name:'前驱 · 3 − 1 → 2', category:'基础数学', term:`(${PRED}) 3`, expected:'2', description:'前驱函数去掉一次函数作用；0 的前驱仍然是 0。' },
@@ -161,7 +163,7 @@
     { id:3, name:'翻转真假', topic:'函数组合', description:'将 TRUE 交给 NOT，观察取反后函数的行为。', start:`(λb.b (${FALSE}) (${TRUE})) (${TRUE})`, target:FALSE, targetLabel:'FALSE · 选择第二个', hint:'布尔值本身是一个选择器。NOT 把 FALSE 放在第一位，把 TRUE 放在第二位。' },
     { id:4, name:'再走一步', topic:'Church 数', description:'将 2 交给后继函数，归约到没有可归约项。', start:`(${SUCC}) (${TWO})`, target:THREE, targetLabel:'Church 数字 3', hint:'数字 n 表示重复 n 次。「加一」会在 n 次作用之外，再套上一层 f。' },
     { id:5, name:'让函数相加', topic:'Church 加法', description:'不用宿主语言的数字运算，只靠函数计算 2 + 3。', start:`(${ADD}) (${TWO}) (${THREE})`, target:FIVE, targetLabel:'Church 数字 5', hint:'m f (n f x)：先把 f 作用 n 次，再继续作用 m 次。运行到正规形后验证答案。' },
-    { id:6, name:'组合子的配合', topic:'S K K', description:'将两个 K 组合子交给 S，找出最终得到的函数。', start:`(λx y z.(x z) (y z)) (${TRUE}) (${TRUE})`, target:I, targetLabel:'I · 恒等函数', hint:'先把两个 K 代入 S，追踪它们如何接收同一个参数。即使外层已经是 λ，也要继续归约函数体。' },
+    { id:6, name:'组合子的配合', topic:'S K K', description:'将两个 K 组合子交给 S，找出最终得到的函数。', start:SKK, target:I, targetLabel:'I · 恒等函数', hint:'先把两个 K 代入 S，追踪它们如何接收同一个参数。即使外层已经是 λ，也要继续归约函数体。' },
     { id:7, name:'交换参数', topic:'组合子 C', description:'交换 TRUE 的两个输入，从 2 和 3 中选出原来的第二项。', start:`(λf x y.f y x) (${TRUE}) 2 3`, target:'3', targetLabel:'Church 数字 3', hint:'先代入 f=TRUE，再跟踪两个输入在交换后的位置。暂时不要展开输入数字。' },
     { id:8, name:'连续加一', topic:'组合子 B', description:'把两个加一函数串起来，将 1 作为最初输入。', start:`(λf g x.f (g x)) (${SUCC}) (${SUCC}) 1`, target:'3', targetLabel:'Church 数字 3', hint:'B f g x = f (g x)。先计算里面的加一，再计算外面的加一。' },
     { id:9, name:'深入函数内部', topic:'λ 内部归约', description:'外层没有参数可接收，函数体里面仍然可以继续归约。', start:'λz.(λx.x) z', target:I, targetLabel:'I · 恒等函数', hint:'外层 λ 没有参数也能继续归约。先找到 λz 内部的应用，再用它的参数替换绑定变量。' },
@@ -188,8 +190,8 @@
     { id:30, name:'最后一关：曲线下面积', topic:'定积分', description:'输入输入丘奇函数 2x 和积分上下限，程序内部编码、积分，再计算端点差。',start:M.churchExpression('DEFINITE',M.churchFunction([0,2]),'0','3'), target:'9', targetType:'rational', targetLabel:'有理数 9', hint:'三个末尾参数依次是被积函数、下限、上限。先生成原函数系数，再代入端点相减。' }
   ];
   const stages=['入门五关','函数与绑定','逻辑与数据','自然数进阶','列表小数','高等数学'].map((name,index)=>({id:index+1,name,levelIds:levels.slice(index*5,index*5+5).map(l=>l.id)}));
-  function rawSourceFor(item,precision=item.decimalPlaces??6){return item.decimalOperation?D.expression(item.decimalOperation,item.operands.map((value,index)=>item.operandEncodings?.[index]==='church'?`${value}_church`:value),precision):item.term??item.start;}
-  function rawInputSourceFor(item,precision=item.decimalPlaces??6){return item.decimalOperation?D.expression(item.decimalOperation,item.operands.map((value,index)=>`${value}_${item.operandEncodings?.[index]??'decimal'}`),precision):rawSourceFor(item,precision);}
+  function rawSourceFor(item,precision=item.decimalPlaces??6){return C.explicitLambdas(item.decimalOperation?D.expression(item.decimalOperation,item.operands.map((value,index)=>item.operandEncodings?.[index]==='church'?`${value}_church`:value),precision):item.term??item.start);}
+  function rawInputSourceFor(item,precision=item.decimalPlaces??6){return C.explicitLambdas(item.decimalOperation?D.expression(item.decimalOperation,item.operands.map((value,index)=>`${value}_${item.operandEncodings?.[index]??'decimal'}`),precision):rawSourceFor(item,precision));}
   function naming(){return root.LambdaGuideNames||(typeof require==='function'?require('./guide-names.js'):null);}
   function sourceFor(item,precision=item.decimalPlaces??6){const raw=rawSourceFor(item,precision);return naming()?.catalog().source(raw,item.name)??raw;}
   function inputSourceFor(item,precision=item.decimalPlaces??6){const raw=rawInputSourceFor(item,precision);return naming()?.catalog().source(raw,item.name)??raw;}

@@ -40,6 +40,19 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
       await page.locator('.guide-pair-complete > summary').first().click();assert.ok(await page.locator('.guide-pair-source').first().isVisible());
       await page.locator('#guide-example').selectOption('0');assert.ok(await page.locator('#guide-expression').isHidden());
     });
+    await check('s, c and w are visible shorthand calls and are actually called by the runnable examples',async()=>{
+      const C=require('../src/core.js');
+      for(const [index,short,expected] of [[4,'s true true','λx.x'],[9,'c true 2 3','3'],[10,'w mul 3','9']]){
+        await page.locator('#guide-example').selectOption(String(index));
+        assert.equal(await page.locator('#guide-expression-short').textContent(),short);
+        await page.locator('#guide-load').click();
+        assert.match(await page.locator('#expression').inputValue(),new RegExp('λ'+short[0]+'\\b'));
+        await page.locator('#convert').click();await page.locator('#fast-run').click();
+        await page.waitForFunction(()=>document.getElementById('state-badge').textContent==='已到正规形');
+        assert.ok(C.equal(C.parse(await page.locator('#current-expression').textContent()),C.parse(expected)));
+        await page.locator('#mode-guide').click();
+      }
+    });
     await check('search, category filtering, empty results and previous/next navigation work',async()=>{
       await page.locator('#guide-category').selectOption('基础数学');
       assert.equal(await page.locator('#guide-example option').count(),P.examples.filter(e=>e.category==='基础数学').length);

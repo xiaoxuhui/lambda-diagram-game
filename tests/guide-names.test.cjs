@@ -3,6 +3,17 @@ const C=require('../src/core.js'),E=require('../src/data-encoding.js'),P=require
 const G=require('../src/guide.js');
 const catalog=G.catalog();
 
+test('all examples and lessons write every Lambda parameter explicitly without changing binding structure',()=>{
+  const grouped=/λ(?:`[^`]+`|[^\sλ\\().\[\],`]+)\s+(?:`[^`]+`|[^\sλ\\().\[\],`]+)\s*\./u;
+  const parse=source=>C.parse(source,Infinity,()=>C.parse('0'),{suffixes:true});
+  for(const item of [...P.examples,...P.levels]){
+    const source=P.inputSourceFor(item);assert.ok(!grouped.test(source),item.name);
+    const raw=P.rawInputSourceFor(item);assert.ok(C.equal(parse(raw),parse(C.explicitLambdas(raw))),item.name);
+    if(!item.decimalOperation){const original=item.term??item.start;assert.ok(C.equal(parse(original),parse(P.rawSourceFor(item))),item.name+' preserves original bindings');}
+  }
+  for(const example of P.examples){const doc=G.lesson(example);for(const source of [doc.core,doc.foundation,doc.walkthrough,...doc.steps.map(step=>step[2]??''),...doc.symbols.map(symbol=>symbol.source)])assert.ok(!grouped.test(source),example.name);}
+});
+
 test('generated naming data matches every raw tutorial',()=>{
   const data=require('../src/guide-name-data.js');
   assert.equal(data.lessons.length,P.examples.length);
@@ -35,8 +46,8 @@ test('all tutorials use one name per expression and one definition per name',()=
     }
   }
   for(const entry of catalog.entries()){
-    assert.match(entry.name,/^(?:[a-z][a-z0-9]*|S)$/,entry.name);
-    assert.ok(!/[A-Z]/.test(entry.source.replace(/\bS\b/g,'')),entry.name);
+    assert.match(entry.name,/^[a-z][a-z0-9]*$/,entry.name);
+    assert.ok(!/[A-Z]/.test(entry.source),entry.name);
     assert.equal(entry.source,byName.get(entry.name),entry.name);
     const pending=[C.parse(entry.source)];while(pending.length){const term=pending.pop();if(term.type==='abs'){assert.equal(term.param.length,1,entry.name+': '+term.param);pending.push(term.body);}else if(term.type==='app')pending.push(term.fn,term.arg);}
   }
@@ -48,8 +59,30 @@ test('common names stay short and the pair selector is f',()=>{
   assert.equal(alias('TRUE').name,'true');assert.equal(alias('FALSE').name,'false');
   assert.equal(alias('SUCC').name,'succ');assert.equal(alias('PRED').name,'pred');
   assert.equal(alias('factorialiter').name,'fac');assert.equal(alias('FAC').name,'recfac');
-  assert.equal(alias('S').name,'S');assert.equal(alias('S').source,'λf.λg.λx.f x (g x)');
+  assert.equal(alias('S').name,'s');assert.equal(alias('S').source,'λf.λg.λx.f x (g x)');
+  assert.equal(alias('C').name,'c');assert.equal(alias('C').source,'λf.λx.λy.f y x');
+  assert.equal(alias('W').name,'w');assert.equal(alias('W').source,'λf.λx.f x x');
   for(const name of ['timesdigit','sinseries','fromexternal','toexternal'])assert.ok(entries.some(entry=>entry.name===name),name+' retains its meaning');
+});
+
+test('S, C and W examples reference their named combinators in both shorthand and runnable programs',()=>{
+  for(const [index,name,compact,expected] of [[4,'s','s true true','λx.x'],[9,'c','c true 2 3','3'],[10,'w','w mul 3','9']]){
+    const example=P.examples[index],doc=G.lesson(example),program=P.inputSourceFor(example),term=C.parse(program);
+    assert.equal(doc.compact,compact);assert.ok(!doc.walkthrough.includes('dup'));
+    assert.match(program,new RegExp('λ'+name+'\\b'));
+    function used(node,bound=false){
+      if(node.type==='var')return bound&&node.name===name;
+      if(node.type==='abs')return used(node.body,bound||node.param===name);
+      return used(node.fn,bound)||used(node.arg,bound);
+    }
+    assert.ok(used(term),name+' is called inside its local binding');
+    assert.equal(C.freeVars(term).size,0);
+    const result=C.normalize(term,2000);assert.equal(result.status,'normal');assert.ok(C.equal(result.term,C.parse(expected)));
+    const definitions=new Map(doc.symbols.map(symbol=>[symbol.name,C.parse(symbol.source)]));
+    const expand=t=>{for(const name of C.freeVars(t))if(definitions.has(name))t=C.substitute(t,name,expand(definitions.get(name)));return t;};
+    const expanded=expand(C.parse(compact));assert.equal(C.freeVars(expanded).size,0);
+    assert.ok(C.equal(C.normalize(expanded,2000).term,result.term));
+  }
 });
 
 test('equivalent selectors and cross-domain helpers merge while distinct list constructors stay distinct',()=>{

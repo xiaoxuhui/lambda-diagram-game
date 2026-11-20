@@ -113,7 +113,7 @@
     function recoverDraft(text,message,draftOnly=false){
       const snapshot=S.decodeStartingState(text,{draftOnly});
       apply(snapshot);recoveredDraft=snapshot.draft;checkpoint=text;
-      const original=JSON.parse(text);if([2,3,4].includes(original.version))recoveredSession=S.validate(original).session;
+      const original=JSON.parse(text);if([2,3,4,5].includes(original.version))recoveredSession=S.validate(original).session;
       $('storage-status').textContent='已保留原自动存档';
       feedback(message);
     }
@@ -221,7 +221,13 @@
     });
     window.addEventListener('pagehide',()=>persist());
     return {expand:t=>L.expand(t,functions),encodingsFor:t=>L.encodingsFor(t,functions),persist,queueSave,restoreInitial,
-      beginSession:()=>{recoveredDraft=null;recoveredSession=null;}};
+      beginSession:()=>{recoveredDraft=null;recoveredSession=null;},
+      functionEntries:()=>functions.slice(),
+      installDefinitions:entries=>{
+        let next=functions;
+        for(const fn of entries){const existing=next.find(item=>item.name===fn.name);if(existing){if(!C.equal(existing.term,fn.term))throw new C.LambdaError('函数库已修改，请重新编译。');}else next=L.add(next,fn.name,fn.source);}
+        functions=next;renderLibrary();
+      }};
   }
   root.LambdaWorkspace={init};
 })(typeof globalThis!=='undefined'?globalThis:window);

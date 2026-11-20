@@ -21,7 +21,7 @@
     CHOOSE:'choose',PERM:'perm',SUM1:'sum',SUM2:'sum2',SUM3:'sum3',GEOSUM:'geosum',BINOM:'binom',TET:'tet',PENT:'pent',SEARCH:'search',ROOT:'root',QUOT:'quot',LOG:'log',SLOG:'slog',SROOT:'sroot',PROOT:'proot',PLOG:'plog',
     S:'applyboth',C:'flip',W:'dup',Ω:'omega',A:'predstep',Z:'predseed',FAC:'factorial',predicate:'nonzero',next:'mark',chain:'chain',bound:'boundterm',freeTerm:'freeterm',abs:'lambdaterm',app:'applyterm',get:'lookup',decode:'decodeterm',evalTerm:'evalterm'
   };
-  const shortNames={first:'fst',second:'snd',fix:'y',applyboth:'S',factorialiter:'fac',factorialstep:'facstep',factorial:'recfac',fibonacci:'fib'};
+  const shortNames={first:'fst',second:'snd',fix:'y',applyboth:'s',flip:'c',dup:'w',factorialiter:'fac',factorialstep:'facstep',factorial:'recfac',fibonacci:'fib'};
   function shortParameter(name,body,bindings,resolve){
     const used=new Set(bindings.values()),pending=[body];
     while(pending.length){const node=pending.pop();if(node.type==='var'){if(node.name!==name)used.add(bindings.get(node.name)??resolve(node.name)??node.name);}else if(node.type==='abs'){if(node.param!==name)used.add(node.param);pending.push(node.body);}else pending.push(node.fn,node.arg);}
@@ -110,7 +110,7 @@
         if(matches.length===leaves.length&&matches.every((match,index)=>literals.has(leaves[index][0])||(match[1]??match[0])===leaves[index][0])){
           let offset=0,index=0,output='';
           for(const match of matches){const [before,after]=leaves[index++];output+=source.slice(offset,match.index)+(before===after?match[0]:C.formatName(after));offset=match.index+match[0].length;}
-          return output+source.slice(offset);
+          return C.explicitLambdas(output+source.slice(offset));
         }
       }
       return C.format(result).replace(/讲解数值占位_[0-9]+_/g,name=>literals.get(name)??name);
@@ -121,7 +121,7 @@
     }
     const parseable=text=>!/[=→←≡≈≤≥×÷+−²³Σ∫…：，。；]/u.test(text)&&!/[fF][′']*\(/.test(text);
     function code(text,ctx){
-      return [...new Set(text.split('\n').map(line=>codeLine(line,ctx)))].join('\n');
+      return C.explicitLambdas([...new Set(text.split('\n').map(line=>codeLine(line,ctx)))].join('\n'));
     }
     function codeLine(line,ctx){
       if(line.includes('；'))return line.split('；').map(part=>codeLine(part,ctx)).join('；');
@@ -186,7 +186,7 @@
       if(doc.compact)result.compact=code(doc.compact,ctx);
       result.steps=doc.steps.map(([title,explanation,expression,calculation])=>[scan(title,ctx),scan(explanation,ctx),expression===undefined?undefined:code(expression,ctx),calculation?mapValue(calculation):undefined]);
       result.walkthrough=code(doc.walkthrough,ctx);
-      result.namingNote='函数名使用能看懂的常见简写，不限制字数：S保留组合子的通用名称，add、mul表示加法、乘法，pair构造序对，succ、pred表示后继、前驱，fac、fib表示迭代阶乘、斐波那契。较复杂的辅助函数保留完整含义；同一 λ 结构共用一个名称。局部变量尽量用单个小写字母，并避开函数名冲突。';
+      result.namingNote='函数名使用能看懂的小写简写，不限制字数：S组合子写作s，add、mul表示加法、乘法，pair构造序对，succ、pred表示后继、前驱，fac、fib表示迭代阶乘、斐波那契。较复杂的辅助函数保留完整含义；同一 λ 结构共用一个名称。局部变量尽量用单个小写字母，并避开函数名冲突。';
       result.displayTitle=scan(key,ctx);
       return result;
     }

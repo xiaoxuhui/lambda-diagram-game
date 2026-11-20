@@ -3,9 +3,12 @@
   const C=root.LambdaCore||require('./core.js');
   const Guard=root.LambdaRunGuard||require('./run-guard.js');
 
-  function normalize(term,{signal,onProgress,growthWindowMs=Guard.DEFAULT_MS,waitWindowMs=0,onPause}={}){
+  function normalize(term,{signal,onProgress,growthWindowMs=Guard.DEFAULT_MS,waitWindowMs=0,onPause,functions=[]}={}){
     const stack=[{kind:'quote'}],names=C.freeVars(term),normalForms=new WeakMap();
-    let job={term,environment:null},value,nextName=0,steps=0;
+    let globals=null;const suspended=[];
+    for(const fn of functions){const argument={term:fn.term,environment:null,value:null};suspended.push(argument);globals={name:fn.name,argument,parent:globals};for(const name of C.freeVars(fn.term))names.add(name);}
+    for(const argument of suspended)argument.environment=globals;
+    let job={term,environment:globals},value,nextName=0,steps=0;
     const guard=Guard.create({windowMs:growthWindowMs,initial:stack.length});
     const waitGuard=Guard.create({windowMs:waitWindowMs,requireGrowth:false});
     // Track unfinished demands, including calls whose result is still being

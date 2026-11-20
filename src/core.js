@@ -7,6 +7,8 @@
   const namePattern = /^[^\sλ\\().\[\],`]+/u;
   const validName = name => typeof name === 'string' && !!name && namePattern.exec(name)?.[0] === name;
   const formatName = name => /^-?[0-9]/.test(name) ? '`'+name+'`' : name;
+  const explicitLambdas=source=>source.replace(/[λ\\]\s*((?:`[^`]+`|[^\sλ\\().\[\],`]+)(?:\s+(?:`[^`]+`|[^\sλ\\().\[\],`]+))+)[ \t]*\./gu,
+    (_,parameters)=>parameters.trim().match(/`[^`]+`|[^\s]+/g).map(name=>'λ'+name).join('.')+'.');
   function churchList(items) {
     const free=new Set();
     for(const item of items)for(const name of freeVars(item))free.add(name);
@@ -340,7 +342,7 @@
     return body.type === 'var' && body.name === x ? n : null;
   }
   function parseInput(source,maxChars=LIMITS.chars){if(!root.LambdaDecimal)throw new LambdaError('列表小数模块尚未加载。');return parse(source,maxChars,root.LambdaDecimal.encodeLiteral);}
-  const API = { LIMITS, STRATEGIES, DIRECTIONS, LambdaError, validName, formatName, V, L, A, churchList, parse, parseInput, format, inspect, freeVars, substitute, alphaKey, key, equal, hasRedex, findRedex, step, stepAt, normalize, churchNumber, cycleCheck };
+  const API = { LIMITS, STRATEGIES, DIRECTIONS, LambdaError, validName, formatName, explicitLambdas, V, L, A, churchList, parse, parseInput, format, inspect, freeVars, substitute, alphaKey, key, equal, hasRedex, findRedex, step, stepAt, normalize, churchNumber, cycleCheck };
   root.LambdaCore = API;
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
 })(typeof globalThis !== 'undefined' ? globalThis : window);
