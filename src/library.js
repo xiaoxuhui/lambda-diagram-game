@@ -12,6 +12,7 @@
     if(!Array.isArray(functions))throw new C.LambdaError('函数库格式不合法。');
     const seen=new Set();let nodes=0,nameChars=0;
     for(const fn of functions) {
+      if(fn.body!==undefined)C.inspect(fn.body);
       if(fn.source!==undefined&&typeof fn.source!=='string')throw new C.LambdaError('函数原始定义需为文本。');
       if(fn.encodings!==undefined&&(!Array.isArray(fn.encodings)||fn.encodings.some(name=>!C.validName(name))))throw new C.LambdaError('函数编码标记不合法。');
       if(fn.sourceFree!==undefined&&(!Array.isArray(fn.sourceFree)||fn.sourceFree.some(name=>!C.validName(name))))throw new C.LambdaError('函数原文变量标记不合法。');
@@ -42,7 +43,7 @@
     const parsed=compiled?compiled.term:numberEncoding==='decimal'?C.parseInput(source,maxChars):C.parse(source,maxChars);
     if(C.freeVars(parsed).has(name))throw new C.LambdaError('定义不能直接引用自身。递归请使用显式不动点组合子。');
     const term=expand(parsed,functions);
-    const result=[...functions,{name,source,term,...(compiled?{encodings:[...new Set([...compiled.encodings,...encodingsFor(parsed,functions)])],sourceFree:[...C.freeVars(parsed)]}:{})}];validate(result);return result;
+    const result=[...functions,{name,source,term,body:parsed,...(compiled?{encodings:[...new Set([...compiled.encodings,...encodingsFor(parsed,functions)])],sourceFree:[...C.freeVars(parsed)]}:{})}];validate(result);return result;
   }
   const remove=(functions,name)=>functions.filter(f=>f.name!==name);
   function update(functions,originalName,name,source,numberEncoding='church',precision=6,dataEncodings=null,prepared=null) {

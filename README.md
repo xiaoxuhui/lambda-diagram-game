@@ -1,6 +1,6 @@
 # Lambda 线路实验室
 
-当前源码及大厅资源版本：**0.3.7**。许可证：[MIT](LICENSE)。新版由[游戏大厅](https://github.com/xiaoxuhui/game-hub/releases)统一发行；独立 APK 保留历史版本 0.3.3。
+当前源码及大厅资源版本：**0.3.8**。许可证：[MIT](LICENSE)。新版由[游戏大厅](https://github.com/xiaoxuhui/game-hub/releases)统一发行；独立 APK 保留历史版本 0.3.3。
 
 ## 安卓 APK
 

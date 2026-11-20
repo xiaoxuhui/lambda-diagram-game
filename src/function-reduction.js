@@ -52,8 +52,15 @@
     return {find,step,unfoldAt};
   }
   function capture(term,functions){
+    const L=root.LambdaLibrary||require('./library.js');
     const registry=new Map(functions.map(fn=>[fn.name,fn])),seen=new Set(),pending=[...C.freeVars(term)],result=[];
-    while(pending.length){const name=pending.pop();if(seen.has(name))continue;seen.add(name);const fn=registry.get(name);if(!fn)continue;result.push({name,term:fn.term});pending.push(...C.freeVars(fn.term));}
+    while(pending.length){
+      const name=pending.pop();if(seen.has(name))continue;seen.add(name);const fn=registry.get(name);if(!fn)continue;
+      let body=fn.body;
+      if(!body&&typeof fn.source==='string')try{body=C.parse(fn.source);}catch{}
+      const term=body&&C.equal(L.expand(body,functions),fn.term)?body:fn.term;
+      result.push({name,term});pending.push(...C.freeVars(term));
+    }
     return result;
   }
   const API={create,capture};root.LambdaFunctionReduction=API;if(typeof module!=='undefined'&&module.exports)module.exports=API;

@@ -31,7 +31,7 @@
       if(f.source!==undefined&&typeof f.source!=='string')fail('函数原始定义需为文本。');
       const term=ast(f.term),retired=f.sourceSyntax==='math';
       // Keep functions saved by the removed input mode usable without its parser.
-      return {name:f.name,term,...(retired?{source:C.format(term)}:f.source===undefined?{}:{source:f.source}),...(f.encodings===undefined?{}:{encodings:f.encodings}),...(retired?{sourceFree:[...C.freeVars(term)]}:f.sourceFree===undefined?{}:{sourceFree:f.sourceFree})};
+      return {name:f.name,term,...(f.body===undefined?{}:{body:ast(f.body)}),...(retired?{source:C.format(term)}:f.source===undefined?{}:{source:f.source}),...(f.encodings===undefined?{}:{encodings:f.encodings}),...(retired?{sourceFree:[...C.freeVars(term)]}:f.sourceFree===undefined?{}:{sourceFree:f.sourceFree})};
     });L.validate(functions);
     if(raw.dataEncodings!==undefined&&!Array.isArray(raw.dataEncodings))fail('数据编码列表不合法。');
     const dataEncodings=(raw.dataEncodings??[]).map(entry=>{

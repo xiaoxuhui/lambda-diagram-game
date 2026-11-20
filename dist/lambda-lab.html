@@ -617,8 +617,15 @@
     return {find,step,unfoldAt};
   }
   function capture(term,functions){
+    const L=root.LambdaLibrary||require('./library.js');
     const registry=new Map(functions.map(fn=>[fn.name,fn])),seen=new Set(),pending=[...C.freeVars(term)],result=[];
-    while(pending.length){const name=pending.pop();if(seen.has(name))continue;seen.add(name);const fn=registry.get(name);if(!fn)continue;result.push({name,term:fn.term});pending.push(...C.freeVars(fn.term));}
+    while(pending.length){
+      const name=pending.pop();if(seen.has(name))continue;seen.add(name);const fn=registry.get(name);if(!fn)continue;
+      let body=fn.body;
+      if(!body&&typeof fn.source==='string')try{body=C.parse(fn.source);}catch{}
+      const term=body&&C.equal(L.expand(body,functions),fn.term)?body:fn.term;
+      result.push({name,term});pending.push(...C.freeVars(term));
+    }
     return result;
   }
   const API={create,capture};root.LambdaFunctionReduction=API;if(typeof module!=='undefined'&&module.exports)module.exports=API;
@@ -3733,6 +3740,7 @@
     if(!Array.isArray(functions))throw new C.LambdaError('函数库格式不合法。');
     const seen=new Set();let nodes=0,nameChars=0;
     for(const fn of functions) {
+      if(fn.body!==undefined)C.inspect(fn.body);
       if(fn.source!==undefined&&typeof fn.source!=='string')throw new C.LambdaError('函数原始定义需为文本。');
       if(fn.encodings!==undefined&&(!Array.isArray(fn.encodings)||fn.encodings.some(name=>!C.validName(name))))throw new C.LambdaError('函数编码标记不合法。');
       if(fn.sourceFree!==undefined&&(!Array.isArray(fn.sourceFree)||fn.sourceFree.some(name=>!C.validName(name))))throw new C.LambdaError('函数原文变量标记不合法。');
@@ -3763,7 +3771,7 @@
     const parsed=compiled?compiled.term:numberEncoding==='decimal'?C.parseInput(source,maxChars):C.parse(source,maxChars);
     if(C.freeVars(parsed).has(name))throw new C.LambdaError('定义不能直接引用自身。递归请使用显式不动点组合子。');
     const term=expand(parsed,functions);
-    const result=[...functions,{name,source,term,...(compiled?{encodings:[...new Set([...compiled.encodings,...encodingsFor(parsed,functions)])],sourceFree:[...C.freeVars(parsed)]}:{})}];validate(result);return result;
+    const result=[...functions,{name,source,term,body:parsed,...(compiled?{encodings:[...new Set([...compiled.encodings,...encodingsFor(parsed,functions)])],sourceFree:[...C.freeVars(parsed)]}:{})}];validate(result);return result;
   }
   const remove=(functions,name)=>functions.filter(f=>f.name!==name);
   function update(functions,originalName,name,source,numberEncoding='church',precision=6,dataEncodings=null,prepared=null) {
@@ -3817,7 +3825,7 @@
       if(f.source!==undefined&&typeof f.source!=='string')fail('函数原始定义需为文本。');
       const term=ast(f.term),retired=f.sourceSyntax==='math';
       // Keep functions saved by the removed input mode usable without its parser.
-      return {name:f.name,term,...(retired?{source:C.format(term)}:f.source===undefined?{}:{source:f.source}),...(f.encodings===undefined?{}:{encodings:f.encodings}),...(retired?{sourceFree:[...C.freeVars(term)]}:f.sourceFree===undefined?{}:{sourceFree:f.sourceFree})};
+      return {name:f.name,term,...(f.body===undefined?{}:{body:ast(f.body)}),...(retired?{source:C.format(term)}:f.source===undefined?{}:{source:f.source}),...(f.encodings===undefined?{}:{encodings:f.encodings}),...(retired?{sourceFree:[...C.freeVars(term)]}:f.sourceFree===undefined?{}:{sourceFree:f.sourceFree})};
     });L.validate(functions);
     if(raw.dataEncodings!==undefined&&!Array.isArray(raw.dataEncodings))fail('数据编码列表不合法。');
     const dataEncodings=(raw.dataEncodings??[]).map(entry=>{

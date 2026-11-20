@@ -15,6 +15,13 @@ const server=hall?require('node:http').createServer((req,res)=>res.writeHead(200
    await page.locator('#expression').fill('idfn');await page.locator('#convert').click();assert.ok(C.equal(C.parse(await page.locator('#current-expression').textContent()),C.parse('λx.x')));
    console.log('PASS',++passed,width+'px: disabled mode expands all functions before displaying the diagram');
    await page.locator('#unfold-functions').check();
+   for(const [name,source] of [['nestedinner','λx.x'],['nestedmiddle','nestedinner'],['nestedouter','nestedmiddle']]){
+    await page.locator('#function-name').fill(name);await page.locator('#function-source').fill(source);await page.locator('#function-add').click();await page.waitForSelector('.function-item[data-name="'+name+'"]');
+   }
+   await page.locator('#expression').fill('nestedouter');await page.locator('#convert').click();
+   for(const expected of ['nestedmiddle','nestedinner','λx.x']){await page.locator('#step').click();assert.ok(C.equal(C.parse(await page.locator('#current-expression').textContent()),C.parse(expected)));}
+   await page.locator('#back').click();assert.equal(await page.locator('#current-expression').textContent(),'nestedinner');
+   console.log('PASS',++passed,width+'px: nested function calls expand one layer and undo restores the function name');
    for(const strategy of ['normal','applicative'])for(const direction of ['left','right']){
     await page.locator('#reduction-order').selectOption(strategy);await page.locator('#reduction-direction').selectOption(direction);
     await page.locator('#expression').fill('(λx.x) idfn');await page.locator('#convert').click();assert.match(await page.locator('#current-expression').textContent(),/idfn/);

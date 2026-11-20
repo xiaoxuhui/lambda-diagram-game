@@ -1,6 +1,19 @@
 const {test}=require('node:test'),assert=require('node:assert/strict');
 const C=require('../src/core.js'),L=require('../src/library.js'),F=require('../src/function-reduction.js'),T=require('../src/trace.js'),S=require('../src/snapshot.js'),Lazy=require('../src/lazy-eval.js');
 const functions=[{name:'f',term:C.parse('λx.x')},{name:'g',term:C.parse('λx.x')}];
+test('nested saved functions unfold exactly one layer, including old saves and replay',()=>{
+  let library=L.add([],'inner','λx.x');library=L.add(library,'middle','inner');library=L.add(library,'outer','middle');
+  for(const entries of [library,library.map(({body,...fn})=>fn)]){
+    const defs=F.capture(C.V('outer'),entries),reducer=F.create(defs);
+    for(const strategy of C.STRATEGIES)for(const direction of C.DIRECTIONS){
+      let term=C.V('outer');for(const expected of ['middle','inner','λx.x']){const result=reducer.step(term,strategy,direction);assert.equal(result.kind,'unfold');term=result.term;assert.ok(C.equal(term,C.parse(expected)));}
+      assert.equal(reducer.find(term),null);
+    }
+  }
+  const changed=L.update(library,'inner','inner','λx.changed');
+  const reducer=F.create(F.capture(C.V('outer'),changed));let term=C.V('outer');for(let i=0;i<4&&reducer.find(term);i++)term=reducer.step(term).term;
+  assert.ok(C.equal(term,C.parse('λx.x')),'changed dependencies do not corrupt saved compiled meaning');
+});
 test('function unfolding follows both reduction orders and both traversal directions',()=>{
   const reducer=F.create(functions);
   for(const strategy of C.STRATEGIES)for(const direction of C.DIRECTIONS){
