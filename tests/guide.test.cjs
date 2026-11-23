@@ -1,14 +1,24 @@
 const {test}=require('node:test'),assert=require('node:assert/strict');
 const C=require('../src/core.js'),P=require('../src/presets.js'),G=require('../src/guide.js'),A=require('../src/guide-advanced.js'),M=require('../src/polynomial.js'),D=require('../src/decimal.js'),Lazy=require('../src/lazy-eval.js');
+const L=require('../src/library.js');
+function teachingFunctions(symbols){
+  const entries=new Map(symbols.map(s=>[s.name,C.parse(s.source)])),terms=new Map();
+  function resolve(name){if(terms.has(name))return terms.get(name);let term=entries.get(name);for(const dep of C.freeVars(term))if(entries.has(dep))term=C.substitute(term,dep,resolve(dep));terms.set(name,term);return term;}
+  return symbols.map(s=>({name:s.name,term:resolve(s.name)}));
+}
 
 test('every advanced math shorthand expands to the actual runnable example',()=>{
   for(const example of P.examples.filter(e=>e.category==='高等数学')){
     const doc=G.lesson(example);assert.ok(doc.inputs.length);assert.ok(doc.steps.length>=5);
     if(!doc.compact)continue;
-    let term=C.parse(doc.compact);
-    for(const symbol of [...doc.symbols].reverse())term=C.substitute(term,symbol.name,C.parse(symbol.source));
-    assert.equal(C.freeVars(term).size,0,example.name);
-    assert.ok(C.equal(term,C.parse(example.term)),example.name);
+    const functions=teachingFunctions(doc.symbols);
+    const input=C.parse(doc.compact),publicEntries=example.metaInterpreter?functions.filter(fn=>G.libraryNames(doc).includes(fn.name)):functions;
+    const term=example.metaInterpreter?G.compileInterpreterCall(input,publicEntries,value=>L.expand(value,publicEntries)):L.expand(input,functions);
+    assert.deepEqual([...C.freeVars(term)].sort(),[...C.freeVars(C.parse(example.term))].sort(),example.name);
+    if(/^(多项式|符号求导|生成导函数|生成原函数|定积分)/.test(example.name)){
+      const actual=C.normalize(term,30000),expected=C.normalize(C.parse(example.term),30000);
+      assert.equal(actual.status,'normal');assert.equal(expected.status,'normal');assert.ok(C.equal(actual.term,expected.term),example.name);
+    }else assert.ok(C.equal(term,C.parse(example.term)),example.name);
   }
 });
 
@@ -73,9 +83,27 @@ test('later lessons have their own worked process and explicit typed inputs',()=
 });
 
 test('all featured decimal helpers exist in the actual compiled program',()=>{
+  const projected=new WeakMap();
+  const unfoldPrecision=t=>{
+    if(projected.has(t))return projected.get(t);
+    let value=t;
+    if(t.type==='abs')value=C.L(t.param,unfoldPrecision(t.body));
+    else if(t.type==='app'){
+      const fn=unfoldPrecision(t.fn),arg=unfoldPrecision(t.arg);
+      value=fn.type==='abs'&&fn.param==='requested'?unfoldPrecision(C.substitute(fn.body,fn.param,arg)):C.A(fn,arg);
+    }
+    projected.set(t,value);return value;
+  };
   for(const example of P.examples.filter(e=>e.decimalOperation)){
     const doc=G.rawLesson(example),actual=A.unpack(D.program(example.decimalOperation));
-    for(const name of doc.featured){const binding=actual.bindings.find(b=>b.name===name);assert.ok(binding,example.name+': '+name);assert.ok(C.equal(C.parse(doc.symbols.find(s=>s.name===name).source),binding.term));}
+    const imported=teachingFunctions(doc.symbols);
+    const expected=teachingFunctions(actual.bindings.map(b=>({name:b.name,source:C.format(b.term)})));
+    for(const name of doc.featured){
+      const binding=actual.bindings.find(b=>b.name===name);assert.ok(binding,example.name+': '+name);
+      let term=imported.find(f=>f.name===name).term;
+      if(doc.symbols.find(s=>s.name===name).precisionParameter)term=C.substitute(term.body,term.param,C.parse('6'));
+      assert.ok(C.equal(unfoldPrecision(term),expected.find(f=>f.name===name).term),example.name+': '+name);
+    }
   }
 });
 

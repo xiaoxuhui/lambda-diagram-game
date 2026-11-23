@@ -63,5 +63,53 @@
     }
     return result;
   }
-  const API={create,capture};root.LambdaFunctionReduction=API;if(typeof module!=='undefined'&&module.exports)module.exports=API;
+  function prepare(term,functions=[],dataTerms=[]){
+    const definitions=capture(term,functions),occupied=new Set(functions.map(fn=>fn.name)),seen=new WeakSet(),pending=[term,...definitions.map(fn=>fn.term)];
+    while(pending.length){const node=pending.pop();if(seen.has(node))continue;seen.add(node);
+      if(node.type==='var')occupied.add(node.name);else if(node.type==='abs'){occupied.add(node.param);pending.push(node.body);}else pending.push(node.fn,node.arg);
+    }
+    const hints=new WeakMap(dataTerms.map(entry=>[entry.term,entry.kind])),numbers=new Map(),rewritten=new WeakMap(),virtual=[];let listIndex=0;
+    function reserve(base){let name=base,index=2;while(occupied.has(name))name=base+'_'+index++;occupied.add(name);return name;}
+    function isList(node){
+      if(node.type!=='abs'||node.body.type!=='abs'||node.param===node.body.param)return false;
+      const cons=node.param,nil=node.body.param;let body=node.body.body;
+      while(body.type==='app'&&body.fn.type==='app'&&body.fn.fn.type==='var'&&body.fn.fn.name===cons)body=body.arg;
+      return body.type==='var'&&body.name===nil;
+    }
+    function walk(root){
+      const work=[{node:root}];
+      while(work.length){
+        const entry=work.pop(),node=entry.node;if(rewritten.has(node))continue;
+        if(!entry.finish){
+          const hint=hints.get(node),number=hint==='list'?null:C.churchNumber(node);
+          if(number!==null){
+            if(!numbers.has(number)){const name=reserve('n'+number);numbers.set(number,name);virtual.push({name,term:node});}
+            rewritten.set(node,C.V(numbers.get(number)));continue;
+          }
+          let deferred=null;
+          if(hint==='list'||isList(node)){
+            const name=reserve('list'+(++listIndex)),parameters=[...C.freeVars(node)],definition={name,term:null};
+            virtual.push(definition);deferred={definition,parameters,reference:parameters.reduce((value,name)=>C.A(value,C.V(name)),C.V(name))};
+          }
+          if(node.type==='var'){rewritten.set(node,node);continue;}
+          work.push({node,finish:true,deferred});
+          if(node.type==='abs')work.push({node:node.body});else work.push({node:node.arg},{node:node.fn});
+        }else{
+          let rebuilt;
+          if(node.type==='abs'){const body=rewritten.get(node.body);rebuilt=body===node.body?node:C.L(node.param,body);}
+          else{const fn=rewritten.get(node.fn),arg=rewritten.get(node.arg);rebuilt=fn===node.fn&&arg===node.arg?node:C.A(fn,arg);}
+          if(entry.deferred){const {definition,parameters,reference}=entry.deferred;definition.term=parameters.reduceRight((value,name)=>C.L(name,value),rebuilt);rewritten.set(node,reference);}
+          else rewritten.set(node,rebuilt);
+        }
+      }return rewritten.get(root);
+    }
+    const prepared=walk(term),named=definitions.map(fn=>({name:fn.name,term:walk(fn.term)}));
+    return {term:prepared,definitions:[...named,...virtual]};
+  }
+  function expand(term,definitions=[]){
+    const L=root.LambdaLibrary||require('./library.js'),names=new Set(definitions.map(fn=>fn.name));
+    for(let i=0;i<definitions.length&&[...C.freeVars(term)].some(name=>names.has(name));i++)term=L.expand(term,definitions);
+    return term;
+  }
+  const API={create,capture,prepare,expand};root.LambdaFunctionReduction=API;if(typeof module!=='undefined'&&module.exports)module.exports=API;
 })(typeof globalThis!=='undefined'?globalThis:window);

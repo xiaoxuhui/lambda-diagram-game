@@ -30,7 +30,7 @@ const artifacts=path.join(__dirname,'artifacts');fs.mkdirSync(artifacts,{recursi
       await page.locator('[data-function-insert="λ"]').tap();assert.equal(await page.locator('#function-source').inputValue(),'λx.x');
     });
     await check('duplicate and invalid definitions are rejected',async()=>{
-      await add('ID','λx y.x');assert.match(await page.locator('#function-error').textContent(),/已存在/);assert.equal(await row('ID').count(),1);
+      await add('ID','λx y.x');assert.match(await page.locator('#save-feedback').textContent(),/重名已跳过：ID/);assert.equal(await row('ID').count(),1);
       await add('Invalid Name','λx.x');assert.match(await page.locator('#function-error').textContent(),/函数名/);
       await add('BAD','λx.');assert.ok(await page.locator('#function-error').isVisible());assert.equal(await row('BAD').count(),0);
     });
@@ -50,7 +50,7 @@ const artifacts=path.join(__dirname,'artifacts');fs.mkdirSync(artifacts,{recursi
       await source('ID');assert.equal(await page.locator('#current-expression').textContent(),'ID');
     });
     await check('manual save retains an intermediate frame and preferences',async()=>{
-      await source(P.examples[5].term);await page.locator('#step').click();await page.locator('#step').click();await page.locator('#speed').selectOption('1200');
+      await source(P.examples.find(e=>e.name==='加法 · 2 + 3').term);await page.locator('#step').click();await page.locator('#step').click();await page.locator('#speed').selectOption('1200');
       await page.locator('#zoom-in').click();await page.locator('#history-details').evaluate(e=>e.open=true);
       await page.locator('#save-state').click();saveFile={current:await page.locator('#current-expression').textContent(),zoom:await page.locator('#zoom-label').textContent()};
       assert.match(await page.locator('#save-feedback').textContent(),/已保存/);assert.ok(await page.locator('#restore-state').isEnabled());
@@ -74,7 +74,7 @@ const artifacts=path.join(__dirname,'artifacts');fs.mkdirSync(artifacts,{recursi
     });
     await check('export and import restore functions, progress, input, and frame',async()=>{
       await page.locator('#mode-challenge').click();await page.locator('#step').click();await page.locator('#check-answer').click();
-      await source(P.examples[5].term);await page.locator('#step').click();await page.locator('#step').click();
+      await source(P.examples.find(e=>e.name==='加法 · 2 + 3').term);await page.locator('#step').click();await page.locator('#step').click();
       const current=await page.locator('#current-expression').textContent(),progress=await page.locator('#progress-text').textContent();
       const wait=page.waitForEvent('download');await page.locator('#export-state').click();const download=await wait;const file=path.join(artifacts,'workspace-save.json');await download.saveAs(file);exported=fs.readFileSync(file,'utf8');
       assert.equal(JSON.parse(exported).version,2);await row('COPY').getByRole('button',{name:'删除函数 COPY'}).click();await source('λq.q');

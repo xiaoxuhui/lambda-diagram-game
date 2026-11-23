@@ -4,9 +4,10 @@
   const COLORS=defaultPalette.binders;
   const routes = new WeakMap();
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&apos;' }[c]));
-  const lineTitle=l=>l.kind==='abstraction'?`λ${l.name}：绑定横线`:l.kind==='variable'?`${l.name}：${l.free?'自由变量':`连接绑定 λ${l.name}`}`:l.kind==='application'?'函数应用：连接左右子项最左变量':'延伸到外层应用';
+  const lineTitle=l=>l.functionName?`${l.name}：点击展开一层函数`:l.kind==='abstraction'?`λ${l.name}：绑定横线`:l.kind==='variable'?`${l.name}：${l.free?'自由变量':`连接绑定 λ${l.name}`}`:l.kind==='application'?'函数应用：连接左右子项最左变量':'延伸到外层应用';
   const lineStroke=line=>line.active?(line.highlight??defaultPalette.highlight):line.color;
-  function layout(term, redexPath = null, palette=defaultPalette) {
+  function layout(term, redexPath = null, palette=defaultPalette, functionNames=[]) {
+    const functions=new Set(functionNames);
     const lines = [], labels = [], binders = [], leaves = []; let leaf = 0;
     const env=new Map(),origin={parent:null,part:null,length:0,matches:true};let tree;
     const child=(parent,part,reducible=false)=>(parent[part]={parent,part,reducible,length:parent.length+1,matches:redexPath!==null&&parent.matches&&redexPath[parent.length]===part});
@@ -48,6 +49,12 @@
         const binder=env.get(t.name)?.at(-1);
         const line = withPath({ kind:'variable', x1:x, x2:x, y1:binder ? binder.y : 30, y2:end,
           color:binder ? binder.color : palette.free, free:!binder, name:t.name, binder:binder ? binder.id : null },route);
+        if(!binder&&functions.has(t.name)){
+          line.functionName=t.name;
+          Object.defineProperty(line,'unfoldPath',{get(){return pathOf(route);}});
+          line.active=redexPath!==null&&route.matches&&route.length===redexPath.length;
+          if(line.active&&palette.highlight!==defaultPalette.highlight)line.highlight=palette.highlight;
+        }
         route.firstLine=lines.length;lines.push(line); leaves.push(line);
         if (!binder) {route.label=labels.length;labels.push({ x, y:19, text:t.name, free:true });}
         tree={left:x,right:x,bottom:end,start,end:leaf};continue;
@@ -98,7 +105,7 @@
     return {lineOrigins,labelOrigins};
   }
   function svg(term, redexPath = null, options = {}) {
-    const model = layout(term, redexPath, options.palette), { width, height } = model;
+    const model = layout(term, redexPath, options.palette, options.functionNames), { width, height } = model;
     const backgrounds = options.export ? `<rect width="100%" height="100%" fill="#131c2d"/>` : '';
     const shapes = model.lines.map(l => `<line x1="${l.x1}" y1="${l.y1}" x2="${l.x2}" y2="${l.y2}" stroke="${esc(lineStroke(l))}" stroke-width="${l.active ? 5 : 3}" stroke-linecap="square" ${l.free ? 'stroke-dasharray="5 5"' : ''} data-kind="${l.kind}" ${l.active ? 'data-active="true"' : ''}><title>${esc(lineTitle(l))}</title></line>`).join('');
     const labels = model.labels.map(l=>`<text x="${l.x}" y="${l.y}" text-anchor="middle" fill="#bac5d8" font-size="10" font-family="monospace"><title>${esc(l.text)}</title>${esc(l.text)}</text>`).join('');

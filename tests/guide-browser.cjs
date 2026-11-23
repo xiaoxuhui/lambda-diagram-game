@@ -16,6 +16,8 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
       await page.locator('#mode-guide').click();assert.ok(await page.locator('#guide-panel').isVisible());
       assert.ok(await page.locator('#lab-screen').isHidden());assert.ok(await page.locator('.save-bar').isHidden());
       assert.equal(await page.locator('#guide-example option').count(),P.examples.length);
+      assert.deepEqual(await page.locator('#examples optgroup').evaluateAll(groups=>groups.map(g=>g.label)),[...new Set(P.examples.map(e=>e.category))]);
+      assert.deepEqual(await page.locator('#guide-example option').evaluateAll(options=>options.map(o=>Number(o.value))),P.examples.map((_,i)=>i));
       for(const [index,example] of P.examples.entries()){
         const doc=G.lesson(example);assert.ok(doc.principle.length>=2);
         await page.locator('#guide-example').selectOption(String(index));
@@ -42,11 +44,12 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
     });
     await check('s, c and w are visible shorthand calls and are actually called by the runnable examples',async()=>{
       const C=require('../src/core.js');
-      for(const [index,short,expected] of [[4,'s true true','λx.x'],[9,'c true 2 3','3'],[10,'w mul 3','9']]){
+      for(const [name,helper,short,expected] of [['S K K','s','skkid','λx.x'],['组合子 C','c','swappick 2 3','3'],['组合子 W','w','square 3','9']]){
+        const index=P.examples.findIndex(e=>e.name.startsWith(name));
         await page.locator('#guide-example').selectOption(String(index));
         assert.equal(await page.locator('#guide-expression-short').textContent(),short);
         await page.locator('#guide-load').click();
-        assert.match(await page.locator('#expression').inputValue(),new RegExp('λ'+short[0]+'\\b'));
+        assert.match(await page.locator('#expression').inputValue(),new RegExp('λ'+helper+'\\b'));
         await page.locator('#convert').click();await page.locator('#fast-run').click();
         await page.waitForFunction(()=>document.getElementById('state-badge').textContent==='已到正规形');
         assert.ok(C.equal(C.parse(await page.locator('#current-expression').textContent()),C.parse(expected)));
@@ -56,6 +59,11 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
     await check('search, category filtering, empty results and previous/next navigation work',async()=>{
       await page.locator('#guide-category').selectOption('基础数学');
       assert.equal(await page.locator('#guide-example option').count(),P.examples.filter(e=>e.category==='基础数学').length);
+      assert.match(await page.locator('#guide-example option').first().textContent(),/^后继/);
+      const divisionIndex=P.examples.findIndex(e=>e.name.startsWith('序对除法'));
+      await page.locator('#guide-example').selectOption(String(divisionIndex));
+      await page.locator('#guide-next').click();assert.match(await page.locator('#guide-title').textContent(),/^整数除法/);
+      await page.locator('#guide-example').selectOption(String(P.examples.findIndex(e=>e.successor)));
       await page.locator('#guide-next').click();assert.ok(await page.locator('#guide-previous').isEnabled());
       await page.locator('#guide-previous').click();assert.ok(await page.locator('#guide-previous').isDisabled());
       await page.locator('#guide-search').fill('前驱');
@@ -154,11 +162,20 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
       await page.locator('#guide-pair-section').screenshot({path:path.resolve(__dirname,'artifacts/pair-expressions-mobile.png')});
       await page.locator('#guide-example').selectOption('0');assert.ok(await page.locator('#guide-pair-section').isHidden());
     });
+    await check('successor has a standalone example, detailed derivation and an importable function',async()=>{
+      await page.locator('#guide-category').selectOption('');await page.locator('#guide-search').fill('后继');
+      const index=P.examples.findIndex(example=>example.successor);await page.locator('#guide-example').selectOption(String(index));
+      assert.match(await page.locator('#guide-title').textContent(),/后继/);assert.match(await page.locator('#guide-core').textContent(),/^succ = /);assert.equal(await page.locator('#guide-steps li').count(),5);
+      await page.locator('#guide-add-library').click();assert.match(await page.locator('#guide-library-feedback').textContent(),/已加入|已有相同定义，已准备好/);
+      await page.locator('#guide-load').click();await page.locator('#fast-run').click();await page.waitForFunction(()=>document.getElementById('state-badge').textContent==='已到正规形');
+      assert.equal(await page.evaluate(()=>LambdaCore.churchNumber(LambdaCore.parse(document.getElementById('current-expression').textContent))),4);
+      await page.locator('#mode-guide').click();
+    });
     await check('offline bundle contains the complete explanation catalog',async()=>{
       const offline=await context.newPage();await offline.goto(base+'/dist/lambda-lab.html');
       await offline.locator('#mode-guide').click();
       assert.equal(await offline.locator('#guide-example option').count(),P.examples.length);
-      await offline.locator('#guide-example').selectOption('13');
+      await offline.locator('#guide-example').selectOption(String(P.examples.findIndex(e=>e.name.startsWith('前驱'))));
       assert.match(await offline.locator('#guide-principle').textContent(),/第一次/);
       await offline.locator('#guide-example').selectOption(String(P.examples.findIndex(example=>example.name.startsWith('阶乘 · 迭代'))));
       assert.equal(await offline.locator('.guide-pair-expression').count(),3);await offline.close();

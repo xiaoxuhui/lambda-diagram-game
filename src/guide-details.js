@@ -56,7 +56,7 @@
   }
   const definitions={
     I:['λx.x','恒等函数，原样返回输入。'],TRUE:['λa b.a','选择第一个分支。'],FALSE:['λa b.b','选择第二个分支。'],
-    SUCC:['λn f x.f (n f x)','在丘奇数的函数体外增加一次 f。'],ADD:['λm n f x.m f (n f x)','先重复 n 次，再重复 m 次。'],MUL:['λm n f.m (n f)','把 n 次作用合成的一段工作重复 m 次。'],POW:['λbase exponent.exponent base','让指数迭代底数这个函数。'],
+    SUCC:['λn f x.f (n f x)','在丘奇数的函数体外增加一次 f。'],ADD:['λm n f x.m f (n f x)','先重复 n 次，再重复 m 次。'],MUL:['λm n f.m (n f)','把 n 次作用合成的一段工作重复 m 次。'],POW:['λb.λe.λf.λx.e b f x','让指数迭代底数，并保留结果的两个参数；零指数返回标准丘奇数1，零的正整数次幂返回0。'],
     PRED:['λn f x.n (λg h.h (g f)) (λu.x) (λu.u)','通过延迟第一次作用形成前驱。'],SUB:['λm n.n PRED m','将 m 连续取 n 次前驱，结果截断在零。'],ISZERO:['λn.n (λx.FALSE) TRUE','零次迭代保留真，至少一次迭代返回假。'],LE:['λm n.ISZERO (SUB m n)','检查自然数截断减法是否为零。'],
     PAIR:['λa b selector.selector a b','把两个值交给选择器。'],FIRST:['λp.p TRUE','读取有序对的第一项。'],SECOND:['λp.p FALSE','读取有序对的第二项。'],Y:['λf.(λx.f (x x)) (λx.f (x x))','满足 Y F → F (Y F)，为递归体提供自身。'],
     NIL:['λc n.n','丘奇空列表，直接返回折叠初值。'],CONS:['λhead tail c n.c head (tail c n)','丘奇列表头插，先折叠尾部再与首项组合。']
@@ -107,8 +107,19 @@
     while(term.type==='app'&&term.fn.type==='abs'){
       bindings.push({name:term.fn.param,term:term.arg});term=term.fn.body;
     }
-    const main=parameterized?C.L('requested',term):term;
-    return {core:`decimal${example.decimalOperation.toLowerCase()} = ${C.format(main)}`,symbols:bindings.map(item=>({name:item.name,meaning:meanings[item.name]??'此辅助值参与下面所示的局部 λ 定义，完整表达式按相同名称绑定它。',source:C.format(item.term)}))};
+    const lifted=new Set();
+    const passPrecision=body=>{
+      for(const name of C.freeVars(body))if(lifted.has(name))body=C.substitute(body,name,C.A(C.V(name),C.V('requested')));
+      return body;
+    };
+    const symbols=bindings.map(item=>{
+      let body=parameterized?passPrecision(item.term):item.term;
+      const takesPrecision=parameterized&&C.freeVars(body).has('requested');
+      if(takesPrecision){lifted.add(item.name);body=C.L('requested',body);}
+      return {name:item.name,meaning:(meanings[item.name]??'供本篇主函数调用的辅助函数。')+(takesPrecision?'第一个参数显式接收输出小数位数，调用者须传入 requested。':''),source:C.format(body),precisionParameter:takesPrecision};
+    });
+    const main=parameterized?C.L('requested',passPrecision(term)):term;
+    return {core:`decimal${example.decimalOperation.toLowerCase()} = ${C.format(main)}`,symbols};
   }
   function describe(example,precision=6){
     if(example.decimalOperation){

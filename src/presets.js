@@ -5,7 +5,7 @@
   const I='λx.x', TRUE='λx.λy.x', FALSE='λx.λy.y';
   const TWO='λf.λx.f (f x)', THREE='λf.λx.f (f (f x))', FIVE='λf.λx.f (f (f (f (f x))))';
   const ADD='λm.λn.λf.λx.m f (n f x)', SUCC='λn.λf.λx.f (n f x)';
-  const MULT='λm n f.m (n f)', POW='λb e.e b';
+  const MULT='λm n f.m (n f)', POW='λb.λe.λf.λx.e b f x';
   const PRED='λn f x.n (λg h.h (g f)) (λu.x) (λu.u)';
   const SUB=`λm n.n (${PRED}) m`, ZERO=`λn.n (λx.(${FALSE})) (${TRUE})`;
   const PAIR='λa b k.k a b', Y='λf.(λx.f (x x)) (λx.f (x x))';
@@ -18,7 +18,7 @@
   const GEOMETRIC_SUM=`λb n.(n (λp.(${PAIR}) ((${MULT}) b (p (${TRUE}))) ((${ADD}) (p (${FALSE})) (p (${TRUE})))) ((${PAIR}) 1 0)) (${FALSE})`;
   const BINOMIAL=`λa b n.((${SUCC}) n (λp.(λk.(${PAIR}) ((${SUCC}) k) ((${ADD}) (p (${FALSE})) ((${MULT}) ((${CHOOSE}) n k) ((${MULT}) ((${POW}) a ((${SUB}) n k)) ((${POW}) b k))))) (p (${TRUE}))) ((${PAIR}) 0 0)) (${FALSE})`;
   const POLYNOMIAL=`λx.(${ADD}) ((${MULT}) ((${ADD}) ((${MULT}) 2 x) 3) x) 1`;
-  const POWER='λb e f x.e b f x';
+  const POWER=POW;
   const TETRATION=`λb h.h ((${POWER}) b) 1`;
   const PENTATION=`λb h.h ((${TETRATION}) b) 1`;
   // The Scott list supplies one unit of fuel per successor. The continuation
@@ -33,11 +33,26 @@
       (op candidate))) start 0`;
   const QUOTIENT=`λn divisor.(${ZERO}) divisor (λk.k (λa b c.a) 0)
     ((${FLOOR_INVERSE}) ((${MULT}) divisor) n 0)`;
-  const PAIR_DIVISION=`λm n.(${ZERO}) n (λk.k (λa b c.a) 0)
-    ((m (λp.p (λr q.(${AT_MOST}) n r
-      ((${PAIR}) ((${SUB}) r n) ((${SUCC}) q))
-      ((${PAIR}) r q)))
-      ((${PAIR}) m 0)) (λr q k.k (${TRUE}) r q))`;
+  const pairDivisionDefinitions=[
+    {name:'TRUE',source:TRUE,meaning:'选择第一个参数。'},
+    {name:'FALSE',source:FALSE,meaning:'选择第二个参数。'},
+    {name:'PAIR',source:PAIR,meaning:'把余数和商保存成一个序对，等待选择器读取。'},
+    {name:'FIRST',source:'λp.p TRUE',meaning:'读取序对第一项：当前剩余量。'},
+    {name:'SECOND',source:'λp.p FALSE',meaning:'读取序对第二项：当前商。'},
+    {name:'SUCC',source:SUCC,meaning:'给丘奇自然数增加一次迭代，用来把商加一。'},
+    {name:'PRED',source:PRED,meaning:'丘奇自然数前驱，零的前驱仍为零。'},
+    {name:'SUB',source:'λm.λn.n PRED m',meaning:'重复取前驱，计算截断在零的自然数减法。'},
+    {name:'ISZERO',source:'λn.n (λx.FALSE) TRUE',meaning:'零返回真，正自然数返回假；先检查除数。'},
+    {name:'ATMOST',source:'λm n.m (λlater fuel.fuel (λrest.later rest) FALSE) (λfuel.TRUE) (n (λrest next done.next rest) (λnext done.done))',meaning:'判断第一个丘奇自然数是否不大于第二个；用有限 Scott 标记链比较。'},
+    {name:'divzero',source:'λk.k (λa b c.a) 0',meaning:'除数为零时的错误记录，不进入状态迭代。'},
+    {name:'quotstep',source:'λn.λp.p (λr.λq.ATMOST n r (PAIR (SUB r n) (SUCC q)) (PAIR r q))',meaning:'先接收除数，再接收旧序对。给序对传入读取函数，一次读出剩余量和商；够减时调用减法、后继和序对构造器，不够减保留两个旧值。'},
+    {name:'divstate',source:'λm.λn.m (quotstep n) (PAIR m 0)',meaning:'从（被除数，零商）开始，把整轮序对更新重复 m 次，返回最终二字段序对。'},
+    {name:'divresult',source:'λp.p (λr.λq.λk.k TRUE r q)',meaning:'一次读取最终序对的余数和商，加上页面识别标记，避免分别读取两项而重复求值整个除法；中间状态始终是二字段序对。'},
+    {name:'pairdiv',source:'λm.λn.ISZERO n divzero (divresult (divstate m n))',meaning:'序对除法入口：先检查除数，再调用状态迭代和结果封装函数。参数依次是被除数、除数。'}
+  ];
+  // Bind the same named definitions shown in the lesson. The actual program
+  // calls quotstep/PAIR/FIRST/SECOND instead of printing unused helper names.
+  const PAIR_DIVISION=pairDivisionDefinitions.reduceRight((body,definition)=>`(λ${definition.name}.${body}) (${definition.source})`,'pairdiv');
   const rootOf=operator=>`λn degree.(${ZERO}) degree (${I})
     ((${FLOOR_INVERSE}) (λbase.(${operator}) base degree) n 1)`;
   const logOf=operator=>`λbase n.(${AT_MOST}) base 1 (${I})
@@ -55,6 +70,8 @@
   const MAP='λf l c n.l (λh r.c (f h) r) n', APPEND='λa b c n.a c (b c n)';
   const REVERSE=`λl.l (λh r a.r ((${CONS}) h a)) (${I}) (${NIL})`;
   const FILTER='λp l c n.l (λh r.p h (c h r) r) n';
+  const NONZERO=`λh.(${ZERO}) h (${FALSE}) (${TRUE})`;
+  const DROPZERO=`λl.(${FILTER}) (${NONZERO}) l`;
   const SKK=`(λS K.S K K) (λf g x.f x (g x)) (${TRUE})`;
   const listExample=(name,term,expected,description,expectedLabel)=>({name,category:'丘奇列表',encoding:term===NIL?'list':'church',term,expected,description,expectedLabel});
   const examples = [
@@ -70,7 +87,7 @@
     { name:'组合子 C · 交换参数 → 3', category:'组合子', term:`(λC TRUE.C TRUE 2 3) (λf x y.f y x) (${TRUE})`, expected:'3', description:'C 交换函数的两个参数。TRUE 原本选择第一个，交换 2 和 3 后返回 3。' },
     { name:'组合子 W · 复制参数 → 9', category:'组合子', term:`(λW MUL.W MUL 3) (λf x.f x x) (${MULT})`, expected:'9', description:'W 把一个参数交给函数两次。把乘法和 3 交给它，得到 3 × 3 = 9。' },
     { name:'乘法 · 2 × 3 → 6', category:'基础数学', term:`(${MULT}) 2 3`, expected:'6', description:'把重复 3 次的函数再重复 2 次，结果是 Church 数 6。' },
-    { name:'乘方 · 2⁴ → 16', category:'基础数学', term:`(${POW}) 2 4`, expected:'16', parameters:['底数 2','指数 4'], description:'Church 数也能当函数使用：指数 4 作用在底数 2 上，归约得到 16。' },
+    { name:'乘方 · 2⁴ → 16', category:'基础数学', term:`(${POW}) 2 4`, expected:'16', parameters:['底数 2','指数 4'], description:'指数迭代底数，并保留结果的 λf.λx，保证结果是标准丘奇数。正数的零次方为1，零的正整数次方为0；本程序约定0⁰=1。' },
     { name:'前驱 · 3 − 1 → 2', category:'基础数学', term:`(${PRED}) 3`, expected:'2', description:'前驱函数去掉一次函数作用；0 的前驱仍然是 0。' },
     { name:'减法 · 5 − 2 → 3', category:'基础数学', term:`(${SUB}) 5 2`, expected:'3', description:'对 5 连续取两次前驱，得到 3。这是自然数减法，小于 0 时停在 0。' },
     { name:'零判断 · 0 = 0 → TRUE', category:'基础数学', term:`(${ZERO}) 0`, expected:TRUE, description:'把数字变成布尔选择器：输入 0 返回 TRUE，其他自然数返回 FALSE。' },
@@ -111,7 +128,7 @@
     listExample('丘奇列表 · 反转 REVERSE → [3, 2, 1]',`(${REVERSE}) (${list123})`,churchList([3,2,1]),'折叠生成接收累积列表的函数，逐项插入头部，让元素次序反转。','丘奇列表 [3, 2, 1]'),
     listExample('丘奇列表 · 折叠求和 → 6',`(${list123}) (${ADD}) 0`,'6','Church 列表本身就是右折叠：l c n。将 c 换成加法、n 设为0，计算1 + (2 + (3 + 0))。'),
     listExample('丘奇列表 · 折叠乘积 → 6',`(${list123}) (${MULT}) 1`,'6','将组合函数换成乘法、初值设为1，计算1 × (2 × (3 × 1))；空表乘积为1。'),
-    listExample('丘奇列表 · 过滤 FILTER 去零 → [2, 3]',`(${FILTER}) (λh.(${ZERO}) h (${FALSE}) (${TRUE})) (${churchList([0,2,0,3])})`,churchList([2,3]),'FILTER 接收布尔谓词和列表，只保留谓词返回 TRUE 的元素；此处筛掉0，保持剩余元素顺序。','丘奇列表 [2, 3]')
+    listExample('丘奇列表 · 过滤 FILTER 去零 → [2, 3]',`(${DROPZERO}) (${churchList([0,2,0,3])})`,churchList([2,3]),'dropzero 在函数内部调用过滤器和非零判断，只需传入一张丘奇列表，就会去掉所有零并保持其他元素的顺序。','丘奇列表 [2, 3]')
   );
   const integerExample=(name,formula,args,expected,description,labels)=>({
     name,category:'高等数学',encoding:'church',term:`(${formula}) ${args}`,expected,description,
@@ -157,6 +174,75 @@
     advancedDecimal('双曲正切 · tanh(0.5)','TANH',['0.5'],'0.462117',hyperbolicNote)
   );
   examples.push({name:'λ解释器 · 编码 → 解释 → 还原表达式',category:'高等数学',encoding:'church',metaInterpreter:true,metaInput:'(λx.λy.x) y',term:Meta.compile('(λx.λy.x) y'),expected:'λz.y',description:'先把输入表达式编码成语法数据，再用λ主函数解释，最后由λ解码器还原为普通表达式。本例得到 λz.y，自由变量y保持自由。'});
+  examples.push({name:'后继 · 3 + 1 → 4',category:'基础数学',encoding:'church',successor:true,term:`(${SUCC}) 3`,expected:'4',parameters:['丘奇自然数 n = 3'],description:'丘奇后继函数 succ 把数字的迭代次数增加一次。3 次函数作用变成 4 次；可把末尾参数改为 0、1 或其他丘奇自然数。'});
+  const capsuleHelpers=[
+    ['S','λf g x.f x (g x)'],['B','λf g x.f (g x)'],['C','λf x y.f y x'],['W','λf x.f x x'],
+    ['TRUE',TRUE],['FALSE',FALSE],['SUCC',SUCC],['ADD',ADD],['MUL',MULT],['PAIR',PAIR],
+    ['SECOND','λp.p FALSE'],['HEAD',HEAD],['MAP',MAP],['BINOM',BINOMIAL]
+  ].map(([name,source])=>({name,source,meaning:'封装函数内部使用的辅助定义。'}));
+  function capsule(prefix,name,parameters,body,description){
+    const example=examples.find(item=>item.name.startsWith(prefix));if(!example)throw new Error('缺少封装示例：'+prefix);
+    const source=parameters.reduceRight((text,param)=>`λ${param.name}.${text}`,body),registry=new Map(capsuleHelpers.map(entry=>[entry.name,entry])),symbols=[],seen=new Set();
+    function dependency(key){if(seen.has(key)||!registry.has(key))return;seen.add(key);const entry=registry.get(key);for(const child of C.freeVars(C.parse(entry.source)))dependency(child);symbols.push(entry);}
+    let term=C.parse(source);for(const key of C.freeVars(term))dependency(key);
+    for(const entry of [...symbols].reverse())term=C.substitute(term,entry.name,C.parse(entry.source));
+    const args=parameters.filter(param=>param.value!==undefined).map(param=>param.value);
+    example.term=`(${C.format(term)})${args.length?' '+args.map(arg=>'('+arg+')').join(' '):''}`;
+    example.description=description;
+    example.parameters=parameters.filter(param=>param.value!==undefined).map(param=>param.role+' '+param.value);
+    example.capsule={name,source,symbols:[...symbols,{name,source,meaning:description}],compact:name+(args.length?' '+args.join(' '):''),inputs:parameters.filter(param=>param.value!==undefined).map(param=>({name:param.name,value:param.value,encoding:param.encoding??'丘奇自然数',role:param.role}))};
+  }
+  capsule('S K K','skkid',[{name:'x',role:'实际数据'}],'S TRUE TRUE x','skkid 把 S、K、K 的组合固定在函数内部；它本身就是恒等函数，可以直接接收一个实际数据。');
+  capsule('组合子 B','twostep',[{name:'n',value:'3',role:'原自然数'}],'B SUCC SUCC n','twostep 在内部固定两个后继函数，用 B 组合起来；外面只传数字，把3变成5。');
+  capsule('组合子 C','swappick',[{name:'a',value:'2',role:'第一项'},{name:'b',value:'3',role:'第二项'}],'C TRUE a b','swappick 在内部固定选择器并调用 C 交换参数，外面只传两个实际数据；本例选出3。');
+  capsule('组合子 W','square',[{name:'n',value:'3',role:'原自然数'}],'W MUL n','square 在内部固定丘奇乘法并调用 W 复制输入；外面只传数字，3得到9。');
+  capsule('有序对','picksecond',[{name:'a',value:'3',role:'第一项'},{name:'b',value:'5',role:'第二项'}],'SECOND (PAIR a b)','picksecond 在内部构造序对并选择第二项，外面只传两个数据，不用再传选择器。');
+  capsule('丘奇列表 · 首项','headzero',[{name:'l',value:'[1,2,3]',encoding:'丘奇列表',role:'原列表'}],'HEAD l 0','headzero 在内部固定空表默认值0，只传一张列表即可取首项；空表返回0。');
+  capsule('丘奇列表 · 映射','incmap',[{name:'l',value:'[1,2,3]',encoding:'丘奇列表',role:'原列表'}],'MAP SUCC l','incmap 在内部固定后继函数并调用映射，外面只传列表，每个丘奇数都增加一。');
+  capsule('丘奇列表 · 折叠求和','sumlist',[{name:'l',value:'[1,2,3]',encoding:'丘奇列表',role:'原列表'}],'l ADD 0','sumlist 在内部固定加法和初值0，只传列表即可求和；空表返回0。');
+  capsule('丘奇列表 · 折叠乘积','prodlist',[{name:'l',value:'[1,2,3]',encoding:'丘奇列表',role:'原列表'}],'l MUL 1','prodlist 在内部固定乘法和初值1，只传列表即可求乘积；空表返回1。');
+  capsule('二项式系数和','binomsum',[{name:'n',value:'3',role:'二项式展开次数'}],'BINOM 1 1 n','binomsum 在内部把两个底数固定为1，只传展开次数，即可求这一行二项式系数之和。');
+  const reciprocal=examples.find(example=>example.name.startsWith('倒数 ·'));
+  reciprocal.fixedNumerator=true;
+  reciprocal.description='reciprocal 在内部固定分子为列表小数1，外部只传输出小数位数与要求倒数的数。';
+  const Sequences=root.LambdaSequences||require('./sequences.js');
+  examples.push(...Sequences.builtins.map(Sequences.example));
+  const BooleanCircuits=root.LambdaBooleanCircuits||require('./boolean-circuits.js');
+  examples.push(...BooleanCircuits.examples);
+  const ListOperations=root.LambdaListOperations||require('./list-operations.js');
+  examples.push(...ListOperations.examples);
+  // Both menus use this curriculum. Keep prerequisites before the programs
+  // that use them, rather than leaving newer examples at the end.
+  const curriculum=[
+    ['入门',['恒等函数','TRUE','FALSE','Church 数字','防止变量捕获']],
+    ['数据结构',['有序对']],
+    ['布尔逻辑与电路',BooleanCircuits.examples.map(example=>example.name)],
+    ['基础数学',['后继','加法','乘法','乘方','零判断','前驱','减法','比较','序对除法','整数除法']],
+    ['组合子',['组合子 B','组合子 C','组合子 W','S K K']],
+    ['丘奇列表',['丘奇列表 · 空表','丘奇列表 · 头部插入','丘奇列表 · 判空 []','丘奇列表 · 判空 [1','丘奇列表 · 首项','丘奇列表 · 长度',...ListOperations.examples.filter(example=>example.category==='丘奇列表').map(example=>example.name),'丘奇列表 · 折叠求和','丘奇列表 · 折叠乘积','丘奇列表 · 映射','丘奇列表 · 拼接','丘奇列表 · 尾部','丘奇列表 · 反转','丘奇列表 · 过滤']],
+    ['二进制列表',ListOperations.examples.filter(example=>example.category==='二进制列表').map(example=>example.name)],
+    ['归约与终止',['Ω']],
+    ['阶乘与递归',['阶乘 · 迭代','阶乘 · Y','斐波那契']],
+    ['列表小数四则',['列表小数加法','列表小数减法','列表小数乘法','列表小数除法']],
+    ['无限列表',['A000004','A000012','A001477','A000027','A005843','A000290','A000578','A000079','A000217','A000142','A000045','A000040']],
+    ['高等数学',['自然数求和','平方和','立方和','等比求和','排列数','组合数','二项式系数和','二项式展开','开根号','对数','多项式','符号求导','生成导函数','生成原函数','定积分','超幂','超对数','超根号','超超幂','超超对数','超超根号','λ解释器']],
+    ['高等小数',['取负','绝对值','小数二进制左移','小数二进制右移','带符号除法','倒数','幂函数','开根号','正弦','余弦','正切','双曲正弦','双曲余弦','双曲正切']]
+  ];
+  for(const example of examples){
+    if(example.name.startsWith('S K K'))example.category='组合子';
+    else if(example.name.startsWith('加法 ·')||example.name.startsWith('整数除法'))example.category='基础数学';
+    else if(example.name.startsWith('Ω'))example.category='归约与终止';
+  }
+  const exampleRanks=new Map();
+  curriculum.forEach(([category,prefixes],group)=>prefixes.forEach((prefix,position)=>{
+    const example=examples.find(item=>(item.category||'入门')===category&&item.name.startsWith(prefix));
+    if(!example)throw new Error('示例目录缺少：'+prefix);
+    example.category=category;exampleRanks.set(example,[group,position]);
+  }));
+  examples.sort((a,b)=>{
+    const ar=exampleRanks.get(a)??[curriculum.length,0],br=exampleRanks.get(b)??[curriculum.length,0];
+    return ar[0]-br[0]||ar[1]-br[1];
+  });
   const levels = [
     { id:1, name:'原样返回', topic:'恒等函数', description:'让恒等函数接收一个函数，看看它如何把输入原样返回。', start:'(λx.x) (λy.y)', target:I, targetLabel:'I · 恒等函数', hint:'λx.x 会把参数直接返回。点击「单步」，观察 x 被整个参数替换。' },
     { id:2, name:'选择第一个', topic:'布尔值', description:'两个函数交给 TRUE；归约后应只留下第一个。', start:`(${TRUE}) (${I}) (${TRUE})`, target:I, targetLabel:'I · 恒等函数', hint:'λx.λy.x 接收两个参数，只保留第一个。第二个参数可以是任意式。' },
@@ -174,7 +260,7 @@
     { id:14, name:'取出第一项', topic:'有序对', description:'将 2 和 5 保存在函数里，再取出第一项。', start:`(${PAIR}) 2 5 (${TRUE})`, target:'2', targetLabel:'Church 数字 2', hint:'有序对把两个值交给选择器。TRUE 选择第一项。' },
     { id:15, name:'取出第二项', topic:'有序对', description:'使用另一个选择器，从同一个有序对中取出第二项。', start:`(${PAIR}) 2 5 (${FALSE})`, target:'5', targetLabel:'Church 数字 5', hint:'FALSE 选择第二项。观察有序对如何展开为一次函数调用。' },
     { id:16, name:'重复中的重复', topic:'Church 乘法', description:'将重复 3 次的操作再重复 2 次，计算 2 × 3。', start:`(${MULT}) 2 3`, target:'6', targetLabel:'Church 数字 6', hint:'乘法 λm n f.m (n f) 把 n 次操作看成一个整体，再重复 m 次。' },
-    { id:17, name:'让数字作用于数字', topic:'Church 乘方', description:'让指数 3 作用在底数 2 上，计算 2³。', start:`(${POW}) 2 3`, target:'8', targetLabel:'Church 数字 8', hint:'Church 乘方可以写成 λb e.e b。归约函数体直到再无可归约项。' },
+    { id:17, name:'让数字作用于数字', topic:'Church 乘方', description:'让指数 3 作用在底数 2 上，计算 2³。', start:`(${POW}) 2 3`, target:'8', targetLabel:'Church 数字 8', hint:'Church 乘方写成 λb.λe.λf.λx.e b f x，保留结果参数，指数为0也会得到标准丘奇数1。' },
     { id:18, name:'向后一步', topic:'Church 前驱', description:'从数字 3 中去掉一次函数作用，观察前驱函数如何实现这一步。', start:`(${PRED}) 3`, target:'2', targetLabel:'Church 数字 2', hint:'前驱借助中间状态，让最终的函数作用少执行一次。' },
     { id:19, name:'连续后退', topic:'Church 减法', description:'对 5 连续取两次前驱，计算自然数减法 5 − 2。', start:`(${SUB}) 5 2`, target:'3', targetLabel:'Church 数字 3', hint:'把前驱函数重复 2 次。此阶段使用 Church 自然数，下阶段再进入负数与小数。' },
     { id:20, name:'辨认零', topic:'零判断', description:'判断 Church 数字 0 是否为零，将结果归约成布尔选择器。', start:`(${ZERO}) 0`, target:TRUE, targetLabel:'TRUE · 真', hint:'看输入数字会让传入的操作执行几次，再观察初始选择器是否被替换。' },
@@ -190,18 +276,67 @@
     { id:30, name:'最后一关：曲线下面积', topic:'定积分', description:'输入输入丘奇函数 2x 和积分上下限，程序内部编码、积分，再计算端点差。',start:M.churchExpression('DEFINITE',M.churchFunction([0,2]),'0','3'), target:'9', targetType:'rational', targetLabel:'有理数 9', hint:'三个末尾参数依次是被积函数、下限、上限。先生成原函数系数，再代入端点相减。' }
   ];
   const stages=['入门五关','函数与绑定','逻辑与数据','自然数进阶','列表小数','高等数学'].map((name,index)=>({id:index+1,name,levelIds:levels.slice(index*5,index*5+5).map(l=>l.id)}));
-  function rawSourceFor(item,precision=item.decimalPlaces??6){return C.explicitLambdas(item.decimalOperation?D.expression(item.decimalOperation,item.operands.map((value,index)=>item.operandEncodings?.[index]==='church'?`${value}_church`:value),precision):item.term??item.start);}
-  function rawInputSourceFor(item,precision=item.decimalPlaces??6){return C.explicitLambdas(item.decimalOperation?D.expression(item.decimalOperation,item.operands.map((value,index)=>`${value}_${item.operandEncodings?.[index]??'decimal'}`),precision):rawSourceFor(item,precision));}
+  function reciprocalSource(item,precision){
+    const fn=C.L('p',C.L('a',C.A(C.A(C.A(D.genericProgram('DIV'),C.V('p')),D.encodeLiteral('1')),C.V('a'))));
+    return '('+C.format(fn)+') '+precision+'_church '+item.operands[1]+'_decimal';
+  }
+  function rawSourceFor(item,precision=item.decimalPlaces??6){if(item.fixedNumerator)return reciprocalSource(item,precision);return C.explicitLambdas(item.decimalOperation?D.expression(item.decimalOperation,item.operands.map((value,index)=>item.operandEncodings?.[index]==='church'?`${value}_church`:value),precision):item.term??item.start);}
+  function rawInputSourceFor(item,precision=item.decimalPlaces??6){if(item.fixedNumerator)return reciprocalSource(item,precision);if(item.booleanCircuit)return C.explicitLambdas(BooleanCircuits.inputSource(item));if(item.sequenceId)return Sequences.program(item.sequenceId,{start:item.sequenceStart,count:item.sequenceCount}).source;return C.explicitLambdas(item.decimalOperation?D.expression(item.decimalOperation,item.operands.map((value,index)=>`${value}_${item.operandEncodings?.[index]??'decimal'}`),precision):rawSourceFor(item,precision));}
+  function callParts(item,precision=item.decimalPlaces??6){
+    const source=rawInputSourceFor(item,precision),literals=new Map();let prefix='entryLiteral';while(source.includes(prefix))prefix+="'";
+    if(/^[λ\\]/.test(source.trim()))return {head:source,args:[]};
+    const atoms=[];let start=-1,depth=0,brackets=0,quoted=false;
+    for(let index=0;index<=source.length;index++){
+      const char=source[index];if(start<0){if(char===undefined||/\s/.test(char))continue;start=index;}
+      if(char==='`')quoted=!quoted;
+      if(!quoted){if(char==='(')depth++;else if(char===')')depth--;else if(char==='[')brackets++;else if(char===']')brackets--;}
+      if(char===undefined||!quoted&&!depth&&!brackets&&/\s/.test(char)){atoms.push(source.slice(start,index));start=-1;}
+    }
+    const format=text=>{
+      const node=C.parse(text,Infinity,(value,suffix)=>{const name=prefix+literals.size;literals.set(name,String(value)+(suffix===null?'':'_'+suffix));return C.V(name);},{suffixes:true}),number=C.churchNumber(node);
+      if(number!==null)return String(number);let result=C.format(node);for(const [name,value]of [...literals].reverse())result=result.replaceAll(name,value);return result;
+    };
+    return {head:atoms[0],args:atoms.slice(1).map(format)};
+  }
   function naming(){return root.LambdaGuideNames||(typeof require==='function'?require('./guide-names.js'):null);}
   function sourceFor(item,precision=item.decimalPlaces??6){const raw=rawSourceFor(item,precision);return naming()?.catalog().source(raw,item.name)??raw;}
-  function inputSourceFor(item,precision=item.decimalPlaces??6){const raw=rawInputSourceFor(item,precision);return naming()?.catalog().source(raw,item.name)??raw;}
+  function programFor(item,precision=item.decimalPlaces??6){const raw=rawInputSourceFor(item,precision),catalog=naming()?.catalog();return catalog?.program(raw,item.name)??{source:raw,call:raw,definitions:[]};}
+  function inputSourceFor(item,precision=item.decimalPlaces??6){return programFor(item,precision).source;}
+  let runtimeHelpers;
+  function helperPatterns(){
+    const catalog=naming()?.catalog();if(!catalog)return [];
+    if(!runtimeHelpers){
+      runtimeHelpers=catalog.entries().map(entry=>({name:entry.name,term:C.parse(entry.source,Infinity)}));
+      const helperNames=new Set(runtimeHelpers.map(entry=>entry.name)),encoding=root.LambdaDataEncoding||(typeof require==='function'?require('./data-encoding.js'):null);
+      // Record the exact declarations emitted by the generator too: their
+      // private names and literal representations may differ from the guide.
+      for(const item of [...examples,...levels]){
+        const source=inputSourceFor(item),pending=[encoding?encoding.parse(source).term:C.parse(source,Infinity)];
+        while(pending.length){const node=pending.pop();if(node.type==='abs')pending.push(node.body);else if(node.type==='app'){
+          if(node.fn.type==='abs'&&(helperNames.has(node.fn.param.replace(/'+$/,''))||node.fn.param.includes("'")))runtimeHelpers.push({name:node.fn.param,term:node.arg});
+          pending.push(node.fn,node.arg);
+        }}
+      }
+    }
+    return runtimeHelpers;
+  }
+  function prepare(term,functions=[]){
+    const library=root.LambdaLibrary||(typeof require==='function'?require('./library.js'):null);
+    return library?library.captureHelpers(term,helperPatterns(),functions):{term,definitions:functions};
+  }
+  function preparePlain(term){
+    const library=root.LambdaLibrary||(typeof require==='function'?require('./library.js'):null);
+    return library?library.linkHelpersInPlace(term,helperPatterns()):term;
+  }
   function parametersFor(item,precision=item.decimalPlaces??6){
+    if(item.fixedNumerator)return ['输出小数位数 '+precision+'_church','要求倒数的小数 '+item.operands[1]+'_decimal'];
+    if(item.sequenceId)return [`起始下标 ${item.sequenceStart}_church`,`读取项数 ${item.sequenceCount}_church`];
     if(item.parameters)return item.parameters;
     const labels={ADD:['第一个加数','第二个加数'],DIV:['被除数','除数'],POW:['底数','指数'],SQRT:['根号内的数'],SHL:['原小数'],SHR:['原小数']}[item.decimalOperation];
     const parameters=labels?.map((label,index)=>`${label} ${item.operands[index]}_${item.operandEncodings?.[index]??'decimal'}`)??item.operands?.map((value,index)=>`输入${index+1} ${value}_${item.operandEncodings?.[index]??'decimal'}`)??[];
     return D.precisionOperations.has(item.decimalOperation)?[`输出小数位数 ${precision}_church`,...parameters]:parameters;
   }
-  const API={ examples, levels, stages, rawSourceFor, rawInputSourceFor, sourceFor, inputSourceFor, parametersFor, I, TRUE, FALSE, churchLists:{encode:churchList,nil:NIL,cons:CONS,head:HEAD,tail:TAIL,isEmpty:EMPTY,length:LENGTH,map:MAP,append:APPEND,reverse:REVERSE,filter:FILTER}, advanced:{factorial:FACTORIAL,recursiveFactorial:RECURSIVE_FACTORIAL,choose:CHOOSE,permutations:PERMUTATIONS,sumPowers,geometricSum:GEOMETRIC_SUM,binomial:BINOMIAL,polynomial:POLYNOMIAL,derivative:DERIVATIVE,integral:INTEGRAL} };
+  const API={ examples, levels, stages, rawSourceFor, rawInputSourceFor, sourceFor, inputSourceFor, programFor, callParts, parametersFor, prepare, preparePlain, I, TRUE, FALSE, pairDivision:{definitions:pairDivisionDefinitions,program:PAIR_DIVISION},churchLists:{encode:churchList,nil:NIL,cons:CONS,head:HEAD,tail:TAIL,isEmpty:EMPTY,length:LENGTH,map:MAP,append:APPEND,reverse:REVERSE,filter:FILTER,nonzero:NONZERO,dropzero:DROPZERO}, advanced:{factorial:FACTORIAL,recursiveFactorial:RECURSIVE_FACTORIAL,choose:CHOOSE,permutations:PERMUTATIONS,sumPowers,geometricSum:GEOMETRIC_SUM,binomial:BINOMIAL,polynomial:POLYNOMIAL,derivative:DERIVATIVE,integral:INTEGRAL} };
   root.LambdaPresets=API;
   if(typeof module !== 'undefined' && module.exports) module.exports=API;
 })(typeof globalThis !== 'undefined' ? globalThis : window);

@@ -6,6 +6,7 @@
   const isBuiltin=name=>builtinKeys.includes(name);
   const builtins=new Map(Object.entries(builtinLabels).flatMap(([key,label])=>[[key,key],[label,key]]));
   const literalCache=new WeakMap();
+  const reductionStepsFor=entry=>entry?.reductionSteps??(entry?.reduceInput===false?0:Infinity);
   const validStoredName=name=>C.validName(name)&&!['church','丘奇数','decimal','列表小数'].includes(name);
   const validName=name=>validStoredName(name)&&!builtins.has(name);
   function validateTemplate(template){
@@ -53,6 +54,8 @@
     for(const entry of entries){
       if(!entry||!validStoredName(entry.name)||names.has(entry.name))throw new C.LambdaError('编码名称重复或含语法符号；名称不能为空，内置编码名称不能占用。');
       if(typeof entry.source!=='string'||!entry.term)throw new C.LambdaError('数据转换函数缺失。');
+      if(entry.reduceInput!==undefined&&typeof entry.reduceInput!=='boolean')throw new C.LambdaError('自定义编码自动归约开关不合法。');
+      if(entry.reductionSteps!==undefined&&(!Number.isSafeInteger(entry.reductionSteps)||entry.reductionSteps<0))throw new C.LambdaError('自定义编码归约步数需为非负整数。');
       C.inspect(entry.term);if(C.freeVars(entry.term).size)throw new C.LambdaError('数据转换函数不能含未定义的自由变量。');
       if(entry.table!==undefined&&!Array.isArray(entry.table))throw new C.LambdaError('数字表达式对照表不合法。');
       const values=new Set();
@@ -65,19 +68,27 @@
     }
     formatSpecs(entries);return entries;
   }
-  function define(entries,name,source,expand=term=>term,editing=null,numberFormats={}){
+  function define(entries,name,source,expand=term=>term,editing=null,numberFormats={},options={}){
     validate(entries);name=name.trim();
     if(name===editing?!validStoredName(name):!validName(name))throw new C.LambdaError('编码名称不能为空，也不能含空白或 λ、点、括号等语法符号；不能使用内置编码名称。');
     if(editing!==null&&!entries.some(entry=>entry.name===editing))throw new C.LambdaError('要编辑的数据编码已不存在。');
     if(entries.some(entry=>entry.name===name&&entry.name!==editing))throw new C.LambdaError(`编码「${name}」已存在，请选择它进行编辑。`);
     // Converter definitions always receive Church numbers; they do not recursively encode themselves.
     const original=entries.find(entry=>entry.name===editing);
+    let reductionSteps=reductionStepsFor(original);
+    if(Object.hasOwn(options,'reductionSteps')){
+      reductionSteps=options.reductionSteps===null?Infinity:options.reductionSteps;
+      if(reductionSteps!==Infinity&&(!Number.isSafeInteger(reductionSteps)||reductionSteps<0))throw new C.LambdaError('自定义编码归约步数需为非负整数。');
+    }else if(Object.hasOwn(options,'reduceInput')){
+      if(typeof options.reduceInput!=='boolean')throw new C.LambdaError('自定义编码自动归约开关不合法。');
+      reductionSteps=options.reduceInput?Infinity:0;
+    }
     const term=original?.source===source?original.term:expand(parse(source,entries,Infinity,'church',numberFormats).term);
-    const entry={name,source,term,...(original?.inputFormat&&original.inputFormat!==`{n}_${original.name}`?{inputFormat:original.inputFormat}:{}),...(original?.table?{table:original.term===term?original.table:[]}:{})};
+    const entry={name,source,term,...(Number.isFinite(reductionSteps)?{reductionSteps}:{}),...(original?.inputFormat&&original.inputFormat!==`{n}_${original.name}`?{inputFormat:original.inputFormat}:{}),...(original?.table?{table:original.term===term?original.table:[]}:{})};
     const result=editing===null?[...entries,entry]:entries.map(old=>old.name===editing?entry:old);validate(result);formatSpecs(result,numberFormats);return result;
   }
   function parse(source,entries=[],maxChars=Infinity,defaultEncoding='church',numberFormats={}){
-    validate(entries);const registry=new Map(entries.map(entry=>[entry.name,entry.term])),encodings=new Set(),literals=[];
+    validate(entries);const registry=new Map(entries.map(entry=>[entry.name,entry.term])),encodings=new Set(),literals=[],dataTerms=[];
     const selected=defaultEncoding.startsWith('custom:')?defaultEncoding:builtins.get(defaultEncoding)||defaultEncoding;
     const term=C.parse(source,maxChars,(value,suffix,position,listDepth)=>{
       const encoding=suffix===null?(selected==='list'&&listDepth>0?'church':selected):registry.has(suffix)?`custom:${suffix}`:builtins.get(suffix)||suffix;
@@ -100,22 +111,36 @@
         }
         if(encoding==='list'){
           encodings.add(encoding);
-          return C.churchList([...BigInt(value).toString()].map(digit=>C.parse(digit)));
+          const term=C.churchList([...BigInt(value).toString()].map(digit=>C.parse(digit)));dataTerms.push({term,kind:'list'});return term;
         }
         const church=C.parse(value);
-        if(encoding==='church'){encodings.add('church');return church;}
+        if(encoding==='church'){encodings.add('church');dataTerms.push({term:church,kind:'church'});return church;}
         const name=encoding.startsWith('custom:')?encoding.slice(7):encoding;
         if(!registry.has(name))throw new C.LambdaError(`未定义数据编码「${name}」。请先保存对应转换函数。`);
         encodings.add(name);const definition=registry.get(name),term=C.A(definition,church);
         literals.push({name,number:naturalNumber(value),definition,term});return term;
       }catch(error){if(error.position===null||error.position===undefined)error.position=position;throw error;}
-    },{suffixes:true,literalMatcher:literalMatcher(entries,numberFormats),onList:()=>encodings.add('list')});
-    return {term,encodings:[...encodings],literals};
+    },{suffixes:true,literalMatcher:literalMatcher(entries,numberFormats),onList:term=>{encodings.add('list');dataTerms.push({term,kind:'list'});}});
+    return {term,encodings:[...encodings],literals,dataTerms};
   }
   async function compile(source,entries=[],defaultEncoding='church',options={}){
     const parsed=parse(source,entries,options.maxChars??Infinity,defaultEncoding,options.numberFormats??{}),replacements=new WeakMap(),mappings=[];
+    const budgets=new Map(entries.map(entry=>[entry.name,reductionStepsFor(entry)])),deferred=[],partial=[];
     const canceled=()=>{if(options.signal?.aborted){const error=new C.LambdaError('数字编码已取消。');error.name='AbortError';throw error;}};
     for(const literal of parsed.literals){
+      canceled();const budget=budgets.get(literal.name);
+      if(budget===0){deferred.push({...literal,steps:0});continue;}
+      if(Number.isFinite(budget)){
+        let term=literal.term,steps=0,started=performance.now();
+        while(steps<budget){
+          canceled();const next=C.step(term);if(!next)break;term=next.term;steps++;
+          if(performance.now()-started>=8){options.onProgress?.({...literal,steps});await new Promise(resolve=>setTimeout(resolve,12));started=performance.now();}
+        }
+        canceled();replacements.set(literal.term,term);
+        const result={...literal,term,steps};
+        if(C.findRedex(term))partial.push(result);else mappings.push(result);
+        continue;
+      }
       canceled();let cache=literalCache.get(literal.definition);if(!cache){cache=new Map();literalCache.set(literal.definition,cache);}
       let term=cache.get(literal.number),steps=0;
       if(!term){
@@ -138,7 +163,7 @@
       if(node.type==='abs'){const body=rebuilt.get(node.body);rebuilt.set(node,body===node.body?node:C.L(node.param,body));}
       else{const fn=rebuilt.get(node.fn),arg=rebuilt.get(node.arg);rebuilt.set(node,fn===node.fn&&arg===node.arg?node:C.A(fn,arg));}
     }
-    return {...parsed,term:rebuilt.get(parsed.term),mappings};
+    return {...parsed,term:rebuilt.get(parsed.term),mappings,deferred,partial,dataTerms:parsed.dataTerms.map(entry=>({...entry,term:rebuilt.get(entry.term)??entry.term}))};
   }
   function isLiteral(source,entries=[],numberFormats={}){
     source=source.trim();const numeric=/^-?[0-9]+(?:\.[0-9]+)?(?:_(.*))?$/u.exec(source);
@@ -217,6 +242,6 @@
     const result=entries.map(entry=>{if(entry.name!==name)return entry;const changed={...entry};if(template===`{n}_${name}`)delete changed.inputFormat;else changed.inputFormat=template;return changed;});
     validate(result);formatSpecs(result,numberFormats);return result;
   }
-  const API={isBuiltin,readBuiltin,readChurchList,validName,validate,define,parse,compile,isLiteral,label,naturalNumber,putMapping,removeMapping,lookup,validateTemplate,validateFormats:formatSpecs,inputFormatFor,withInputFormat};root.LambdaDataEncoding=API;
+  const API={isBuiltin,readBuiltin,readChurchList,validName,validate,define,parse,compile,isLiteral,label,naturalNumber,putMapping,removeMapping,lookup,validateTemplate,validateFormats:formatSpecs,inputFormatFor,withInputFormat,reductionStepsFor};root.LambdaDataEncoding=API;
   if(typeof module!=='undefined'&&module.exports)module.exports=API;
 })(typeof globalThis!=='undefined'?globalThis:window);

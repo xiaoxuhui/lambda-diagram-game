@@ -77,23 +77,31 @@
         ]}:{} )};
     }
     if(prefix==='序对除法'){
-      let program=C.parse(P.rawSourceFor(example));while(program.type==='app')program=program.fn;
-      const body=program.body.body,normal=body.arg,loop=normal.fn;
-      const step=C.substitute(loop.fn.arg,'n',number(2)),initial=numbers([7,0]);
+      const definitions=P.pairDivision.definitions;
+      const close=source=>{let term=C.parse(source);for(const definition of [...definitions].reverse())term=C.substitute(term,definition.name,C.parse(definition.source));return term;};
+      const step=close('quotstep 2'),initial=close('PAIR 7 0');
       cards.push(card('初始状态','第一项保存剩余量，第二项保存商。',initial,numbers([7,0]),'(余数7,商0)'));
       const repeated=C.A(C.A(number(7),step),initial);
       cards.push(card('被除数提供7轮更新次数','同一个更新函数检查剩余量：够减就减除数并增加商，不够减就保持状态。',repeated,numbers([1,3]),'(余数1,商3)'));
-      cards.push(card('构造可识别的最终记录','完成状态更新后加入真标记。最终记录的字段顺序是标记、余数、商；它和中间两字段序对的形状不同。',C.parse(P.rawSourceFor(example)),C.parse(example.expected),'余数1，商3'));
+      cards.push(card('构造可识别的最终记录','完成状态更新后加入真标记。最终记录的字段顺序是标记、余数、商；它和中间两字段序对的形状不同。',close('pairdiv 7 2'),C.parse(example.expected),'余数1，商3'));
       ['PAIR 7 0','7 (quotstep 2) (PAIR 7 0)','pairdiv 7 2'].forEach((source,i)=>cards[i].compactSource=source);
-      return {...doc,core:'pairdiv = '+printable(program)+'\nquotstep = '+printable(C.L('n',loop.fn.arg)),pairExamples:cards,
-        walkthrough:'m (quotstep n) (PAIR m 0)\n→ PAIR 余数 商\n→ λk.k TRUE 余数 商',
+      const mainNames=['pairdiv','quotstep','divstate','divresult'];
+      const ordered=[...mainNames.map(name=>definitions.find(item=>item.name===name)),...definitions.filter(item=>!mainNames.includes(item.name))];
+      const trace={columns:['轮数','旧序对（剩余量，商）','除数≤剩余量？','返回的新序对'],rows:Array.from({length:7},(_,i)=>[String(i+1),i<3?`(${7-i*2},${i})`:'(1,3)',i<3?'真：减2，商加1':'假：保留旧值',i<3?`(${5-i*2},${i+1})`:'(1,3)'])};
+      return {...doc,core:ordered.map(item=>item.name+' = '+item.source).join('\n'),symbols:definitions,featured:['PAIR','FIRST','SECOND','quotstep','divstate'],compact:'pairdiv 7 2',libraryEntries:['pairdiv'],pairExamples:cards,
+        inputs:[{name:'m',value:'7_church',encoding:'丘奇自然数',role:'被除数；也为有限迭代提供最多 m 轮更新次数'},{name:'n',value:'2_church',encoding:'丘奇自然数',role:'除数；必须大于零，每轮保持相同'}],
+        principle:['先用 PAIR m 0 构造（剩余量，商）。divstate 每一轮实际调用 quotstep n；quotstep 给旧序对传入 λr.λq.…，一次读出两项，再调用 PAIR 构造新序对。FIRST、SECOND 留给调用者单独取余数或商。','条件为真时调用 SUB 与 SUCC，得到（剩余量−除数，商+1）；条件为假时调用 PAIR 保留两个旧值。除数至少是1，所以成功相减不会超过 m 次，固定 m 轮已足够，不需要递归搜索。','divstate 返回二字段序对。pairdiv 最后才调用 divresult，一次读取最终序对并转成页面可识别的三字段记录；TRUE 是识别标记，后面依次是余数、商。分别在两个取项函数中重新计算整个迭代会重复工作，因此内部使用一次读取。'],
+        walkthrough:'pairdiv 7 2\n→ divresult (divstate 7 2)\n→ divresult (7 (quotstep 2) (PAIR 7 0))\n→ divresult (PAIR 1 3)\n→ λk.k TRUE 1 3',
         steps:[
-          ['保存剩余量与商','初始剩余量为被除数7，商为0。每轮通过 p 接收读取者，将两个字段一起传给 λr q。','PAIR 7 0 → λk.k 7 0\np (λr q.body) → body[r←剩余量,q←商]'],
-          ['判断够不够再减一次','读取剩余量r后，判断除数2是否不大于r。满足时走减法分支，否则保留原状态；不是等到负数才结束。','(2≤r) (PAIR (SUB r 2) (SUCC q)) (PAIR r q)'],
-          ['成功相减时同时更新两项','quotstep 先接收除数，再接收旧序对。从同一旧状态读出r和q，用剩余量减除数，用商加1，再封装成一个新序对。','quotstep n (PAIR r q) → PAIR (SUB r n) (SUCC q)'],
-          ['不够减时为什么还能继续迭代','丘奇7固定调用更新函数7次。到(1,3)后，每轮都选择保留分支，所以剩下4轮不会再增加商。','quotstep 2 (PAIR 1 3) → PAIR 1 3'],
-          ['把状态转成输出记录','读取最终的余数与商，加上真标记后返回三字段函数。除数为0会在进入迭代前返回错误记录。','(PAIR 1 3) (λr q k.k TRUE r q)\n→ λk.k TRUE 1 3']
-        ]};
+          ['主函数先检查除数，再调用其他函数','pairdiv 调用 ISZERO。除数为零选择 divzero；除数为正选择 divresult (divstate m n)。正规序先选择分支，不计算未选中的分支。','pairdiv 7 2 → ISZERO 2 divzero (divresult (divstate 7 2))\n→ divresult (divstate 7 2)'],
+          ['构造序对，传入一个读取函数','divstate 从 PAIR 7 0 开始。quotstep 将 λr.λq.… 传给旧序对，让剩余量进入 r、商进入 q。单独取项时也可以调用 FIRST、SECOND；内部一次读取两项避免重复计算。','(PAIR 7 0) (λr.λq.body) → body[r←7,q←0]\nFIRST (PAIR 7 0) → 7\nSECOND (PAIR 7 0) → 0'],
+          ['把整个旧序对交给更新函数','quotstep 的第一个参数是除数，第二个参数是旧序对；本例先固定除数2，得到一个只接收序对的更新函数。判断2≤7为真后，用减法、后继和序对构造器得到新状态。','quotstep 2 (PAIR 7 0)\n→ ATMOST 2 7 (PAIR (SUB 7 2) (SUCC 0)) (PAIR 7 0)\n→ PAIR 5 1'],
+          ['每轮都调用同一个函数，不够减就返回原序对','丘奇7调用 quotstep 2 共7次。到(1,3)后，条件2≤1为假，选择原序对 p，所以剩下4轮不会再增加商。循环中没有把状态改成别的编码。','divstate 7 2 = 7 (quotstep 2) (PAIR 7 0)\nquotstep 2 (PAIR 1 3) → PAIR 1 3',trace],
+          ['最后读取序对，封装页面识别记录','divresult 一次读取最终序对的余数1、商3。TRUE 标记仅为兼容结果显示；需要继续操作普通序对时，直接调用 divstate。','divresult (PAIR 1 3) → λk.k TRUE 1 3\nFIRST (divstate 7 2) → 1\nSECOND (divstate 7 2) → 3']
+        ],encodingText:'输入为丘奇自然数。divstate 返回 PAIR 余数 商；pairdiv 在最终序对外加页面识别标记，输出 λk.k TRUE 余数 商。',
+        parameterNote:'加入函数库只添加 pairdiv，所需辅助定义放在它内部。外部只传被除数和除数，结果区直接显示余数与商。其他数字编码下请给两个参数加 _church。',
+        boundaries:['除数0返回除零错误；只有除数大于0时，m轮足够的论证才成立。divstate 是内部迭代函数，直接调用时由使用者保证正除数。','被除数0得到（0,0）；被除数小于正除数时保持（被除数,0）；整除时余数为0。两个输入均为丘奇自然数，不接收负数或列表小数。','使用正规序可先选择条件分支，避免计算未选中的减法分支。所有状态都满足：原被除数 = 除数×当前商 + 当前剩余量。'],
+        exercise:'把被除数改为8、除数改为4，依次跟踪（8,0）→（4,1）→（0,2）。用两个取项函数分别核对余数0和商2。'};
     }
     if(example.category==='丘奇列表'&&example.name.includes('尾部')){
       const body=C.parse(P.churchLists.tail).body,step=body.fn.fn.arg;

@@ -82,14 +82,16 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
         await page.locator('#restore-state').click();assert.equal(await page.locator('#number-encoding option[value="custom:Box"]').count(),1);await result('λk.k 3 3');
       });
       await check(`${width}px decimal example remains exact and labelled`,async()=>{
+        await page.locator('#growth-window').selectOption('0'); // This check verifies the result, not timed growth pauses.
         const example=P.examples.find(e=>e.decimalOperation==='ADD');await page.locator('#examples').selectOption(String(P.examples.indexOf(example)));
         assert.match(await page.locator('#expression').inputValue(),/0\.1_decimal/);await fast();assert.equal(await page.locator('#decoded').textContent(),'小数 0.3');assert.match(await page.locator('#expression-encoding').textContent(),/列表小数/);
       });
       await check(`${width}px export-before-clear and import roundtrip all encodings and checkpoint`,async()=>{
+        const optionCount=await page.locator('#number-encoding option').count();
         const pending=page.waitForEvent('download');await page.locator('#clear-all').click();const download=await pending,backup=fs.readFileSync(await download.path(),'utf8');
         assert.equal(await page.locator('#number-encoding option[data-custom-encoding]').count(),0);assert.equal(await page.locator('#encoding-name').inputValue(),'');
         await page.locator('#import-file').setInputFiles({name:'backup.json',mimeType:'application/json',buffer:Buffer.from(backup)});
-        await page.waitForFunction(()=>document.getElementById('number-encoding').options.length===5);assert.equal(await page.locator('#decoded').textContent(),'小数 0.3');
+        await page.waitForFunction(count=>document.getElementById('number-encoding').options.length===count,optionCount);assert.equal(await page.locator('#decoded').textContent(),'小数 0.3');
         await page.locator('#restore-state').click();await result('λk.k 3 3');
       });
       await check(`${width}px long names and converter inputs fit and remain editable`,async()=>{

@@ -67,9 +67,9 @@
       'MUL 2 3 f x → 2 (3 f) x\n→ (3 f) ((3 f) x)\n→ f (f (f (f (f (f x)))))'
     ],
     '乘方 · 2⁴ → 16':[
-      'POW = λbase exponent.exponent base',
-      ['指数是一个迭代器。让指数迭代底数这个丘奇函数，会把函数重复次数逐层相乘。','参数顺序是底数、指数。此例的 4 在程序内部作用于 2，形成 2 的四次方。'],
-      'POW 2 4 → 4 2\n2⁴ = 2 × 2 × 2 × 2 = 16'
+      'POW = λb.λe.λf.λx.e b f x',
+      ['指数是一个迭代器。让指数迭代底数这个丘奇函数，再显式保留 λf.λx，结果始终具有丘奇数的两个参数。','参数顺序是底数、指数。指数为0时，0 b f x → f x，所以结果是标准丘奇数1；底数为0、指数为正整数时，结果是标准丘奇数0。','本程序采用空乘积约定：0⁰也返回1。这是该程序的定义，不表示所有数学场合都将0⁰定义为1。'],
+      'POW 2 4 → λf.λx.4 2 f x → 16\nPOW 3 0 → λf.λx.f x → 1\nPOW 0 3 → λf.λx.x → 0\nPOW 0 0 → 1（程序约定）'
     ],
     '前驱 · 3 − 1 → 2':[
       'PRED = λn f x.n (λg h.h (g f)) (λu.x) (λu.u)',
@@ -299,7 +299,7 @@
     DIV:['先对齐输入的小数位数，把除数和被除数变成同一单位的整数数位。长除法每次带下一位进入余数，用重复减法求商位；需要小数位时继续带入零。','1÷8\n整数商为 0，余数 1\n10÷8 → 商位 1，余数 2\n20÷8 → 商位 2，余数 4\n40÷8 → 商位 5，余数 0\n→ 0.125'],
     NEG:['保留绝对值、位数和近似标记，只翻转符号位。构造函数会检查零值并清除零的负号。','1.25 → 符号由正变负 → −1.25\n0 → 0'],
     ABS:['保留数位列表、小数位数与近似标记，把符号位设为正。它既能接收正数，也能接收负数和零。','−2.75 → 清除负号 → 2.75'],
-    POW:['指数使用丘奇自然数，决定重复多少次带符号小数乘法。累计值从 1 开始，每轮把底数乘入；中间结果先归约成小数数据再继续。','(−0.5)³\n累计值 1 → −0.5 → 0.25 → −0.125\n指数为 0 时返回 1'],
+    POW:['指数使用丘奇自然数，决定重复多少次带符号小数乘法。累计值从 1 开始，每轮把底数乘入；中间结果先归约成小数数据再继续。底数为0且指数为正整数时返回0；指数为0返回1，包括本程序约定的0⁰=1。','(−0.5)³\n累计值 1 → −0.5 → 0.25 → −0.125\n指数为 0 时返回 1'],
     SHL:['把原数位列表与自身相加，小数位数保持不变，等于乘以 2。操作只接收一个小数，可以用丘奇数在外面重复调用。','−1.25 → −2.5\n3_church SHIFT_LEFT 1.25_decimal\n表示连续左移三位，得到 10'],
     SHR:['有限十进制数除以 2，可以把数位整数乘以 5，同时把小数位数增加 1。这里每次只移动一位，所有数位都会保留。','1.25 = 125/100\n→ 625/1000 = 0.625\n连续右移三次等于除以 8'],
     SQRT:['从输入值和 1 中较大者开始，用牛顿迭代更新估计值。每轮计算“原数除以当前估计”，再与当前估计求平均，工作值截断到 4 位小数；估计不再下降时结束。','求 √2\n2 → (2+2/2)/2=1.5\n→ (1.5+2/1.5)/2≈1.4166\n→ … → 页面显示 ≈1.414'],
@@ -311,29 +311,59 @@
     TANH:['先计算双曲正弦和双曲余弦，再做小数除法。这里继承双曲多项式的输入范围和工作精度。','tanh(0.5)=sinh(0.5)/cosh(0.5)\n≈0.521/1.127\n→ ≈0.462']
   };
   function rawLesson(example,precision=6){
+    if(example.listOperation)return (root.LambdaListOperations||require('./list-operations.js')).lesson(example);
+    if(example.fixedNumerator){
+      const base=rawLesson({...example,fixedNumerator:false},precision),source='λp.λa.decimaldiv p ('+(root.LambdaCore||require('./core.js')).format((root.LambdaDecimal||require('./decimal.js')).encodeLiteral('1'))+') a';
+      return {...base,core:'reciprocal = '+source+'\n'+base.core,symbols:[...base.symbols,{name:'reciprocal',source,meaning:'内部固定分子为1，只接收输出位数和要求倒数的小数。'}],compact:'reciprocal '+precision+'_church '+example.operands[1]+'_decimal',libraryEntries:['reciprocal'],inputs:[base.inputs[0],{...base.inputs[2],name:'a',role:'要求倒数的小数，分子1已经在函数内部固定'}],parameterNote:'只传输出位数和要求倒数的小数；不再传固定分子1。',steps:[['只传实际数据','入口在内部调用小数除法并固定分子为1。','reciprocal = '+source],...base.steps]};
+    }
+    if(example.booleanCircuit)return (root.LambdaBooleanCircuits||require('./boolean-circuits.js')).lesson(example);
+    if(example.capsule){
+      const spec=example.capsule,base=rawLesson({...example,capsule:null},precision),symbols=new Map(base.symbols.map(symbol=>[symbol.name,symbol]));
+      for(const symbol of spec.symbols)if(!symbols.has(symbol.name))symbols.set(symbol.name,symbol);
+      return {...base,core:spec.name+' = '+spec.source+'\n'+base.core,symbols:[...symbols.values()],compact:spec.compact,inputs:spec.inputs,libraryEntries:[spec.name],
+        principle:[example.description,...base.principle],
+        parameterNote:'辅助函数、选择器和固定初值已放在 '+spec.name+' 内部。'+(spec.inputs.length?'外部只传上表中的实际数据。':'本例展示函数本身；使用时传入一个实际数据即可。')+' 加入函数库时只添加入口函数，辅助定义随它封装保存。',
+        steps:[['先看封装后的入口',example.description,spec.name+' = '+spec.source+'\n'+spec.compact],...base.steps],
+        exercise:spec.inputs.length?'只修改本例的实际数据参数，再核对结果。若要改变固定的辅助操作，可编辑入口函数内部定义。':'给 '+spec.name+' 传入一个自由变量或另一个函数，观察它原样返回这个数据。'};
+    }
+    if(example.successor){
+      const source='λn.λf.λx.f (n f x)';
+      return {core:'SUCC = '+source,symbols:[{name:'SUCC',source,meaning:'丘奇后继函数：保留原数字的迭代，再在外面增加一次 f 的作用。'}],featured:['SUCC'],compact:'SUCC 3',
+        inputs:[{name:'n',value:'3_church',encoding:'丘奇自然数',role:'决定原来重复执行 f 的次数；可改为其他非负整数'}],
+        basics:['丘奇数 n 接收函数 f 和初值 x，把 f 连续作用 n 次。','后继返回新的丘奇数，保留 λf.λx 这两个参数，在原来的迭代外再增加一层 f。'],
+        foundation:'3 = λf.λx.f (f (f x))\n4 = λf.λx.f (f (f (f x)))',
+        principle:['把数字 n 代入 λn.λf.λx.f (n f x)，得到 λf.λx.f (n f x)。其中 n f x 是原有的 n 次作用。','最外层新增的 f 再作用一次，因此总次数成为 n+1。结果仍接收 f、x，可以继续传给后继、加法、乘法或列表映射。'],
+        steps:[['读取输入 3','输入是一个执行三次 f 的函数。','3 = λf.λx.f (f (f x))'],['代入数字','把 n 替换为丘奇数 3，保留结果函数的 f 和 x。','SUCC 3 → λf.λx.f (3 f x)'],['展开原有迭代','原数字先把 f 作用在 x 上三次。','3 f x → f (f (f x))'],['增加一次作用','外面原有的一层 f 包住这三次作用，得到四次。','λf.λx.f (f (f (f x)))'],['继续使用结果','结果是丘奇数 4，再做一次后继会得到 5。','SUCC (SUCC 3) → SUCC 4 → 5']],
+        walkthrough:'SUCC 3\n→ λf.λx.f (3 f x)\n→ λf.λx.f (f (f (f x)))\n→ 4',
+        boundaries:['0 不执行原有迭代，后继仍新增一次作用，因此 SUCC 0 = 1。','这个函数接收丘奇自然数。负数、列表小数和自定义编码需要使用对应的编码转换或运算定义。','按需展开开启时，数字可能先显示为 n3；展开数据函数后再继续普通 β 归约，最终仍得到丘奇数 4。'],
+        exercise:'把末尾的 3 改成 0 或 1，再连续应用两次后继，检查结果是否分别为 2 或 3。',
+        encodingText:'输入和输出都是丘奇自然数。示例会选择丘奇编码；也可在实验中写 3_church 明确指定。',parameterNote:'完整表达式末尾只有一个参数 n。函数 f 与初值 x 是结果中的形式参数。'};
+    }
+    if(example.sequenceId)return (root.LambdaSequences||require('./sequences.js')).lesson(example);
     if(example.metaInterpreter){
       const C=root.LambdaCore||require('./core.js'),Meta=root.LambdaMeta||require('./meta-lambda.js');
       const input=C.parse(example.metaInput),stages=Meta.stages(input);
       const meanings={bound:'绑定变量节点，保存从当前位置向外数的绑定深度。',freeTerm:'自由变量节点，保存自由变量环境中的下标。',abs:'抽象节点，保存函数体语法。',app:'应用节点，保存函数与参数的语法。',get:'按丘奇下标读取Scott环境中的值。',cons:'把一个值压入环境，供变量下标读取。',nil:'空环境。',closure:'解释器中的函数闭包，保存函数体的求值过程。',neutral:'不能继续执行的自由变量或中性应用。',evalTerm:'按环境解释四类语法节点。',reify:'把闭包和中性值还原成已归约的语法数据。',normalize:'先解释语法，再还原为语法正规形。',decode:'把语法数据还原为普通λ表达式；绑定变量查局部环境，自由变量查输入环境。'};
       return {
         core:'interpret = '+Meta.mainSource,
+        compact:'interpret ('+example.metaInput+')',libraryEntries:['interpret'],
         symbols:Meta.definitions.map(definition=>({...definition,meaning:meanings[definition.name]??'供主函数使用的丘奇运算或不动点定义。'})),featured:['normalize','decode','evalTerm','reify'],
-        inputs:[{name:'freeenv',value:'[y]',encoding:'Scott值环境',role:'保存自由变量y本身，供输出还原时读取'},{name:'input',value:example.metaInput,encoding:'编码后的四分支语法树',role:'生成器先编码这个普通λ表达式，随后交给主函数'}],
+        inputs:[{name:'input',value:example.metaInput,encoding:'普通λ表达式',role:'只传待解释的表达式；转换时自动编码，并把环境与语法树封装成一个输入'}],
         basics:['先区分表达式和表达式的语法数据。λx.x是函数；“抽象节点，里面是绑定变量0”则是描述这个函数的数据。','绑定变量用距离最近绑定的下标表示，所以改名不会改变它所指的绑定。自由变量单独放进值环境，避免被新λ意外捕获。'],
         foundation:'bound = λi b f l a.b i\nfreeTerm = λi b f l a.f i\nabs = λbody b f l a.l body\napp = λp q b f l a.a p q',
-        principle:['生成器遍历输入的变量、抽象、应用，把它们编码成四种λ构造器。这里只转换语法，不先算出答案。','主函数先用normalize在语法数据上执行解释，再用decode把结果还原成可继续应用的普通λ式。最后的还原也在λ程序中执行，页面无需把语法节点另行拼成表达式。'],
+        principle:['在最外层写 interpret (表达式)；转换器先编码这一个参数，并封装自由变量环境。不要再手动传环境、标签或语法构造函数。只识别函数库中实际的解释器定义，不占用 interpret 这个名称。','生成器遍历输入的变量、抽象、应用，把它们编码成四种λ构造器。这里只转换语法，不先算出答案。','主函数先用normalize在语法数据上执行解释，再用decode把结果还原成可继续应用的普通λ式。最后的还原也在λ程序中执行，页面无需把语法节点另行拼成表达式。'],
         overview:'普通表达式先编码；主函数执行解释；λ解码器输出普通表达式。示例的自由变量y在整个过程中保持自由。',
         flow:{columns:['阶段','传递的内容','负责什么'],rows:[['输入编码',example.metaInput,'生成器转换语法节点，不执行β求值'],['主函数','normalize input','用λ环境解释器计算语法正规形'],['输出还原','decode freeenv nil 结果语法','在λ程序内部重建变量、函数和应用'],['最终结果','λz.y','普通表达式，可接着应用其他参数']]},
         steps:[
           ['先编码输入','本例把两个抽象、一次应用和变量分别编码。绑定变量用下标，自由变量y用自由环境下标0。',C.format(stages.encoded)],
-          ['把编码交给主函数','自由环境含y这个真实变量值。主函数的参数顺序是环境、编码后的输入。','interpret freeenv input → decode freeenv nil (normalize input)'],
+          ['只传一个表达式','转换器把自由环境与编码后的语法树封装成一个序对。主函数从这个参数中同时读出两项，用户不用分别传入。','interpret ((λx.λy.x) y)\ninterpret (λk.k freeenv syntax) → decode freeenv nil (normalize syntax)'],
           ['主函数执行解释','evalTerm按环境解释语法。进入抽象时构造闭包，应用闭包时把实参压入环境；变量通过下标查回对应值。','normalize = λterm.reify (evalTerm nil term) 0'],
           ['把结果语法还原成普通λ式','decode处理绑定、自由、抽象、应用四个分支。抽象分支真的生成λ，应用分支真的应用两个已还原的子式。','decode = '+Meta.definitions.find(definition=>definition.name==='decode').source],
           ['读取最终结果','结果是一个返回自由变量y的函数。绑定变量名称可以改变，y的自由身份保持不变。','(λx.λy.x) y → λz.y']
         ],
         walkthrough:'输入表达式 → 编码后的语法 → normalize → decode → 普通λ表达式',
         encodingText:'语法树使用四分支λ编码，运行环境使用Scott列表；最后输出普通λ表达式，不附带解释器结果标记。',
-        parameterNote:'生成器负责输入语法编码，主函数与输出解码由生成的λ程序执行。可用自由变量、当前数字编码和自定义函数作为原始输入。',
+        parameterNote:'入口只接收一个普通λ表达式。转换器在表达式外编码并封装环境，解释和输出还原由λ程序执行；原输入保持可编辑。已有旧版双参数解释器也按这个单表达式入口识别，用户的其他同名函数保持其原有含义。',
         boundaries:['使用从左到右正规序执行。原输入没有正规形时，解释器也不会凭空得到结果；现有暂停和取消功能仍可使用。','自由变量来自输入环境；不能从一个不含自由变量的闭合λ式中凭空生成一个新的自由变量。'],
         exercise:'把输入改为 (λx.x) (λy.y)，重新生成并运行；输出应直接是恒等函数。'
       };
@@ -349,7 +379,10 @@
       let walkthrough=walk;
       if(example.name.startsWith('带符号除法'))walkthrough='−7.5÷2 → 对齐整数单位 75÷20\n→ 长除法得到 3.75\n→ 两个输入符号不同，结果 −3.75';
       if(example.name.startsWith('倒数'))walkthrough='1÷0.4 → 同比例变成 10÷4\n→ 商为 2.5';
-      return {...Details.describe(example,precision),principle:[method,notes],walkthrough,...Advanced.describe(example,precision)};
+      const D=root.LambdaDecimal||require('./decimal.js');
+      const args=example.operands.map((value,index)=>`${value}_${example.operandEncodings?.[index]??'decimal'}`);
+      if(D.precisionOperations.has(example.decimalOperation))args.unshift(precision+'_church');
+      return {...Details.describe(example,precision),principle:[method,notes],walkthrough,...Advanced.describe(example,precision),compact:'decimal'+example.decimalOperation.toLowerCase()+' '+args.join(' ')};
     }
     const entry=lessons[example.name];
     if(!entry)throw new Error(`Missing explanation for ${example.name}`);
@@ -358,8 +391,96 @@
   }
   const namedLessons=new Map();
   function catalog(){return Names?.catalog();}
-  function lesson(example,precision=6){const key=example.name+'\0'+precision;if(!namedLessons.has(key)){const raw={...rawLesson(example,precision),purpose:example.description??''};namedLessons.set(key,catalog()?.normalize(raw,example.name)??raw);}return namedLessons.get(key);}
+  function lesson(example,precision=6){const key=example.name+'\0'+precision;if(!namedLessons.has(key)){
+    const raw={...rawLesson(example,precision),purpose:example.description??''},doc=catalog()?.normalize(raw,example.name)??raw;
+    const program=P.programFor(example,precision);doc.argumentFunctions=program.argumentFunctions??[];
+    if(!doc.compact){const call=program.call;if(!/[λ\\]/.test(call))doc.compact=call.replace(/^\(([^()]+)\)/,'$1');}
+    publicContract(example,doc,precision);
+    namedLessons.set(key,doc);
+  }return namedLessons.get(key);}
   function titleFor(example){return lesson(example).displayTitle??example.name;}
+  function libraryNames(doc){
+    if(doc.entryContract)return doc.entryContract.name?[doc.entryContract.name]:[];
+    const known=new Set(doc.symbols.map(symbol=>symbol.name));let names=doc.libraryEntries;
+    if(!names&&doc.compact){
+      try{const C=root.LambdaCore||require('./core.js');names=[...C.freeVars(C.parse(doc.compact,Infinity,()=>C.V('tutorialInputLiteral'),{suffixes:true}))].filter(name=>known.has(name));}catch{}
+    }
+    if(!names?.length)names=[...doc.core.matchAll(/^([^\s=]+)\s*=/gm)].map(match=>match[1]);
+    return [...new Set(names.concat(doc.argumentFunctions??[]).filter(name=>known.has(name)))];
+  }
+  function publicContract(example,doc,precision){
+    const C=root.LambdaCore||require('./core.js'),known=new Set(doc.symbols.map(entry=>entry.name));let name=doc.libraryEntries?.find(key=>known.has(key));
+    if(!name&&doc.compact){try{let head=C.parse(doc.compact,Infinity,()=>C.V('inputLiteral'),{suffixes:true});while(head.type==='app')head=head.fn;if(head.type==='var'&&known.has(head.name))name=head.name;}catch{}}
+    if(!name)name=[...doc.core.matchAll(/^([^\s=]+)\s*=/gm)].map(match=>match[1]).find(key=>known.has(key));
+    const args=P.callParts(example,precision).args;
+    if(!name){doc.entryContract={kind:'value',name:null,inputs:[]};return;}
+    if(example.category==='归约与终止'){doc.compact=name;doc.inputs=[];}
+    if(example.category==='丘奇列表'){
+      if(example.name.includes('空表 []')&&!example.name.includes('判空'))doc.inputs=[];
+      else if(doc.inputs?.length===args.length)doc.compact=name+' '+doc.inputs.map(input=>input.value.startsWith('[')||!/[\sλ\\()]/.test(input.value)?input.value:'('+input.value+')').join(' ');
+    }
+    if(!doc.compact)doc.compact=name+(args.length?' '+args.map(arg=>'('+arg+')').join(' '):'');
+    const roles=[['加法',['第一个加数','第二个加数']],['乘法',['第一个因数','第二个因数']],['乘方',['底数','指数']],['零判断',['待判断的自然数']],['前驱',['原自然数']],['减法',['被减数','减数']],['比较',['第一项','第二项']],['阶乘',['求阶乘的自然数']],['斐波那契',['数列下标']]].find(([prefix])=>example.name.startsWith(prefix))?.[1];
+    if(!doc.inputs)doc.inputs=args.map((value,index)=>({name:'p'+(index+1),value,encoding:/^[0-9]+(?:_church)?$/.test(value)?'丘奇自然数':'λ表达式',role:roles?.[index]??'实际输入'+(index+1)}));
+    doc.libraryEntries=[name];doc.entryContract={kind:example.category==='归约与终止'?'program':args.length||doc.inputs.length?'function':'value',name,inputs:doc.inputs.map(input=>({...input})),variadic:!!example.booleanCircuit&&['bits','delay','delayi','delayat','allbits','anybits','parity'].includes(example.booleanCircuit.name)};
+    doc.parameterNote=(doc.parameterNote??'外部只传实际数据参数。')+' 加入函数库只添加入口 '+name+'，辅助定义和固定值封装在内部。结果中的丘奇数、列表或布尔值自带的选择参数不需要额外传入。';
+  }
+  let interpreterTemplates;
+  let listCallTemplates;
+  const callContracts=new WeakMap();
+  function pendingCall(input,functions=[]){
+    if(!functions.length)return null;
+    const C=root.LambdaCore||require('./core.js'),Library=root.LambdaLibrary||require('./library.js');let head=input,supplied=0;
+    if(typeof input==='string'){try{head=C.parse(input,Infinity,()=>C.V('callLiteral'),{suffixes:true});}catch{return null;}}
+    while(head.type==='app'){supplied++;head=head.fn;}
+    if(head.type!=='var')return null;
+    const fn=functions.find(entry=>entry.name===head.name);if(!fn)return null;
+    if(!callContracts.has(fn.term)){
+      if(!listCallTemplates)listCallTemplates=P.examples.filter(example=>example.listOperation).map(example=>{const doc=lesson(example),term=Library.importDefinitions([],doc.symbols,libraryNames(doc)).functions[0].term;return {term,inputs:doc.inputs};});
+      callContracts.set(fn.term,listCallTemplates.find(template=>C.equal(template.term,fn.term))??null);
+    }
+    const contract=callContracts.get(fn.term);if(!contract||supplied>=contract.inputs.length)return null;
+    const missing=contract.inputs.slice(supplied),message='等待参数：'+fn.name+' 还需'+missing.length+'个参数（'+missing.map(input=>input.role).join('、')+'）。';
+    return {name:fn.name,supplied,missing,message};
+  }
+  function compileInterpreterCall(term,functions=[],expand=value=>value){
+    if(!functions.length)return term;
+    const C=root.LambdaCore||require('./core.js');
+    const Meta=root.LambdaMeta||require('./meta-lambda.js'),Library=root.LambdaLibrary||require('./library.js');
+    if(!interpreterTemplates){
+      const example=P.examples.find(entry=>entry.metaInterpreter),doc=lesson(example),name=libraryNames(doc)[0];
+      const legacy=C.format(catalog().canonicalTerm(C.parse(Meta.legacyMainSource),example.name));
+      interpreterTemplates=[];
+      for(const source of [doc.symbols.find(entry=>entry.name===name).source,legacy]){
+        const entries=doc.symbols.map(entry=>entry.name===name?{...entry,source}:entry);
+        interpreterTemplates.push(Library.importDefinitions([],entries,[name]).functions[0].term);
+        const registry=new Map(entries.map(entry=>[entry.name,C.parse(entry.source)])),resolved=new Map();
+        function resolve(key){if(resolved.has(key))return resolved.get(key);const parsed=registry.get(key),deps=[...C.freeVars(parsed)].filter(dep=>registry.has(dep)).map(dep=>({name:dep,term:resolve(dep)})),value=Library.expand(parsed,deps);resolved.set(key,value);return value;}
+        interpreterTemplates.push(resolve(name));
+      }
+    }
+    const names=new Set(functions.filter(fn=>interpreterTemplates.some(template=>C.equal(template,fn.term))).map(fn=>fn.name));
+    if(!names.size)return term;
+    const bound=(name,scope)=>{for(let current=scope;current;current=current.parent)if(current.name===name)return true;return false;};
+    const work=[{node:term,scope:null}],values=[];let found=false;
+    while(work.length){
+      const {node,scope,finish,call}=work.pop();
+      if(node.type==='var'){values.push(node);continue;}
+      if(!finish){
+        const matched=node.type==='app'&&node.fn.type==='var'&&names.has(node.fn.name)&&!bound(node.fn.name,scope);
+        work.push({node,scope,finish:true,call:matched});
+        if(node.type==='abs')work.push({node:node.body,scope:{name:node.param,parent:scope}});
+        else work.push({node:node.arg,scope},{node:node.fn,scope});
+        continue;
+      }
+      if(node.type==='abs'){const body=values.pop();values.push(body===node.body?node:C.L(node.param,body));continue;}
+      const arg=values.pop(),fn=values.pop();
+      if(call){found=true;values.push(arg);}else values.push(fn===node.fn&&arg===node.arg?node:C.A(fn,arg));
+    }
+    // Quote the surrounding expression too so local binders retain their
+    // scope and ordinary context can discard unused divergent arguments.
+    return found?Meta.compileTerm(values[0],expand):term;
+  }
   function init(api){
     const $=id=>document.getElementById(id),category=$('guide-category'),search=$('guide-search'),select=$('guide-example');
     function workedTable(spec,label){
@@ -390,11 +511,25 @@
     const inputLink=document.createElement('a');inputLink.href='#guide-input-section';inputLink.textContent='输入参数';
     document.querySelector('.guide-toc').children[0].after(inputLink);
     let selected=0,filtered=[];
+    const coreNames=libraryNames;
+    function addFunctions(names=null){
+      const feedback=$('guide-library-feedback');
+      try{
+        const doc=lesson(P.examples[selected],api.precision()),selectedNames=names??coreNames(doc);
+        if(!selectedNames.length)throw new Error('本篇是表达式演示，没有可直接导入的命名函数。');
+        const result=api.addFunctions(doc.symbols,selectedNames);
+        feedback.textContent=root.LambdaLibrary.importFeedback(result);
+        const calls=selectedNames.map(name=>result.bindings[name]??name).filter(name=>result.added.includes(name)||result.replaced.includes(name)||result.ready.includes(name)||result.reused.includes(name));
+        if(calls.length)feedback.textContent+=' 可调用：'+calls.join('、')+'。';
+      }catch(error){feedback.textContent='加入失败：'+error.message;}
+      feedback.hidden=false;
+    }
     for(const name of new Set(P.examples.map(example=>example.category||'入门'))){
       const option=document.createElement('option');option.value=name;option.textContent=name;category.append(option);
     }
     function render(){
       const example=P.examples[selected],doc=lesson(example,api.precision());
+      $('guide-library-feedback').hidden=true;$('guide-add-library').disabled=!coreNames(doc).length;
       $('guide-title').textContent=doc.displayTitle??example.name;
       $('guide-purpose').textContent=doc.purpose||'从下面的关键表达式开始，跟随参数替换理解计算。';
       flow.hidden=!doc.flow;$('guide-overview').textContent=doc.overview??'';
@@ -429,7 +564,9 @@
       const symbolItem=symbol=>{
         const item=document.createElement('div'),details=document.createElement('details'),title=document.createElement('summary'),explanation=document.createElement('p'),pre=document.createElement('pre'),code=document.createElement('code');
         title.textContent=symbol.name+'：'+symbol.meaning.split('。')[0];explanation.textContent=symbol.meaning;code.textContent=`${symbol.name} = ${symbol.source}`;
-        pre.append(code);details.append(title,explanation,pre);item.append(details);return item;
+        const add=document.createElement('button');add.type='button';add.className='button';add.textContent='加入函数库';add.setAttribute('aria-label',`加入函数 ${symbol.name} 到函数库`);
+        add.addEventListener('click',()=>addFunctions([symbol.name]));
+        pre.append(code);details.append(title,explanation,pre,add);item.append(details);return item;
       };
       const uniqueSymbols=doc.symbols.filter(symbol=>!coreLines.has(symbol.name+' = '+symbol.source));
       const keyNames=doc.featured??uniqueSymbols.slice(-5).map(symbol=>symbol.name),keySymbols=uniqueSymbols.filter(symbol=>keyNames.includes(symbol.name)),others=uniqueSymbols.filter(symbol=>!keyNames.includes(symbol.name));
@@ -466,7 +603,7 @@
       select.replaceChildren(...options);select.value=selected;
       $('guide-count').textContent=`找到 ${filtered.length} / ${P.examples.length} 个示例`;
       const empty=!filtered.length;
-      $('guide-article').hidden=empty;$('guide-load').disabled=empty;select.disabled=empty;
+      $('guide-article').hidden=empty;$('guide-load').disabled=empty;$('guide-add-library').disabled=empty;select.disabled=empty;
       if(empty){$('guide-previous').disabled=true;$('guide-next').disabled=true;}else render();
     }
     select.addEventListener('change',()=>{selected=Number(select.value);render();api.save();});
@@ -475,11 +612,12 @@
       selected=filtered[filtered.indexOf(selected)+delta];select.value=selected;render();api.save();
     });
     $('guide-load').addEventListener('click',()=>api.load(P.examples[selected]));
+    $('guide-add-library').addEventListener('click',()=>addFunctions());
     filter();
     return {refresh:render,capture:()=>P.examples[selected].name,restore:name=>{
       selected=Math.max(0,P.examples.findIndex(example=>example.name===name));category.value='';search.value='';filter();
     }};
   }
-  const API={lesson,rawLesson,catalog,titleFor,init};root.LambdaGuide=API;
+  const API={lesson,rawLesson,catalog,titleFor,libraryNames,pendingCall,compileInterpreterCall,init};root.LambdaGuide=API;
   if(typeof module!=='undefined'&&module.exports)module.exports=API;
 })(typeof globalThis!=='undefined'?globalThis:window);

@@ -11,8 +11,8 @@ const P=require('../src/presets.js'),G=require('../src/guide.js');process.env.PO
    const select=async(fragment)=>{const i=P.examples.findIndex(e=>e.name.includes(fragment));assert.ok(i>=0,fragment);await page.locator('#examples').selectOption(String(i));return P.examples[i];};
    const run=async(number)=>{await page.locator('#speed-ms').fill('1');await page.locator('#run').click();await page.waitForFunction(()=>document.getElementById('state-badge').textContent==='已到正规形',null,{timeout:180000});assert.equal(await page.locator('#decoded').textContent(),`Church 数 ${number}`);};
    await check(`${width}px grouped choices all render complete diagrams and descriptions`,async()=>{
-    assert.equal(await page.locator('#examples option').count(),P.examples.length+1);assert.equal(await page.locator('#examples optgroup').count(),9);
-    assert.equal(await page.locator('#examples optgroup[label="高等数学"] option').count(),23);
+    assert.equal(await page.locator('#examples option').count(),P.examples.length+1);assert.equal(await page.locator('#examples optgroup').count(),new Set(P.examples.map(e=>e.category)).size);
+    assert.equal(await page.locator('#examples optgroup[label="高等数学"] option').count(),P.examples.filter(e=>e.category==='高等数学').length);
     for(const e of P.examples.filter(e=>e.expected!==undefined)){await select(e.name);assert.equal(await page.locator('#expression').inputValue(),P.inputSourceFor(e));assert.ok(await page.locator('#diagram-mount line').count()>0);assert.ok(await page.locator('#error-message').isHidden());assert.ok((await page.locator('#example-info').textContent()).includes(G.lesson(e).purpose));}
     assert.equal(await page.locator('#function-count').textContent(),'0 个函数');
    });
@@ -39,6 +39,8 @@ const P=require('../src/presets.js'),G=require('../src/guide.js');process.env.PO
     const group=page.locator('#examples optgroup[label="基础数学"]');
     assert.equal(await group.getByRole('option',{name:/序对除法/}).count(),1);
     await select('序对除法');
+    const source=await page.locator('#expression').inputValue();
+    for(const name of ['pair','succ','pred','true','false']){assert.ok(!new RegExp('\\b'+name+'[2-9]\\b').test(source));assert.equal([...source.matchAll(new RegExp('λ'+name+'\\.','g'))].length,1);}
     await page.locator('#fast-run').click();
     await page.waitForFunction(()=>document.getElementById('decoded').textContent==='余数 1，商 3');
    });

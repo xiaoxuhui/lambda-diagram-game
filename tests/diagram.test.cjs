@@ -8,6 +8,18 @@ const E=require('../src/data-encoding.js');
 const parseExample=s=>E.parse(s,[],Infinity,P.examples.find(e=>e.term===s)?.encoding??'church').term;
 const model = s => D.layout(parseExample(s));
 
+test('only known free functions have selectable unfolding routes, including nested and repeated calls',()=>{
+  const F=require('../src/function-reduction.js'),definitions=[{name:'fn',term:C.parse('λx.x')}],reducer=F.create(definitions);
+  for(const source of ['fn','keep (fn fn)','λfn.fn','λx.fn','λfn.fn (λx.fn)']){
+    const term=C.parse(source),diagram=D.layout(term,null,undefined,['fn']),hits=diagram.lines.filter(line=>line.functionName);
+    for(const line of hits){assert.equal(line.free,true);assert.equal(line.name,'fn');assert.ok(reducer.unfoldAt(term,line.unfoldPath));assert.match(D.lineTitle(line),/展开一层/);}
+    assert.equal(hits.length,source==='keep (fn fn)'?2:source==='fn'||source==='λx.fn'?1:0);
+    assert.equal(D.layout(term).lines.filter(line=>line.functionName).length,0);
+  }
+  const active=D.layout(C.parse('keep fn'),['arg'],undefined,['fn']).lines.find(line=>line.functionName);
+  assert.equal(active.active,true);assert.deepEqual(active.unfoldPath,['arg']);
+});
+
 test('parameter wires disappear, move or split according to free occurrences',()=>{
   for(const [source,copies] of [
     ['(λx.z) (λq.q)',0],

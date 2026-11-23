@@ -7,11 +7,24 @@
   function init(api) {
     const cancel=document.createElement('button');cancel.id='function-cancel';cancel.type='button';cancel.className='button';cancel.textContent='取消编辑';cancel.hidden=true;
     $('function-add').before(cancel);
-    let functions=[],checkpoint=null,saveTimer=null,restoring=false,editing=null,functionController=null;
+    let functions=[],checkpoint=null,saveTimer=null,restoring=false,editing=null,functionController=null,collision='skip';
     let replayController=null,recoveredDraft=null,recoveredSession=null,storageLocked=true;
     const restoreDialog=$('restore-progress');
     let lastAuto=null,lastCaptured=null;
     const signature=snapshot=>{const {savedAt,...state}=snapshot;return JSON.stringify(state);};
+    function syncCollisionControls(){document.querySelectorAll('[data-function-collision]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.functionCollision===collision)));}
+    function attachCollisionControls(parent,before=null){
+      const group=document.createElement('div');group.className='function-collision-controls';group.setAttribute('role','group');group.setAttribute('aria-label','函数重名处理');
+      const label=document.createElement('span');label.textContent='函数重名时：';group.append(label);
+      for(const [value,text]of [['replace','重名替换'],['rename','重名加数字'],['skip','重名跳过'],['reuse','重名直接使用']]){
+        const button=document.createElement('button');button.type='button';button.className='button';button.dataset.functionCollision=value;button.textContent=text;button.setAttribute('aria-pressed',String(collision===value));
+        button.addEventListener('click',()=>{collision=value;syncCollisionControls();persist();});group.append(button);
+      }
+      parent.insertBefore(group,before);return group;
+    }
+    attachCollisionControls($('function-form').parentElement,$('function-form'));
+    attachCollisionControls($('guide-add-library').parentElement,$('guide-add-library'));
+    attachCollisionControls($('combinator-status').parentElement,$('combinator-status'));
     function cancelReplay(){replayController?.abort();}
     $('cancel-restore').addEventListener('click',cancelReplay);
     restoreDialog.addEventListener('cancel',event=>{event.preventDefault();cancelReplay();});
@@ -29,6 +42,7 @@
     const feedback=(message,error=false)=>{$('save-feedback').hidden=false;$('save-feedback').textContent=message;$('save-feedback').classList.toggle('error',error);};
     function captured() {
       const snapshot={...api.capture(),version:2,savedAt:new Date().toISOString(),functions,functionDraft:{name:$('function-name').value,source:$('function-source').value,...(editing===null?{}:{editing})}};
+      snapshot.view.functionCollision=collision;
       if(recoveredSession)snapshot.session={...recoveredSession,dirty:recoveredSession.dirty||snapshot.draft!==recoveredDraft};
       return snapshot;
     }
@@ -107,7 +121,7 @@
       abortFunctionCompile();
       recoveredDraft=null;recoveredSession=null;
       restoring=true;
-      try {functions=snapshot.functions;renderLibrary();api.apply(snapshot);$('function-name').value=snapshot.functionDraft.name;$('function-source').value=snapshot.functionDraft.source;editing=snapshot.functionDraft.editing??null;renderEditMode();$('function-error').hidden=true;}
+      try {functions=snapshot.functions;collision=snapshot.view.functionCollision??'skip';syncCollisionControls();renderLibrary();api.apply(snapshot);$('function-name').value=snapshot.functionDraft.name;$('function-source').value=snapshot.functionDraft.source;editing=snapshot.functionDraft.editing??null;renderEditMode();$('function-error').hidden=true;}
       finally{restoring=false;}
     }
     function recoverDraft(text,message,draftOnly=false){
@@ -154,11 +168,24 @@
       e.preventDefault();$('function-error').hidden=true;
       abortFunctionCompile();const controller=new AbortController();functionController=controller;renderEditMode();
       try {
-        const name=$('function-name').value.trim(),source=$('function-source').value,encoding=api.getNumberEncoding?.()||'decimal',precision=api.getDecimalPlaces?.()??6,entries=api.getDataEncodings?.()??null,target=editing;
+        const name=$('function-name').value.trim(),source=$('function-source').value,encoding=api.getNumberEncoding?.()||'decimal',precision=api.getDecimalPlaces?.()??6,entries=api.getDataEncodings?.()??null,target=editing,policy=collision;
+        if(policy==='reuse'&&functions.some(fn=>fn.name===name&&fn.name!==target)){feedback('已直接使用同名函数：'+name+'（沿用现有定义）。');api.toast('已直接使用同名函数：'+name);persist();return;}
         const original=functions.find(fn=>fn.name===target),prepared=api.compileSource&&source!==original?.source?await api.compileSource(source,controller.signal):null;
         if(controller.signal.aborted||functionController!==controller)return;
-        functions=target===null?L.add(functions,name,source,C.LIMITS.chars,encoding,precision,entries,prepared):L.update(functions,target,name,source,encoding,precision,entries,prepared);
-        renderLibrary();clearEditor();const saved=persist();api.toast(saved?`已保存函数 ${name}`:`函数 ${name} 已加入本页，尚未保存到浏览器，请导出存档。`);
+        const existing=functions.find(fn=>fn.name===name&&fn.name!==target);let actual=name;
+        if(existing){
+          const candidate=prepared?.term??(source===original?.source?original.term:root.LambdaDataEncoding.parse(source,entries??[],Infinity,encoding).term);
+          if(C.equal(existing.term,L.expand(candidate,functions))){feedback('已有相同定义，已准备好：'+name+'。');api.toast('已有相同定义：'+name);persist();return;}
+          if(policy==='skip'){feedback('重名已跳过：'+name+'。草稿保留，可切换处理方式后重试。');api.toast('重名已跳过：'+name);persist();return;}
+          if(policy==='rename'){
+            const same=functions.find(fn=>fn.name.startsWith(name)&&/^[0-9]+$/.test(fn.name.slice(name.length))&&C.equal(fn.term,L.expand(candidate,functions)));
+            if(same){feedback('已有相同定义，已准备好：'+same.name+'。');api.toast('已有相同定义：'+same.name);persist();return;}
+            actual=L.availableName(name,functions,C.freeVars(candidate));
+          }
+        }
+        if(target===null)functions=existing&&policy==='replace'?L.update(functions,name,name,source,encoding,precision,entries,prepared):L.add(functions,actual,source,C.LIMITS.chars,encoding,precision,entries,prepared);
+        else functions=L.update(existing&&policy==='replace'?L.remove(functions,name):functions,target,actual,source,encoding,precision,entries,prepared);
+        renderLibrary();clearEditor();const saved=persist(),message=existing?policy==='replace'?'重名已替换：'+actual:'重名已加数字：'+name+' → '+actual:'已保存函数 '+actual;feedback(saved?message+'。':message+'。尚未保存到浏览器，请导出存档。');api.toast(message);
       }
       catch(error){if(!controller.signal.aborted){$('function-error').textContent=error.message;$('function-error').hidden=false;}}
       finally{if(functionController===controller){functionController=null;renderEditMode();}}
@@ -220,9 +247,24 @@
       catch(e){if(e.name==='AbortError')feedback('已取消重放，当前状态保留。');else{storageStatus(false);feedback(`导入失败：${e.message}。当前现场未改变。`,true);}}
     });
     window.addEventListener('pagehide',()=>persist());
-    return {expand:t=>L.expand(t,functions),encodingsFor:t=>L.encodingsFor(t,functions),persist,queueSave,restoreInitial,
+    return {expand:t=>L.expand(t,functions),encodingsFor:t=>L.encodingsFor(t,functions),persist,queueSave,restoreInitial,attachCollisionControls,collisionPolicy:()=>collision,
       beginSession:()=>{recoveredDraft=null;recoveredSession=null;},
       functionEntries:()=>functions.slice(),
+      saveDefinition:(name,source,prepared)=>{
+        const previous=functions;
+        const next=functions.some(fn=>fn.name===name)?L.update(functions,name,name,source,'church',6,null,prepared):L.add(functions,name,source,Infinity,'church',6,null,prepared);
+        functions=next;
+        try{const snapshot=captured();storeSnapshot(snapshot);lastCaptured=signature(snapshot);}
+        catch(error){functions=previous;throw error;}
+        renderLibrary();
+      },
+      importDefinitions:(definitions,selected,options={})=>{
+        const result=L.importDefinitions(functions,definitions,selected,{collision,...options}),previous=functions;
+        functions=result.functions;
+        try{const snapshot=captured();storeSnapshot(snapshot);lastCaptured=signature(snapshot);}
+        catch(error){functions=previous;throw error;}
+        renderLibrary();return result;
+      },
       installDefinitions:entries=>{
         let next=functions;
         for(const fn of entries){const existing=next.find(item=>item.name===fn.name);if(existing){if(!C.equal(existing.term,fn.term))throw new C.LambdaError('函数库已修改，请重新编译。');}else next=L.add(next,fn.name,fn.source);}

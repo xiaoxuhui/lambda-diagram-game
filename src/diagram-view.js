@@ -9,7 +9,9 @@
     const viewport=mount.parentElement;
     const reducedMotion=root.matchMedia('(prefers-reduced-motion: reduce)');
     const element=name=>document.createElementNS(NS,name);
-    const hitShape=line=>`M ${line.x1} ${line.y1-3} H ${line.x2} V ${line.y1+3} H ${line.x1} Z`;
+    const hitShape=line=>line.functionName
+      ?`M ${line.x1-Math.max(10,line.name.length*3.2)} 6 H ${line.x1+Math.max(10,line.name.length*3.2)} V 27 H ${line.x1+6} V ${line.y2} H ${line.x1-6} V 27 H ${line.x1-Math.max(10,line.name.length*3.2)} Z`
+      :`M ${line.x1} ${line.y1-3} H ${line.x2} V ${line.y1+3} H ${line.x1} Z`;
     function attribute(node,name,value,previous){if(value!==previous){if(value===null)node.removeAttribute(name);else node.setAttribute(name,String(value));}}
     function cancelTransition(){
       motion?.cancel();motion=null;
@@ -146,7 +148,7 @@
     }
     function render(next){
       cancelTransition();
-      if(!svg){svg=element('svg');svg.setAttribute('xmlns',NS);svg.setAttribute('role','group');svg.setAttribute('aria-label','John Tromp Lambda 图示，可点击顶部横条归约');
+      if(!svg){svg=element('svg');svg.setAttribute('xmlns',NS);svg.setAttribute('role','group');svg.setAttribute('aria-label','John Tromp Lambda 图示，可点击顶部横条归约或点击函数名展开');
         const title=element('title');title.textContent='John Tromp Lambda 图示';hitLayer=element('g');svg.append(title,hitLayer);mount.replaceChildren(svg);}
       attribute(svg,'viewBox',`0 0 ${next.width} ${next.height}`,model?`0 0 ${model.width} ${model.height}`:undefined);
       const newLines=document.createDocumentFragment();
@@ -158,7 +160,7 @@
         attribute(node,'stroke-width',line.active?5:3,old?(old.active?5:3):undefined);
         attribute(node,'stroke-dasharray',line.free?'5 5':null,old?(old.free?'5 5':null):undefined);
         attribute(node,'data-kind',line.kind,old?.kind);attribute(node,'data-active',line.active?'true':null,old?(old.active?'true':null):undefined);
-        if(!old||line.kind!==old.kind||line.name!==old.name||line.free!==old.free)node.firstElementChild.textContent=D.lineTitle(line);
+        if(!old||line.kind!==old.kind||line.name!==old.name||line.free!==old.free||line.functionName!==old.functionName)node.firstElementChild.textContent=D.lineTitle(line);
       }
       while(lines.length>next.lines.length)lines.pop().remove();
       if(newLines.firstChild)svg.insertBefore(newLines,labels[0]||hitLayer);
@@ -175,19 +177,21 @@
       model=next;
       const newHits=document.createDocumentFragment();let hitCount=0;
       for(const line of next.lines){
-        if(!Object.prototype.hasOwnProperty.call(line,'redexPath'))continue;
+        if(!Object.prototype.hasOwnProperty.call(line,'redexPath')&&!line.functionName)continue;
         let hit=hits[hitCount++];
-        if(!hit){hit=element('path');hit.setAttribute('data-redex-hit','true');hit.setAttribute('role','button');hit.setAttribute('stroke','transparent');hit.setAttribute('stroke-width','18');hit.setAttribute('vector-effect','non-scaling-stroke');hit.setAttribute('fill','transparent');hit.append(element('title'));hits.push(hit);newHits.append(hit);hit.setAttribute('tabindex',enabled?'0':'-1');hit.setAttribute('aria-disabled',String(!enabled));hit.style.pointerEvents=enabled?'all':'none';}
+        if(!hit){hit=element('path');hit.setAttribute('data-diagram-action','true');hit.setAttribute('role','button');hit.setAttribute('stroke','transparent');hit.setAttribute('stroke-width','18');hit.setAttribute('vector-effect','non-scaling-stroke');hit.setAttribute('fill','transparent');hit.append(element('title'));hits.push(hit);newHits.append(hit);hit.setAttribute('tabindex',enabled?'0':'-1');hit.setAttribute('aria-disabled',String(!enabled));hit.style.pointerEvents=enabled?'all':'none';}
         const old=hit.reductionLine;
+        attribute(hit,'data-redex-hit',line.functionName?null:'true',old?(old.functionName?null:'true'):undefined);
+        attribute(hit,'data-unfold-hit',line.functionName?'true':null,old?(old.functionName?'true':null):undefined);
         attribute(hit,'d',hitShape(line),old?hitShape(old):undefined);
-        if(!old||old.name!==line.name){const label=`点击 λ${line.name} 顶部横条，归约这一项`;hit.setAttribute('aria-label',label);hit.firstElementChild.textContent=label;}
+        if(!old||old.name!==line.name||old.functionName!==line.functionName){const label=line.functionName?`点击函数 ${line.name}，展开一层`:`点击 λ${line.name} 顶部横条，归约这一项`;hit.setAttribute('aria-label',label);hit.firstElementChild.textContent=label;}
         hit.reductionLine=line;
       }
       while(hits.length>hitCount)hits.pop().remove();
       if(newHits.firstChild)hitLayer.append(newHits);
     }
     function setEnabled(value){if(enabled===value)return;enabled=value;for(const hit of hits){hit.setAttribute('tabindex',enabled?'0':'-1');hit.setAttribute('aria-disabled',String(!enabled));hit.style.pointerEvents=enabled?'all':'none';}}
-    function selection(target){const hit=target.closest?.('[data-redex-hit]');return enabled&&hit&&mount.contains(hit)?{path:hit.reductionLine.redexPath}:null;}
+    function selection(target){const hit=target.closest?.('[data-diagram-action]');return enabled&&hit&&mount.contains(hit)?{path:hit.reductionLine.functionName?hit.reductionLine.unfoldPath:hit.reductionLine.redexPath,kind:hit.reductionLine.functionName?'unfold':'beta'}:null;}
     function clear(){cancelTransition();mount.replaceChildren();svg=null;hitLayer=null;model=null;lines.length=0;labels.length=0;hits.length=0;}
     return {render,clear,setEnabled,selection,captureFrame,transitionFrom,cancelTransition};
   }

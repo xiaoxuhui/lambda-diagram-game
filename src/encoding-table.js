@@ -66,7 +66,7 @@
       }catch(error){cancel();status(error.message,true);}
     });
     $('encoding-table-cancel').addEventListener('click',cancel);
-    $('encoding-table-number').addEventListener('input',()=>{cancel();if(/^[0-9]+$/.test($('encoding-table-number').value.trim()))autoTimer=setTimeout(()=>$('encoding-table-generate').click(),180);});
+    $('encoding-table-number').addEventListener('input',()=>{cancel();if(E.reductionStepsFor(api.getEntry())===Infinity&&/^[0-9]+$/.test($('encoding-table-number').value.trim()))autoTimer=setTimeout(()=>$('encoding-table-generate').click(),180);});
     return {render,cancel};
   }
   root.LambdaEncodingTable={init};

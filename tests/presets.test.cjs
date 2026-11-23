@@ -40,9 +40,9 @@ test('Church list functions handle empty, singleton, custom mappings and ordered
   ];
   for(const [source,expected] of cases)assert.ok(C.equal(result(source),C.parse(expected)),source);
 });
-test('the original eight choices and five challenges retain their identities',()=>{
-  assert.equal(P.examples[3].name,'Church 数字 2');assert.equal(P.examples[5].name,'加法 · 2 + 3');
-  assert.equal(P.examples[6].name,'Ω · 无限循环');assert.equal(P.levels.length,30);
+test('the original choices and five challenges retain their identities after reordering',()=>{
+  for(const name of ['Church 数字 2','加法 · 2 + 3','Ω · 无限循环'])assert.ok(P.examples.some(e=>e.name===name));
+  assert.equal(P.levels.length,30);
   assert.deepEqual(P.levels.slice(0,5).map(l=>[l.id,l.name]),[[1,'原样返回'],[2,'选择第一个'],[3,'翻转真假'],[4,'再走一步'],[5,'让函数相加']]);
 });
 for(const e of P.examples.filter(e=>e.expected!==undefined))test(`example reaches its stated result: ${e.name}`,async()=>{
@@ -86,9 +86,10 @@ test('Pascal combinations handle edges, symmetry and k greater than n',()=>{
     assert.equal(C.churchNumber(result(`(${P.advanced.choose}) ${n} ${k}`)),expected,`C(${n},${k})`);
 });
 test('higher mathematics includes combinations and genuine symbolic calculus',()=>{
-  const group=P.examples.filter(e=>e.category==='高等数学');assert.equal(group.length,23);
-  assert.equal(P.examples[20].category,'高等数学');assert.equal(P.examples[21].name,'斐波那契 · F(5) → 5');
-  for(const name of ['排列数','自然数求和','平方和','立方和','等比求和','系数和','二项式展开','多项式','符号求导','定积分','生成导函数','生成原函数','超幂','超超幂','开根号','整数除法','对数','超对数','超根号','超超根号','超超对数'])assert.ok(group.some(e=>e.name.startsWith(name)||e.name.includes(name)),name);
+  const group=P.examples.filter(e=>e.category==='高等数学');assert.equal(group.length,22);
+  assert.equal(P.examples.find(e=>e.name.startsWith('斐波那契')).category,'阶乘与递归');
+  assert.equal(P.examples.find(e=>e.name.startsWith('整数除法')).category,'基础数学');
+  for(const name of ['排列数','自然数求和','平方和','立方和','等比求和','系数和','二项式展开','多项式','符号求导','定积分','生成导函数','生成原函数','超幂','超超幂','开根号','对数','超对数','超根号','超超根号','超超对数'])assert.ok(group.some(e=>e.name.startsWith(name)||e.name.includes(name)),name);
 });
 test('inverse examples recalculate after changing operands and reject invalid inputs',()=>{
   for(const [name,oldArgs,args,expected] of [

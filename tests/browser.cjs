@@ -68,7 +68,7 @@ const C=require('../src/core.js'),P=require('../src/presets.js');
       assert.equal(await page.locator('#diagram-mount [stroke-dasharray]').count(),1);
     });
     await check('automatic run and pause stop the timer',async()=>{
-      await source(P.examples[5].term);await page.locator('#speed').selectOption('1200');await page.locator('#run').click();
+      await source(P.examples.find(e=>e.name==='加法 · 2 + 3').term);await page.locator('#speed').selectOption('1200');await page.locator('#run').click();
       assert.equal(await page.locator('#run-label').textContent(),'暂停');
       await page.locator('#run').click();const count=await page.locator('#step-count').textContent();
       await page.waitForTimeout(1300);assert.equal(await page.locator('#step-count').textContent(),count);
@@ -79,7 +79,7 @@ const C=require('../src/core.js'),P=require('../src/presets.js');
       await page.locator('#step').click();assert.equal(await page.locator('#step-count').textContent(),count);assert.equal(await page.locator('#decoded').textContent(),'Church 数 5');
     });
     await check('editing during execution cancels stale timer and controls',async()=>{
-      await source(P.examples[5].term);await page.locator('#speed').selectOption('1200');await page.locator('#run').click();
+      await source(P.examples.find(e=>e.name==='加法 · 2 + 3').term);await page.locator('#speed').selectOption('1200');await page.locator('#run').click();
       await page.locator('#expression').fill('λz.z');assert.ok(await page.locator('#step').isDisabled());
       assert.equal(await page.locator('#state-badge').textContent(),'已编辑 · 请转换');await page.waitForTimeout(1300);
       assert.equal(await page.locator('#step-count').textContent(),'0');
@@ -100,7 +100,7 @@ const C=require('../src/core.js'),P=require('../src/presets.js');
       await page.locator('#step').click();assert.equal(await page.locator('#step-count').textContent(),'2');
     });
     await check('zoom controls and fit change SVG size',async()=>{
-      await source(P.examples[5].term);const w=await page.locator('#diagram-mount svg').getAttribute('width');
+      await source(P.examples.find(e=>e.name==='加法 · 2 + 3').term);const w=await page.locator('#diagram-mount svg').getAttribute('width');
       await page.locator('#zoom-in').click();
       await page.waitForFunction(width=>Number(document.querySelector('#diagram-mount svg').getAttribute('width'))>width,Number(w));
       await page.locator('#zoom-out').click();await page.locator('#fit').click();
@@ -113,7 +113,7 @@ const C=require('../src/core.js'),P=require('../src/presets.js');
     });
     await check('help and example selector work',async()=>{
       await page.locator('#help-toggle').click();assert.ok(await page.locator('#help-panel').isVisible());await page.locator('#help-toggle').click();
-      await page.locator('#examples').selectOption('3');assert.equal(await page.locator('#decoded').textContent(),'Church 数 2');
+      await page.locator('#examples').selectOption(String(P.examples.findIndex(e=>e.name==='Church 数字 2')));assert.equal(await page.locator('#decoded').textContent(),'Church 数 2');
     });
     await check('challenge requires normal form and hints toggle',async()=>{
       await page.locator('#mode-challenge').click();await page.locator('#check-answer').click();
@@ -141,7 +141,7 @@ const C=require('../src/core.js'),P=require('../src/presets.js');
       assert.equal(await page.locator('#progress-text').textContent(),'5 / 30 关已完成');
     });
     await check('desktop has no horizontal overflow and controls are visible',async()=>{
-      await page.locator('#mode-free').click();await source(P.examples[5].term);await page.locator('#history-details').evaluate(el=>el.open=false);
+      await page.locator('#mode-free').click();await source(P.examples.find(e=>e.name==='加法 · 2 + 3').term);await page.locator('#history-details').evaluate(el=>el.open=false);
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
       await page.screenshot({path:path.join(artifact,'desktop.png'),fullPage:true});
     });

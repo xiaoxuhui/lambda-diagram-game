@@ -11,8 +11,8 @@
     MUL:['λm n f.m (n f)','把 n 次作用视为一段工作，再重复 m 次。'],
     SUB:['λm n.n PRED m','对 m 做 n 次前驱，差小于零时返回零。'],
     ISZERO:['λn.n (λx.FALSE) TRUE','零次迭代保留真，至少一次迭代把结果改为假。'],
-    POW:['λbase exponent.exponent base','自然数乘方。两个参数分别是底数、指数。'],
-    POWER:['λb e f x.e b f x','逆运算中使用的乘方写法。b 为底数、e 为指数，结果仍接收 f、x。'],
+    POW:['λb.λe.λf.λx.e b f x','自然数乘方。先传底数和指数，结果保留 f、x；指数为零返回1，零的正整数次幂返回0。'],
+    POWER:['λb.λe.λf.λx.e b f x','与自然数乘方使用同一完整定义；逆运算也保留零输入的正确行为。'],
     Y:['λf.(λx.f (x x)) (λx.f (x x))','不动点组合子。Y F 可展开成 F (Y F)，把递归函数交回递归体；应使用正规序先选择终止分支。'],
     CHOOSE:['Y (λr n k.ISZERO k 1 (ISZERO n 0 (ADD (r (PRED n) (PRED k)) (r (PRED n) k))))','组合数递归体。r 是递归调用，先判 k=0，再判 n=0，最后把选与不选两类方案相加。'],
     PERM:['λn k.(k (λp.PAIR (PRED (p TRUE)) (MUL (p TRUE) (p FALSE))) (PAIR n 1)) FALSE','排列数。p 的两项为剩余选择数、累计乘积；重复 k 次，再取累计乘积。'],
@@ -115,14 +115,30 @@
   };
   function inverseLesson(name){
     const [key,args,label1,a,label2,b,operation,start,trace,meaning]=inverse[name];
-    return {key,args,inputs:[natural(label1,a,label1),natural(label2,b,label2)],steps:[
-      ['先确认到底在求哪个参数',meaning,'op(candidate) = '+operation],
-      ['理解统一的搜索接口','SEARCH op target start 把当前候选与上次有效候选交给递归函数。op 是函数参数，不是写死的数学符号。','SEARCH = λop target start.(Y (λsearch candidate previous.…)) start 0\n当前起点 = '+start],
-      ['理解比较为什么能提早结束','ATMOST m n 先用 n 造一个 n 格的 Scott 标记链。m 的每次函数作用消耗一格；标记耗尽而 m 还要求继续，就立即是假。比较巨大幂值时不必先把它整个展开完。','next = λrest next done.next rest\nend = λnext done.done\nm≤n：m 次消耗后仍能结束 → TRUE\nm>n：先遇到空链 → FALSE'],
-      ['拆开搜索中的两个选择器','先检查 value≤target。假就返回 previous；真再反向检查 target≤value。两边都真说明相等，返回 candidate；只有前者真说明还小，要继续下一候选。','ATMOST value target\n  (ATMOST target value candidate (search (SUCC candidate) candidate))\n  previous'],
-      ['用本例逐个代入候选','每行都实际调用一次 op，再按上一步的分支决定继续或返回。',trace],
-      ['解释返回数据','得到的候选是一个丘奇自然数。整数向下取整意味着选择最后一个未超过目标的候选；没有生成负数或小数答案。',meaning]
-    ],boundaries:key==='QUOT'?['除数零返回除零错误，不进入搜索。','被除数小于正除数时商为零；例如 1÷2 在这里是零，列表小数除法才能返回 0.5。']:['根运算的固定次数必须大于零；对数类底数至少为二，目标至少为一。无效输入按该函数约定返回 I，I 不是数值答案。','搜索依赖对应运算的单调性。正整数底数和上述参数范围是本例的前提。'],exercise:'根据本篇的参数顺序改一个输入，列出 candidate、op(candidate)、previous，再判断是哪一次返回。'};
+    const root=['ROOT','SROOT','PROOT'].includes(key),target=root||key==='QUOT'?a:b;
+    const op={ROOT:`λbase.POWER base ${b}`,QUOT:`MUL ${b}`,LOG:`POWER ${a}`,SLOG:`TET ${a}`,SROOT:`λbase.TET base ${b}`,PROOT:`λbase.PENT base ${b}`,PLOG:`PENT ${a}`}[key];
+    const candidates={ROOT:[[1,1],[2,4],[3,9],[4,16]],QUOT:[[0,0],[1,2],[2,4],[3,6],[4,8]],LOG:[[0,1],[1,2],[2,4],[3,8],[4,16]],SLOG:[[0,1],[1,2],[2,4],[3,16]],SROOT:[[1,1],[2,4]],PROOT:[[1,1],[2,4]],PLOG:[[0,1],[1,2],[2,4]]}[key];
+    let previous=0;
+    const rows=candidates.map(([candidate,value])=>{const old=previous,action=value>target?`返回上次 ${old}`:value===target?`相等，返回 ${candidate}`:`继续：候选 ${candidate+1}，上次 ${candidate}`;if(value<target)previous=candidate;return [String(candidate),String(old),String(value),String(target),action];});
+    return {key,args,inputs:[natural(label1,a,root||key==='QUOT'?'固定目标值，搜索时保持不变':'固定底数，搜索时保持不变'),natural(label2,b,root?'固定次数，搜索时改变底数':key==='QUOT'?'每份的大小，搜索时改变整数商':`固定目标值，搜索时改变${key==='LOG'?'指数':key==='SLOG'?'幂塔高度':'超超幂次数'}`)],
+      basics:['输入、候选和返回值都是丘奇自然数：0=λf.λx.x，1=λf.λx.f x。_church 后缀可以在选用其他编码时明确指定这种输入。','本篇把逆运算变成单调搜索：先固定已知参数，得到只缺一个参数的函数 op，再从较小的候选依次试起。op 是真正的 λ 函数。','搜索把 candidate 和 previous 作为递归函数的两个独立参数传递。比较器内部使用 Scott 标记链；这些标记只帮助比较，不是输出数据。'],
+      foundation:'TRUE = λa.λb.a\nFALSE = λa.λb.b\nSUCC = '+helpers.SUCC[0]+'\nY = '+helpers.Y[0],
+      encodingText:'两个输入和最终返回值都使用丘奇自然数。比较中的 TRUE、FALSE 选择计算分支；内部 Scott 标记链仅供比较器消耗。列表小数和自定义数值须先转换成相应输入编码。',
+      principle:[meaning,`把未知数放进一个单参数函数：本例 op = ${op}。SEARCH 接收这个函数、目标 ${target}、候选起点 ${start}；每次只给 op 传一个候选数。`, '搜索保存两个丘奇自然数：candidate 是这次要试的数，previous 是上次通过比较的数。小于目标就同时更新这两个数，相等直接返回候选，超过目标返回 previous。'],
+      overview:`本例调用 ${key} ${args}，把输入转成一元函数后，从 ${start} 开始搜索；最终输出丘奇自然数。`,
+      flow:{columns:['阶段','传入内容','作用'],rows:[['公开调用',`${key} ${args}`,'两个参数的顺序见下表'],['固定已知参数',`op = ${op}`,'保留一个未知参数给搜索器'],['开始搜索',`SEARCH (${op}) ${target} ${start}`,'另带初始 previous=0'],['返回结果',String(candidates.at(-1)[1]===target?candidates.at(-1)[0]:candidates.at(-2)[0]),'候选本身就是丘奇数，可以继续参与计算']]},
+      steps:[
+      ['先确认到底在求哪个参数',meaning,`${key} ${args}\nop = ${op}\nSEARCH (${op}) ${target} ${start}`],
+      ['把候选和上次有效值传进递归','SEARCH 的三个参数依次是单参数函数 op、目标 target、候选起点 start。递归体的 search 由 Y 提供；candidate 与 previous 都是函数参数，并不是宿主语言变量。最初 previous=0，所以第一个候选已超过目标时返回零。','SEARCH = '+helpers.SEARCH[0]],
+      ['丘奇数怎样完成大小比较','ATMOST m n 先让丘奇数 n 建立 n 格 Scott 链。每格是 λnext done.next rest，空链是 λnext done.done。丘奇数 m 控制消费次数：每次取下一格；先遇到空链则 FALSE，完成全部消费则 TRUE。因此比较不要求先把巨大的 m 完整归约成一长串 f。','ATMOST = '+helpers.ATMOST[0]+'\nATMOST 2 3 → TRUE：消耗两格后完成\nATMOST 4 3 → FALSE：第四次发现空链'],
+      ['布尔选择器决定继续还是返回','TRUE a b 返回 a，FALSE a b 返回 b。先检查 value≤target；不成立时直接选择 previous。成立后再检查 target≤value：相等选择 candidate，严格小于才选择下一次 search。正规序先选择分支，可丢掉未选中的递归调用；应用序可能提前展开递归分支而无法结束。','ATMOST value target\n  (ATMOST target value candidate (search (SUCC candidate) candidate))\n  previous\nvalue < target → search (candidate+1) candidate\nvalue = target → candidate\nvalue > target → previous'],
+      ['逐轮追踪同一条更新规则','上次值列记录进入本轮前的 previous。只有严格小于目标才进入下一轮；相等与超过都会结束。',trace,{columns:['候选 candidate','上次 previous','op(candidate)','目标 target','选择的分支'],rows}],
+      ['返回值为什么是向下取整','不超过目标的候选逐次增加；首次超过时，上次候选就是所求整数。相等时已经得到精确逆像，直接返回，不计算下一项。返回的是丘奇数，不是包装着答案的搜索状态。',`${key} ${args} → ${candidates.at(-1)[1]===target?candidates.at(-1)[0]:candidates.at(-2)[0]}`]
+    ],parameterNote:`加入函数库保存的是接收两个参数的 ${key} 函数及其依赖，不保存本例的答案。调用时依次传入「${label1}」「${label2}」。若当前选用其他数字编码，请显式写 ${args.split(' ').map(n=>n+'_church').join(' ')}。`,
+      boundaries:key==='QUOT'?['除数必须为正；除数零返回除零错误，不进入搜索。','只返回非负整数商。例如 1÷2 返回0；7÷2返回3，余数为7−2×3=1。需要商和余数一起输出时用序对除法，需要0.5这样的结果时用列表小数除法。']:
+        root?['固定次数必须大于零；次数零返回 I（恒等函数），它不是数值答案。目标为0时，第一个正候选已超过目标，因此返回丘奇数0。','普通开根号的参数是目标、根指数；超根号的第二个参数是幂塔高度，超超根号的第二个参数是超超幂次数。几种运算都返回整数，不能用来索取小数近似。']:
+          ['底数至少为2，目标至少为1；底数0或1、目标0返回 I（恒等函数），它不是数值答案。目标1返回丘奇数0。','普通对数改变指数；超对数改变幂塔高度；超超对数改变超超幂次数。它们固定的都是第一个参数：底数。'],
+      exercise:`保留 ${key} 的定义，改变末尾的一个丘奇参数。先写出新的一元函数 op，再列候选、上次值和两次比较；用正规序从左到右核对结果。`};
   }
   const PolyGuide=root.LambdaGuidePolynomial||require('./guide-polynomial.js');
   function unpack(program){const bindings=[];let main=typeof program==='string'?C.parse(program):program;while(main.type==='app'&&main.fn.type==='abs'){bindings.push({name:main.fn.param,term:main.arg});main=main.fn.body;}return {bindings,main};}
@@ -165,7 +181,7 @@
       ['完成第一次乘法','n=3 非零，调用 dmul −0.5 1。force 把这一轮符号、数位、位数归约成可读取记录，再传给下一轮 next。','(n=3,acc=1) → (n=2,acc=−0.5)'],
       ['继续两轮并跟踪符号','负乘负变正，再乘负变负。小数位数按乘法规则累加，因此没有借助浮点乘方。','(2,−0.5) → (1,0.25) → (0,−0.125)'],
       ['零判断选择结束分支','n=0 时 ISZERO 选择 acc，丢弃继续相乘的分支。结果是已累积的三次乘积。','powerBy a 0 (−0.125) → −0.125'],
-      ['解释零指数','如果一开始 n 就为零，立即返回初值 one。这个程序不支持负指数，也没有默认求倒数。','dpow a 0 → 1_decimal']
+      ['解释零输入','如果一开始指数为零，立即返回初值 one；底数为零且指数为正整数时，乘积为零。本程序的0⁰采用空乘积约定返回1，不支持负指数。','dpow a 0 → 1_decimal\ndpow 0_decimal 3 → 0_decimal\ndpow 0_decimal 0 → 1_decimal（程序约定）']
     ],
     SQRT:[
       ['平方根与自然数根搜索的区别','本例求非负实数平方根的有限小数近似，不是高等数学里“候选平方不超过目标”的整数搜索。负号为真先返回定义域错误，零直接返回零。','输入 a=2_decimal\n目标是求 x≥0，使 x²=2'],
@@ -234,7 +250,7 @@
       ['只输出三项','toexternal 去掉内部ID和近似位，将Scott工作表恢复成书写顺序的丘奇列表，补足整数位的0。数值按要求截断，页面不向数值塞入额外字段。','0.125 = λk.k true [0,1,2,5] 3']
     ]:['SIN','COS','TAN','SINH','COSH','TANH'].includes(op)?[
       ['读取位数与角度','第一个参数指定输出小数位数，第二个参数是列表小数。三角函数使用弧度；双曲函数保留当前示例的输入范围。',`decimal${op.toLowerCase()} requested x`],
-      ['由精度决定工作量','工作位数为 requested+6，展开次数为 requested+3。增加输出位数时，同时提高中间精度和展开项数。','workplaces = add requested 6'],
+      ['由精度决定工作量','工作位数为 requested+6，展开次数为 requested+3。增加输出位数时，同时提高中间精度和展开项数。','workplaces requested → add requested 6'],
       ['递推计算级数项','正弦和双曲正弦从x开始，余弦和双曲余弦从1开始。三角级数交替变号，双曲级数各项为正。','正弦项：tₖ₊₁ = −tₖ×x² / ((2k+2)(2k+3))\n余弦项：tₖ₊₁ = −tₖ×x² / ((2k+1)(2k+2))\n双曲级数使用相同分母，去掉负号'],
       ['先缩小角度，再恢复函数关系','小角度直接计算级数；大角度先消去周期并利用对称性。π使用同一工作精度动态计算，不再使用固定的8位常量。','π = 16 atan(1/5) − 4 atan(1/239)\ncos(x)=sin(x+π/2)；tan(x)=sin(x)/cos(x)'],
       ['按请求截断并输出三项','最后截到 requested 位。近似标记只在工作记录中使用，输出是正负标记、丘奇数位列表、小数位数。','requested=2 → 保留2位；requested=6 → 保留6位']
@@ -268,6 +284,7 @@
       ['区分这个列表与小数数位表','这里 c 接收当前元素与“尾部折叠后的结果”。小数记录中的 Scott 数位表则直接把当前元素和尾表交给选择器；两者同叫列表，但参数协议不同。','丘奇列表：λc n.c head (tail c n)\nScott列表：λc n.c head tail']
     ];
     let keys=['NIL','CONS'];
+    if(name.includes('过滤'))steps[0][2]='[0,2,0,3] = λc n.c 0 (c 2 (c 0 (c 3 n)))\n[] = λc n.n';
     if(name.includes('空表'))steps.push(
       ['把两个参数交给空表','空表忽略 c，因此根本不访问元素，直接返回初值 n。','(λc n.n) ADD 0 → 0\n(λc n.n) MUL 1 → 1'],
       ['说明为什么与零和假同形','λc n.n、λf x.x、λa b.b 只改变绑定变量名，结构相同；必须结合上下文的读取方式来解释。','[] ≡ 0 ≡ FALSE（仅在 λ 结构上同形）'],
@@ -314,10 +331,10 @@
       ['先展开函数链，不把它误读成已经反转的列表','用 R 表示折叠得到的函数，最后仍需传入空表作初值。','R = step 1 (step 2 (step 3 I))\nREVERSE [1,2,3] = R []'],
       ['执行链中的头插','第一次放入一，再放入二，最后放入三。每次都插在头部，所以旧元素向后移。','R []\n→ (step 2 (step 3 I)) [1]\n→ (step 3 I) [2,1]\n→ I [3,2,1] → [3,2,1]']
     );}
-    else if(name.includes('过滤')){keys.push('FILTER','ISZERO','TRUE','FALSE');steps.push(
-      ['解释谓词怎么把零排除','谓词是接收元素并返回布尔选择器的函数；这里 ISZERO 为真时选择 FALSE，为假时选择 TRUE。','predicate = λh.ISZERO h FALSE TRUE\npredicate 0→FALSE；predicate 2→TRUE'],
-      ['把布尔值用作条件选择','如果谓词为真就调用 c 保留当前元素，否则直接用后缀结果 r。','FILTER = λp l c n.l (λh r.p h (c h r) r) n'],
-      ['按右折叠顺序查看四个元素','先处理最后的三，再处理零、二、最前面的零；每个保留元素都接在已有后缀前。','读3：[3]\n读0：仍[3]\n读2：[2,3]\n读0：仍[2,3]'],
+    else if(name.includes('过滤')){keys.push('dropzero','FILTER','nonzero','ISZERO','TRUE','FALSE');steps.push(
+      ['把非零判断放进去零函数内部','dropzero 只接收列表 l，在自己的函数体内调用 FILTER nonzero l。调用者不必再手动传入 nonzero。辅助谓词把零判断的真假结果反转：零返回 FALSE，非零返回 TRUE。','dropzero = λl.FILTER nonzero l\nnonzero = λh.ISZERO h FALSE TRUE\ndropzero [0,2,0,3] → FILTER nonzero [0,2,0,3]'],
+      ['内部过滤器怎样使用谓词','FILTER 是可复用的通用过滤器，由 dropzero 在内部传入 nonzero。如果谓词为真就调用 c 保留当前元素，否则直接使用后缀结果 r。','FILTER = λp l c n.l (λh r.p h (c h r) r) n\nnonzero 0 → FALSE\nnonzero 2 → TRUE'],
+      ['按嵌套的后缀核对结果','从空后缀倒推，可以依次核对三、零、二、最前面的零，每个保留元素都接在后缀前。这里描述右折叠的结构，不是强制求值顺序；正规序也可以先判断最左侧元素的谓词。','保留3：[3]\n丢弃0：仍[3]\n保留2：[2,3]\n丢弃0：仍[2,3]'],
       ['检查谓词与元素各自的编码','谓词必须返回可选择两分支的丘奇布尔。数字0与FALSE虽同形，任意其他自然数都不能直接当作TRUE。','返回列表：λc n.c 2 (c 3 n)']
     );}
     else {const product=name.includes('乘积');keys.push(product?'MUL':'ADD');steps.push(
@@ -326,34 +343,35 @@
       ['逐层合并结果',product?'最内层三乘一得三，再乘二得六，最后乘一仍为六。':'最内层三加零得三，再加二得五，最后加一得六。',product?'1×(2×(3×1)) → 1×(2×3) → 1×6 → 6':'1+(2+(3+0)) → 1+(2+3) → 1+5 → 6'],
       ['用空表检查初值是否正确','空表直接返回 n，因此初值本身就是这项运算对空表的约定结果。',product?'[] MUL 1 → 1':'[] ADD 0 → 0']
     );}
-    const sources={NIL:P.churchLists.nil,CONS:P.churchLists.cons,HEAD:P.churchLists.head,TAIL:P.churchLists.tail,EMPTY:P.churchLists.isEmpty,LENGTH:P.churchLists.length,MAP:P.churchLists.map,APPEND:P.churchLists.append,REVERSE:P.churchLists.reverse,FILTER:P.churchLists.filter};
+    const sources={NIL:P.churchLists.nil,CONS:P.churchLists.cons,HEAD:P.churchLists.head,TAIL:P.churchLists.tail,EMPTY:P.churchLists.isEmpty,LENGTH:P.churchLists.length,MAP:P.churchLists.map,APPEND:P.churchLists.append,REVERSE:P.churchLists.reverse,FILTER:P.churchLists.filter,nonzero:'λh.ISZERO h FALSE TRUE',dropzero:'λl.FILTER nonzero l'};
     const meanings={NIL:'空表，返回调用者的初值。',CONS:'新元素头插到旧列表，保持旧表次序。',HEAD:'用忽略后缀的选择器取首项，空表返回显式默认值。',TAIL:'用两张相邻后缀表重建去掉首元素的列表。',EMPTY:'有元素则返回假，空表保留真。',LENGTH:'每个元素贡献一次后继，与元素值无关。',MAP:'逐项应用函数，结果保持原顺序。',APPEND:'把第二张表的折叠结果作为第一张表的初值。',REVERSE:'构造接受累积表的函数链，顺次头插完成反转。',FILTER:'谓词选择保留当前项或直接取后缀。'};
     let inputs=[input('list',name.includes('空表')||name.includes('判空 []')?'[]':'[1,2,3]','丘奇列表','要操作的原列表，元素按丘奇自然数表示')];
     if(name.includes('头部插入'))inputs=[natural('h',1,'新插入的首元素'),input('tail','[2,3]','丘奇列表','已有尾表，不作为单个元素插入')];
     else if(name.includes('首项'))inputs.push(natural('d',0,'空表时返回的默认值'));
     else if(name.includes('映射'))inputs=[input('f','λn f x.f (n f x)','丘奇数→丘奇数','SUCC：对每个元素加一'),...inputs];
     else if(name.includes('拼接'))inputs=[input('a','[1,2]','丘奇列表','排在前面的列表'),input('b','[3]','丘奇列表','接在后面的列表')];
-    else if(name.includes('过滤'))inputs=[input('predicate','λh.ISZERO h FALSE TRUE','丘奇数→丘奇布尔','零返回假，非零返回真'),input('list','[0,2,0,3]','丘奇列表','等待过滤的元素')];
+    else if(name.includes('过滤'))inputs=[input('list','[0,2,0,3]','丘奇列表','唯一需要传入的参数；非零谓词已在 dropzero 内部固定')];
     else if(name.includes('折叠'))inputs.push(input('c',name.includes('乘积')?'MUL':'ADD','组合函数','组合当前元素和已折叠的后缀结果'),natural('n',name.includes('乘积')?1:0,'空表初值'));
     else if(name.includes('空表'))inputs=[input('c','任意二参数组合函数','λ函数','本例为空表，因此不会调用'),input('n','调用者指定','任意λ数据','空表直接返回的初值')];
-    return {steps,symbols:keys.map(key=>({name:key,source:sources[key]??helpers[key][0],meaning:meanings[key]??helpers[key][1]})),inputs,
+    return {steps,symbols:keys.map(key=>({name:key,source:sources[key]??helpers[key]?.[0],meaning:key==='nonzero'?'非零判断：输入丘奇自然数，零返回假，正数返回真。':key==='dropzero'?'去零入口：内部固定使用 nonzero，外部只传列表。':meanings[key]??helpers[key][1]})),inputs,
+      ...(name.includes('过滤')?{core:'dropzero = '+sources.dropzero,compact:'dropzero [0,2,0,3]',parameterNote:'唯一参数是丘奇列表。dropzero 在内部调用 FILTER nonzero；加入函数库时自动补齐辅助定义，无需再把谓词作为参数传入。'}:{}),
       encodingText:'本篇使用丘奇列表（右折叠编码）。它不同于列表小数内部的 Scott 数位表；两种 cons 定义不能互换。',
       boundaries:['空表与 FALSE、丘奇数零在 λ 结构上同形。仅看结构不能唯一决定含义，页面会结合编码与操作上下文解释。','丘奇列表接收组合函数和初值；不能把它直接交给只接受 Scott 列表尾指针的数位函数。'],exercise:'把本例输入依次换成空表、[0]、[2,0,3]，按本篇组合函数展开一层，再判断哪部分保留、哪部分被丢弃。'};
   }
   function describe(example,precision=6){
     if(example.decimalOperation)return decimal(example,precision);
     if(example.category==='丘奇列表')return listLesson(example);
-    if(example.category!=='高等数学')return null;
-    if(/^(多项式|符号求导|定积分|生成导函数|生成原函数)/.test(example.name))return polynomial(example);
     const prefix=example.name.split(' · ')[0];
+    if(example.category!=='高等数学'&&!inverse[prefix])return null;
+    if(/^(多项式|符号求导|定积分|生成导函数|生成原函数)/.test(example.name))return polynomial(example);
     const doc=math[prefix]??(['自然数求和','平方和','立方和'].includes(prefix)?summation(example):prefix.startsWith('二项式')?binomial(example):inverse[prefix]?inverseLesson(prefix):null);
     if(!doc)throw new Error('缺少高等数学讲解：'+example.name);
     const symbols=symbolsFor(doc.key);
     return {...doc,core:doc.key+' = '+helpers[doc.key][0],symbols,compact:doc.key+' '+doc.args,
       walkthrough:inverse[prefix]?doc.steps[4][2]:doc.steps.at(-1)[2]??doc.key+' '+doc.args,
-      basics:['本篇把丘奇数当作“重复执行某个更新函数的次数”。数学中的循环并不是额外指令，而是 n step initial 这样的函数应用。',stateIntro,'关键表达式中的英文名都是下方有 λ 定义的辅助函数。完整表达式用 (λ名称.后续程序) (定义) 把它们逐个绑定，不需要预先保存同名函数。'],
-      foundation:doc.key+' '+doc.args+'\nPAIR = λa b selector.selector a b\nTRUE = λa b.a\nFALSE = λa b.b\nn step initial：执行 n 次 step，初值为 initial',
-      encodingText:'本篇数字使用丘奇自然数。表达式末尾按下表顺序传入参数；正文中的 (a,b) 是有序对简写，实际由 λ 选择器保存。'};
+      basics:doc.basics??['本篇把丘奇数当作“重复执行某个更新函数的次数”。数学中的循环并不是额外指令，而是 n step initial 这样的函数应用。',stateIntro,'关键表达式中的英文名都是下方有 λ 定义的辅助函数。完整表达式用 (λ名称.后续程序) (定义) 把它们逐个绑定，不需要预先保存同名函数。'],
+      foundation:doc.foundation??doc.key+' '+doc.args+'\nPAIR = λa b selector.selector a b\nTRUE = λa b.a\nFALSE = λa b.b\nn step initial：执行 n 次 step，初值为 initial',
+      encodingText:doc.encodingText??'本篇数字使用丘奇自然数。表达式末尾按下表顺序传入参数；正文中的 (a,b) 是有序对简写，实际由 λ 选择器保存。'};
   }
   const API={describe,unpack};root.LambdaGuideAdvanced=API;
   if(typeof module!=='undefined'&&module.exports)module.exports=API;

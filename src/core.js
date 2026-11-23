@@ -124,8 +124,8 @@
           while(peek().kind===','){at++;items.push(expr());}
         }
         if(peek().kind!==']')fail('列表元素之间用逗号隔开，末尾需要「]」。');
-        at++;listDepth--;options.onList?.();
-        return churchList(items);
+        at++;listDepth--;const list=churchList(items);options.onList?.(list,items);
+        return list;
       }
       fail(peek().kind === 'end' ? '这里需要一个表达式。' : '这里需要变量或括号内的表达式。');
     }

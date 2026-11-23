@@ -1,5 +1,5 @@
 const {test}=require('node:test'),assert=require('node:assert/strict');
-const C=require('../src/core.js'),before=require('./fixtures/core-before-performance.cjs');
+const before=require('./fixtures/core-before-performance.cjs'),C=require('../src/core.js');
 const Lazy=require('../src/lazy-eval.js');
 const Trace=require('../src/trace.js');
 test('engine nodes are immutable so cached structural facts cannot become stale',()=>{

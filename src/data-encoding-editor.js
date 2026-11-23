@@ -23,8 +23,9 @@
         const edit=document.createElement('button');edit.type='button';edit.textContent='编辑';edit.setAttribute('aria-label',`编辑数据编码 ${entry.name}`);
         edit.addEventListener('click',()=>{api.setSelection(`custom:${entry.name}`);select(`custom:${entry.name}`);api.onChange();$('encoding-source').focus();$('encoding-form').scrollIntoView({block:'nearest'});});
         const del=document.createElement('button');del.type='button';del.textContent='删除';del.className='delete-function';del.setAttribute('aria-label',`删除数据编码 ${entry.name}`);del.addEventListener('click',()=>remove(entry.name));
-        const source=document.createElement('code');source.textContent=entry.source;
-        actions.append(edit,del);head.append(name,actions);row.append(head,source);list.append(row);
+        const source=document.createElement('code'),steps=E.reductionStepsFor(entry);source.textContent=entry.source;
+        const stepLabel=document.createElement('p');stepLabel.className='function-note';stepLabel.textContent='输入数字时归约：'+(Number.isFinite(steps)?steps+' 步':'到正规形');
+        actions.append(edit,del);head.append(name,actions);row.append(head,source,stepLabel);list.append(row);
       }
     }
     function options(){
@@ -33,7 +34,7 @@
       if(!E.isBuiltin(api.getSelection())&&!entries.some(entry=>api.getSelection()===`custom:${entry.name}`))api.setSelection('church');
       $('number-encoding').value=api.getSelection();buttons();renderList();
     }
-    function fresh(){tableView?.cancel();editing=null;$('encoding-name').value='';$('encoding-source').value='';error('');buttons();api.queueSave();}
+    function fresh(){tableView?.cancel();editing=null;$('encoding-name').value='';$('encoding-source').value='';$('encoding-reduction-steps').value='';error('');buttons();api.queueSave();}
     function remove(name){
       entries=entries.filter(entry=>entry.name!==name);
       if(editing===name)fresh();options();api.onChange();api.toast(`已删除编码 ${name}`);
@@ -43,6 +44,7 @@
       const entry=entries.find(entry=>`custom:${entry.name}`===value);if(!entry)return;
       if(editing!==entry.name)tableView?.cancel();
       editing=entry.name;$('encoding-name').value=entry.name;$('encoding-source').value=entry.source;
+      const steps=E.reductionStepsFor(entry);$('encoding-reduction-steps').value=Number.isFinite(steps)?String(steps):'';
       $('custom-data-panel').open=true;error('');buttons();
     }
     $('encoding-form').addEventListener('submit',event=>{
@@ -51,9 +53,11 @@
         const name=$('encoding-name').value.trim();
         const original=entries.find(entry=>entry.name===editing),source=$('encoding-source').value;
         // Unchanged definitions retain their compiled dependencies even after library changes.
-        if(original&&name===editing&&source===original.source){api.toast(`编码 ${name} 已保存`);return;}
+        const text=$('encoding-reduction-steps').value.trim(),reductionSteps=text===''?null:Number(text);
+        if(text!==''&&(!/^[0-9]+$/.test(text)||!Number.isSafeInteger(reductionSteps)))throw new Error('归约步数需为非负整数；0表示不归约。');
+        if(original&&name===editing&&source===original.source&&E.reductionStepsFor(original)===(reductionSteps??Infinity)){api.toast(`编码 ${name} 已保存`);return;}
         tableView?.cancel();
-        entries=E.define(entries,name,source,api.expand,editing,api.getNumberFormats?.()??{});editing=name;
+        entries=E.define(entries,name,source,api.expand,editing,api.getNumberFormats?.()??{},{reductionSteps});editing=name;
         api.setSelection(`custom:${name}`);options();error('');api.onChange();api.toast(`已保存编码 ${name}`);
       }catch(e){error(e.message);}
     });
@@ -69,6 +73,7 @@
       remove(editing);
     });
     for(const id of ['encoding-name','encoding-source'])$(id).addEventListener('input',()=>{error('');api.queueSave();});
+    $('encoding-reduction-steps').addEventListener('input',()=>{error('');api.queueSave();});
     tableView=root.LambdaEncodingTable.init({host:$('encoding-form'),getEntry:()=>entries.find(entry=>entry.name===editing),getEntries:()=>entries,setEntries:value=>{entries=value;renderList();},onChange:api.onChange,currentTerm:api.currentTerm,loadTerm:api.loadTerm});
     options();
     return {
@@ -78,8 +83,8 @@
         for(const mapping of mappings)if(entries.some(entry=>entry.name===mapping.name&&entry.term===mapping.definition))entries=E.putMapping(entries,mapping.name,mapping.number,mapping.term);
         tableView.render();
       },
-      capture:()=>({dataEncodings:entries,encodingDraft:{name:$('encoding-name').value,source:$('encoding-source').value,...(editing===null?{}:{editing})}}),
-      restore(snapshot){tableView.cancel();entries=snapshot.dataEncodings??[];const draft=snapshot.encodingDraft??{name:'',source:''};editing=draft.editing??null;$('encoding-name').value=draft.name;$('encoding-source').value=draft.source;options();error('');$('custom-data-panel').open=entries.length>0||!!draft.source;}
+      capture:()=>({dataEncodings:entries,encodingDraft:{name:$('encoding-name').value,source:$('encoding-source').value,reductionSteps:$('encoding-reduction-steps').value,...(editing===null?{}:{editing})}}),
+      restore(snapshot){tableView.cancel();entries=snapshot.dataEncodings??[];const draft=snapshot.encodingDraft??{name:'',source:''};editing=draft.editing??null;$('encoding-name').value=draft.name;$('encoding-source').value=draft.source;$('encoding-reduction-steps').value=draft.reductionSteps??(draft.reduceInput===false?'0':'');options();error('');$('custom-data-panel').open=entries.length>0||!!draft.source;}
     };
   }
   root.LambdaDataEncodingEditor={init};

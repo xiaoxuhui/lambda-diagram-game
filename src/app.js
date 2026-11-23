@@ -14,9 +14,9 @@
   let repeatedTerm=null,runGuard=null;
   const Guard=window.LambdaRunGuard;
   let labPan=null;
-  const state={ term:null, original:null, history:Trace.create(), dirty:false, running:false, timer:null,
-    mode:'free', level:0, completed:new Set(), halt:'', scale:1, autoFit:true, model:null, speed:600, strategy:'normal', direction:'left',numberEncoding:'church',numberFormats:{},decimalPlaces:6,decimalDigitsOrder:'forward',growthWindowMs:Guard.DEFAULT_MS,unfoldFunctions:false,functionDefinitions:[],fast:false,encodings:null,encodingBusy:false };
-  let toastTimer,workspace,viewer,dataEditor,formatEditor,guide,conversionController=null,compilingDefinitions=null,preparationTimer=null,historySource=null,renderedCount=0,diagramTerm=null,diagramRoute=null;
+  const state={ term:null, original:null, inputCall:null, history:Trace.create(), dirty:false, running:false, timer:null,
+    mode:'free', level:0, completed:new Set(), halt:'', scale:1, autoFit:true, model:null, speed:600, strategy:'normal', direction:'left',numberEncoding:'church',numberFormats:{},decimalPlaces:6,decimalDigitsOrder:'forward',growthWindowMs:Guard.DEFAULT_MS,unfoldFunctions:false,dataAsFunctions:true,compilerSpecial:true,functionDefinitions:[],fast:false,encodings:null,encodingBusy:false };
+  let toastTimer,workspace,viewer,dataEditor,formatEditor,guide,sequenceEditor=null,conversionController=null,compilingDefinitions=null,preparationTimer=null,historySource=null,renderedCount=0,diagramTerm=null,diagramRoute=null;
   const RUN_PAINT_INTERVAL=120;
   const INLINE_HISTORY_NODES=256;
   const HISTORY_PAGE_SIZE=32;
@@ -45,12 +45,12 @@
   function cancelConversion(){clearTimeout(preparationTimer);preparationTimer=null;conversionController?.abort();conversionController=null;compilingDefinitions=null;state.encodingBusy=false;encodingProgress.hidden=true;cancelEncoding.hidden=true;}
   function queueLiteralPreparation(){clearTimeout(preparationTimer);if(E.isLiteral(input.value,dataEditor.entries(),state.numberFormats))preparationTimer=setTimeout(prepareLiteral,180);}
   async function prepareLiteral(){
-    cancelConversion();const controller=new AbortController();conversionController=controller;compilingDefinitions=new Map(dataEditor.entries().map(entry=>[entry.name,entry.term]));
+    cancelConversion();const controller=new AbortController();conversionController=controller;compilingDefinitions=new Map(dataEditor.entries().map(entry=>[entry.name,entry]));
     try{
       const compiled=await E.compile(input.value,dataEditor.entries(),state.numberEncoding,{numberFormats:state.numberFormats,signal:controller.signal,onProgress:literal=>{encodingProgress.hidden=false;cancelEncoding.hidden=false;encodingProgress.textContent=`正在准备数字编码 ${literal.number}_${literal.name} · ${literal.steps} 步`;}});
       if(controller.signal.aborted||conversionController!==controller)return;
       if(compiled.mappings.some(mapping=>!dataEditor.entries().some(entry=>entry.name===mapping.name&&entry.term===mapping.definition)))return;
-      dataEditor.remember(compiled.mappings);encodingProgress.hidden=false;encodingProgress.textContent='数字编码已归约就绪，点击「转换成图示」后显示。';cancelEncoding.hidden=true;save();
+      dataEditor.remember(compiled.mappings);encodingProgress.hidden=false;encodingProgress.textContent=compiled.partial.length?'已按设定步数归约，剩余表达式可在图示中继续运行。':compiled.deferred.length?'自定义编码保留未归约表达式，点击「转换成图示」后运行。':'数字编码已归约就绪，点击「转换成图示」后显示。';cancelEncoding.hidden=true;save();
     }catch(error){if(!controller.signal.aborted){encodingProgress.hidden=false;encodingProgress.textContent=error.message;cancelEncoding.hidden=true;}}
     finally{if(conversionController===controller){conversionController=null;compilingDefinitions=null;cancelEncoding.hidden=true;}}
   }
@@ -59,10 +59,11 @@
   function capture() {
     return {...dataEditor.capture(),draft:input.value,completed:[...state.completed],mode:state.mode,level:state.level,
       session:{original:state.original,...(state.functionDefinitions.length?{functionDefinitions:state.functionDefinitions}:{}),steps:Math.max(0,state.history.length-1),dirty:state.dirty,halt:state.halt,...(state.encodings===null?{}:{encodings:state.encodings}),...(state.history.choices.length?{choices:state.history.choices}:{})},
-      view:{growthWindowMs:state.growthWindowMs,speed:state.speed,strategy:state.strategy,direction:state.direction,unfoldFunctions:state.unfoldFunctions,numberEncoding:state.numberEncoding,numberFormats:state.numberFormats,inputFormatDraft:formatEditor.capture(),guideExample:guide.capture(),decimalPlaces:state.decimalPlaces,decimalDigitsOrder:state.decimalDigitsOrder,...(palette===Palette.defaults?{}:{palette}),scale:state.scale,autoFit:state.autoFit,panX:labPan?.x??$('diagram-viewport').scrollLeft,panY:labPan?.y??$('diagram-viewport').scrollTop,historyOpen:$('history-details').open,helpOpen:!$('help-panel').hidden,hintOpen:!$('hint').hidden},
+      view:{...(sequenceEditor?{sequenceDraft:sequenceEditor.capture()}:{}),growthWindowMs:state.growthWindowMs,speed:state.speed,strategy:state.strategy,direction:state.direction,unfoldFunctions:state.unfoldFunctions,dataAsFunctions:state.dataAsFunctions,compilerSpecial:state.compilerSpecial,numberEncoding:state.numberEncoding,numberFormats:state.numberFormats,inputFormatDraft:formatEditor.capture(),guideExample:guide.capture(),decimalPlaces:state.decimalPlaces,decimalDigitsOrder:state.decimalDigitsOrder,...(palette===Palette.defaults?{}:{palette}),scale:state.scale,autoFit:state.autoFit,panX:labPan?.x??$('diagram-viewport').scrollLeft,panY:labPan?.y??$('diagram-viewport').scrollTop,historyOpen:$('history-details').open,helpOpen:!$('help-panel').hidden,hintOpen:!$('hint').hidden},
       selection:{start:input.selectionStart,end:input.selectionEnd},error:$('error-message').hidden?'':$('error-message').textContent};
   }
   function applySnapshot(s) {
+    state.inputCall=window.LambdaGuide.pendingCall(s.draft,s.functions);
     cancelRewind();
     cancelConversion();
     viewer?.cancelZoom();
@@ -72,7 +73,9 @@
     revealAnswer(false);
     state.functionDefinitions=s.session.functionDefinitions??[];functionReducer=F.create(state.functionDefinitions);
     state.original=s.session.original;state.term=s.term;state.history=s.trace??Trace.create(s.session.original,state.functionDefinitions);state.dirty=s.session.dirty;state.halt=s.session.halt;
-    state.scale=s.view.scale;state.autoFit=s.view.autoFit;state.speed=s.view.speed;state.strategy=s.view.strategy??'normal';state.direction=s.view.direction??'left';state.unfoldFunctions=s.view.unfoldFunctions??false;renderSpeed();
+    state.scale=s.view.scale;state.autoFit=s.view.autoFit;state.speed=s.view.speed;state.strategy=s.view.strategy??'normal';state.direction=s.view.direction??'left';state.unfoldFunctions=s.view.unfoldFunctions??false;state.dataAsFunctions=s.view.dataAsFunctions??true;state.compilerSpecial=s.view.compilerSpecial??true;renderSpeed();
+    const implicitFunctions=!state.unfoldFunctions&&state.functionDefinitions.length>0;
+    if(implicitFunctions)state.dirty=true;
     state.growthWindowMs=s.view.growthWindowMs??Guard.DEFAULT_MS;$('growth-window').value=String(state.growthWindowMs);
     labPan=s.mode==='guide'?{x:s.view.panX,y:s.view.panY}:null;
     state.numberEncoding=s.view.numberEncoding??'church';state.numberFormats=s.view.numberFormats??{};state.decimalPlaces=s.view.decimalPlaces??6;
@@ -80,11 +83,13 @@
     decodedTerms=new WeakMap();interpretedSource=null;
     state.encodings=s.session.encodings??null;dataEditor.restore(s);formatEditor.restore(s.view.inputFormatDraft);
     guide.restore(s.view.guideExample);
+    sequenceEditor?.restore(s.view.sequenceDraft);
     applyPalette(s.view.palette??Palette.defaults);paletteEditor.restore(palette);
     $('history-details').open=s.view.historyOpen;$('help-panel').hidden=!s.view.helpOpen;$('help-toggle').setAttribute('aria-expanded',String(s.view.helpOpen));
     $('hint').hidden=!s.view.hintOpen;$('hint-toggle').textContent=s.view.hintOpen?'收起提示':'显示提示';$('hint-toggle').setAttribute('aria-expanded',String(s.view.hintOpen));
     $('challenge-feedback').textContent='';$('next-level').hidden=true;$('error-message').textContent=s.error;$('error-message').hidden=!s.error;
     renderMode();if(s.hasSession)render();else convert();input.setSelectionRange(s.selection.start,s.selection.end);
+    if(implicitFunctions)toast('旧会话的隐式函数定义与历史已保留。点击「转换成图示」即可按关闭状态生成普通 λ 表达式。');
     if(!state.term){$('zoom-label').textContent=`${Math.round(state.scale*100)}%`;$('fit').setAttribute('aria-pressed',String(state.autoFit));}
     $('diagram-viewport').scrollLeft=s.view.panX;$('diagram-viewport').scrollTop=s.view.panY;
   }
@@ -113,7 +118,7 @@
     cancelRewind();
     cancelConversion();const controller=new AbortController();conversionController=controller;let showedProgress=false;
     diagramView.cancelTransition();
-    compilingDefinitions=new Map(dataEditor.entries().map(entry=>[entry.name,entry.term]));
+    compilingDefinitions=new Map(dataEditor.entries().map(entry=>[entry.name,entry]));
     stop(); $('error-message').hidden=true; state.halt='';state.dirty=true;
     $('challenge-feedback').textContent=''; $('next-level').hidden=true;
     try {
@@ -121,16 +126,22 @@
       const compiled=await E.compile(input.value,dataEditor.entries(),state.numberEncoding,{numberFormats:state.numberFormats,signal:controller.signal,onProgress:literal=>{if(!showedProgress){state.encodingBusy=true;render();showedProgress=true;}encodingProgress.hidden=false;cancelEncoding.hidden=false;encodingProgress.textContent=`正在自动编码 ${literal.number}_${literal.name} · ${literal.steps} 步`;}});
       if(controller.signal.aborted||conversionController!==controller)return false;
       if(compiled.mappings.some(mapping=>!dataEditor.entries().some(entry=>entry.name===mapping.name&&entry.term===mapping.definition)))return false;
+      state.inputCall=window.LambdaGuide.pendingCall(compiled.term,workspace?.functionEntries()??[]);
       const expanded=term=>workspace?workspace.expand(term):term;
-      const parsed=window.LambdaMeta.repair(compiled.term,expanded);
-      if(parsed!==compiled.term){
+      const interpreted=window.LambdaGuide.compileInterpreterCall(compiled.term,workspace?.functionEntries()??[],expanded);
+      const parsed=window.LambdaMeta.repair(interpreted,expanded);
+      if(interpreted!==compiled.term)toast('解释器输入已自动编码，环境已封装；运行时执行解释并还原表达式。');
+      else if(parsed!==compiled.term){
         input.value=C.format(parsed);
         toast('解释器表达式已更新，待计算表达式会在解释器内部执行。');
       }
       dataEditor.remember(compiled.mappings);
-      state.functionDefinitions=state.unfoldFunctions&&parsed===compiled.term?F.capture(parsed,workspace?.functionEntries()??[]):[];
+      const base=state.unfoldFunctions&&parsed===compiled.term?{term:parsed,definitions:F.capture(parsed,workspace?.functionEntries()??[])}:{term:parsed===compiled.term?expanded(parsed):parsed,definitions:[]};
+      const linked=state.unfoldFunctions?P.prepare(base.term,base.definitions):{term:P.preparePlain(base.term),definitions:[]};
+      const prepared=state.unfoldFunctions&&state.dataAsFunctions?F.prepare(linked.term,linked.definitions,compiled.dataTerms):linked;
+      state.functionDefinitions=prepared.definitions;
       functionReducer=F.create(state.functionDefinitions);
-      const term=parsed===compiled.term?(state.unfoldFunctions?parsed:expanded(parsed)):parsed;
+      const term=prepared.term;
       viewer?.cancelZoom();
       workspace?.beginSession();
       state.decimalDigitsOrder='forward';
@@ -169,7 +180,7 @@
     if(!state.term) { diagramView.clear(); $('diagram-empty').hidden=false; state.model=null; return; }
     $('diagram-empty').hidden=true;
     const previous=duration>0?diagramView.captureFrame():null;
-    state.model=D.layout(state.term,route,palette);diagramView.render(state.model);
+    state.model=D.layout(state.term,route,palette,state.unfoldFunctions?state.functionDefinitions.map(fn=>fn.name):[]);diagramView.render(state.model);
     mount.style.opacity=state.dirty?'0.35':'1';
     applyScale();
     viewer?.restore(anchor);
@@ -217,6 +228,10 @@
     const interpreted=window.LambdaMeta.readTerm(t)??(state.original&&window.LambdaMeta.isPipeline(state.original)&&!C.hasRedex(t)?t:null);
     if(interpreted)return `解释器结果：${describeInterpretation(interpreted)}`;
     if(decodedTerms.has(t))return decodedTerms.get(t);
+    if(state.numberEncoding==='bool'){
+      const output=window.LambdaBooleanCircuits.read(t);
+      if(output!==null){const text='布尔输出 '+output;decodedTerms.set(t,text);return text;}
+    }
     const decimal=window.LambdaDecimal.read(t,{legacyOnly:state.numberEncoding!=='decimal'&&!state.encodings?.includes('decimal'),digitsOrder:state.decimalDigitsOrder});if(decimal){const text=decimal.error?`错误：${decimal.error}`:`小数 ${window.LambdaDecimal.format(decimal)}`;decodedTerms.set(t,text);return text;}
     const integer=E.readBuiltin(t,'int',{legacyOnly:state.numberEncoding!=='int'&&!state.encodings?.includes('int')});
     if(integer!==null){decodedTerms.set(t,integer);return integer;}
@@ -274,7 +289,7 @@
       }});
       if(valueJob===controller){
         normalForm=result;
-        valueResult.textContent=decode(result,false);
+        valueResult.textContent=state.inputCall?.message??decode(result,false);
         valueDetails.hidden=false;
       }
     }catch(error){
@@ -379,6 +394,10 @@
     $('reduction-order').value=state.strategy;
     $('reduction-direction').value=state.direction;
     $('unfold-functions').checked=state.unfoldFunctions;
+    $('data-functions-control').hidden=!state.unfoldFunctions;
+    $('data-as-functions').checked=state.dataAsFunctions;
+    $('compiler-special').checked=state.compilerSpecial;
+    $('data-as-functions').disabled=!state.unfoldFunctions;
     const side=state.direction==='right'?'右':'左';
     $('strategy-hint').textContent=state.strategy==='normal'?`先替换最${side}侧外层项，再处理内部。`:`先归约最${side}侧内部项，再做外层替换。`;
     const count=Math.max(0,state.history.length-1);
@@ -397,10 +416,10 @@
     else if(state.dirty) { badge.textContent='已编辑 · 请转换'; badge.classList.add('dirty'); }
     else if(state.running) badge.textContent='正在归约';
     else if(state.halt) { badge.textContent='已暂停'; badge.classList.add('error'); }
-    else if(!redex) badge.textContent='已到正规形';
+    else if(!redex) badge.textContent=state.inputCall?'等待参数':'已到正规形';
     else badge.textContent='可以归约';
     $('run-status').textContent=rewindJob?'正在重算上一帧…':state.encodingBusy?'正在自动归约数字编码，完成后显示图示。':!state.term?'输入有效表达式后，就能开始运行。':state.dirty?'输入已改变。重新转换后开始新的归约。':
-      state.halt|| (state.running?'自动运行中。高亮线路标记下一次函数替换。':!redex?'已到 β 正规形；可点击单步或运行再次尝试，不能归约时保持当前式。':count?'可以继续单步，或回退查看上一帧。':'准备好了。点击单步，观察一次函数替换。');
+      state.halt|| (state.running?'自动运行中。高亮线路标记下一次函数替换。':state.inputCall?state.inputCall.message:!redex?'已到 β 正规形；可点击单步或运行再次尝试，不能归约时保持当前式。':count?'可以继续单步，或回退查看上一帧。':'准备好了。点击单步，观察一次函数替换。');
     $('current-expression').textContent=state.term?C.format(state.term):'—';
     $('expression-encoding').textContent=!state.term?'':state.encodings===null?'编码：旧存档保留原表达式':state.encodings.length?`数字来源编码：${state.encodings.map(E.label).join('、')}${state.encodings.includes('decimal')&&state.decimalDigitsOrder==='reverse'?'（旧数位顺序，原表达式保留）':''}`:'编码：纯 λ 表达式（无数字字面量）';
     const customNames=state.encodings?.filter(name=>!E.isBuiltin(name))??[];
@@ -413,7 +432,7 @@
       ?E.readBuiltin(state.term,selectedBuiltin)??(state.encodings?.includes('list')?E.readChurchList(state.term):null)
       :null;
     renderInterpretation(ready&&!redex?state.term:null);
-    $('decoded').textContent=interpretedTerm?`解释器结果：${describeInterpretation(interpretedTerm)}`:ready&&!(state.running&&redex)?(matches.length?matches.map(match=>`${match.number}_${match.name}`).join(' / ')+(matches.length>1?'（多项匹配）':''):builtInResult??(hasCustomData?'自定义数据':decode(state.term))):'';
+    $('decoded').textContent=ready&&state.inputCall?state.inputCall.message:interpretedTerm?`解释器结果：${describeInterpretation(interpretedTerm)}`:ready&&!(state.running&&redex)?(matches.length?matches.map(match=>`${match.number}_${match.name}`).join(' / ')+(matches.length>1?'（多项匹配）':''):builtInResult??(hasCustomData?'自定义数据':decode(state.term))):'';
     const next=$('next-explanation'); next.replaceChildren();
     if(ready&&redex?.kind==='unfold'){
       next.append('下一步：展开函数 ',code(redex.term.name),'，随后继续按所选顺序归约。');
@@ -425,10 +444,10 @@
     renderDiagram(redex,duration,undone);
     save();
   }
-  function advance(path=null,display=true) {
+  function advance(path=null,display=true,kind=null) {
     if(!state.term||state.dirty||rewindJob) return false;
     try {
-      const selected=Array.isArray(path),result=selected?C.stepAt(state.term,path):reductionStep(); if(!result){stop();if(display)render();return false;}
+      const selected=Array.isArray(path),result=selected?(kind==='unfold'?functionReducer.unfoldAt(state.term,path):C.stepAt(state.term,path)):reductionStep(); if(!result){stop();if(display)render();return false;}
       const choice=result.kind==='unfold'?{unfold:result.path}:selected||state.unfoldFunctions?result.path:state.strategy==='normal'&&state.direction==='left'?null:`${state.strategy}:${state.direction}`;
       state.term=result.term;state.history.append(result,choice);state.halt='';
       // The preview is only a hint: confirm with an actual attempt before stopping.
@@ -444,7 +463,7 @@
     } catch(e) {stop();state.halt=e.message;if(display)render();return false;}
   }
   function captureTap(target){const selection=diagramView.selection(target);return !state.dirty&&selection?{...selection,term:diagramTerm}:null;}
-  function manualStep(selection){if(!selection||state.dirty||selection.term!==state.term)return;stop();advance(selection.path);}
+  function manualStep(selection){if(!selection||state.dirty||selection.term!==state.term)return;stop();advance(selection.path,true,selection.kind);}
   function schedule(delay=0) {
     state.timer=setTimeout(()=>{if(!state.running)return;
       const started=performance.now();
@@ -557,31 +576,44 @@
   }
   input.addEventListener('input',event=>{changed();if(!event.isComposing)queueLiteralPreparation();});
   input.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();convert();}});
-  $('compile-combinators').addEventListener('click',async()=>{
+  async function compileCombinators(basis='optimized'){
+    const specialize=state.compilerSpecial,simplify=specialize&&basis==='sk',collision=workspace.collisionPolicy();
     stop();cancelConversion();
-    const controller=new AbortController(),entries=dataEditor.entries(),source=input.value,functions=workspace.functionEntries(),button=$('compile-combinators');
-    conversionController=controller;compilingDefinitions=new Map(entries.map(entry=>[entry.name,entry.term]));button.disabled=true;
+    const controller=new AbortController(),entries=dataEditor.entries(),source=input.value,functions=workspace.functionEntries(),buttons=[$('compile-combinators'),$('compile-sk'),$('compile-bckw')];
+    conversionController=controller;compilingDefinitions=new Map(entries.map(entry=>[entry.name,entry]));buttons.forEach(button=>button.disabled=true);$('compiler-special').disabled=true;
     try{
       const parsed=await E.compile(source,entries,state.numberEncoding,{numberFormats:state.numberFormats,signal:controller.signal});
-      const result=await window.LambdaCombinatorCompiler.compileTerm(workspace.expand(parsed.term),{functions,signal:controller.signal,onProgress:()=>{
+      const syntax=window.LambdaGuide.compileInterpreterCall(parsed.term,functions,term=>workspace.expand(term));
+      const result=await window.LambdaCombinatorCompiler.compileTerm(syntax===parsed.term?workspace.expand(parsed.term):syntax,{basis,simplify,specialize,collision,functions,signal:controller.signal,onProgress:()=>{
         encodingProgress.hidden=false;cancelEncoding.hidden=false;encodingProgress.textContent='正在外部编译组合子…';
       }});
       if(controller.signal.aborted||conversionController!==controller||input.value!==source)return;
       const current=workspace.functionEntries();
       if(current.length!==functions.length||current.some((fn,index)=>fn!==functions[index]))throw new C.LambdaError('函数库已修改，请重新编译。');
-      workspace.persist();workspace.installDefinitions(result.definitions);dataEditor.remember(parsed.mappings);
-      input.value=result.source;changed();
-      $('combinator-status').hidden=false;$('combinator-status').textContent=result.used.length?`已在外部编译；算式使用 ${result.used.join('、')}。定义保存在函数库，可编辑和删除。`:'编译完成，输入不需要组合子。';
+      if(workspace.collisionPolicy()!==collision)throw new C.LambdaError('重名处理方式已改变，请重新编译。');
+      const imported=workspace.importDefinitions(result.definitions,undefined,{collision});dataEditor.remember(parsed.mappings);
+      input.value=result.source;changed();workspace.persist();
+      $('combinator-status').hidden=false;$('combinator-status').textContent=result.used.length?`已在外部编译${basis==='sk'?'为 SK':basis==='bckw'?'为 BCKW':''}；算式使用 ${result.used.join('、')}。缺少的定义已加入函数库，可编辑和删除。`:'编译完成，输入不需要组合子。';
+      if(result.ready.length)$('combinator-status').textContent+=' 已有相同定义，已准备好：'+result.ready.join('、')+'。';
+      if(result.reused.length)$('combinator-status').textContent+=' 已直接使用同名函数：'+result.reused.join('、')+'（沿用现有定义）。';
+      if(imported.replaced.length)$('combinator-status').textContent+=' 重名已替换：'+imported.replaced.join('、')+'。';
+      $('combinator-status').textContent+=specialize?' 当前使用特殊化简。':' 当前使用普通转换（无特殊化简）。';
+      input.focus();input.setSelectionRange(input.value.length,input.value.length);
       toast('编译完成，点击「转换成图示」后运行。');
     }catch(error){
       if(controller.signal.aborted)return;
       $('error-message').textContent=error.message;$('error-message').hidden=false;
-    }finally{button.disabled=false;if(conversionController===controller)cancelConversion();}
-  });
+      $('combinator-status').textContent=error.message;$('combinator-status').hidden=false;
+    }finally{buttons.forEach(button=>button.disabled=false);$('compiler-special').disabled=false;if(conversionController===controller)cancelConversion();}
+  }
+  $('compile-combinators').addEventListener('click',()=>compileCombinators());
+  $('compile-sk').addEventListener('click',()=>compileCombinators('sk'));
+  $('compile-bckw').addEventListener('click',()=>compileCombinators('bckw'));
+  $('compiler-special').addEventListener('change',()=>{state.compilerSpecial=$('compiler-special').checked;save();});
   $('compile-meta-lambda').addEventListener('click',async()=>{
     cancelConversion();
     const controller=new AbortController(),entries=dataEditor.entries();
-    conversionController=controller;compilingDefinitions=new Map(entries.map(entry=>[entry.name,entry.term]));
+    conversionController=controller;compilingDefinitions=new Map(entries.map(entry=>[entry.name,entry]));
     try{
       const compiled=await E.compile(input.value,entries,state.numberEncoding,{
         numberFormats:state.numberFormats,signal:controller.signal,onProgress:literal=>{
@@ -590,7 +622,8 @@
         }
       });
       if(controller.signal.aborted||conversionController!==controller)return;
-      const program=window.LambdaMeta.compileTerm(compiled.term,term=>workspace.expand(term));
+      const named=window.LambdaGuide.compileInterpreterCall(compiled.term,workspace.functionEntries(),term=>workspace.expand(term));
+      const program=named!==compiled.term?named:window.LambdaMeta.compileTerm(compiled.term,term=>workspace.expand(term));
       dataEditor.remember(compiled.mappings);
       input.value=C.format(program);changed();
       toast('解释器表达式已生成，请点击「转换成图示」。');
@@ -606,7 +639,10 @@
   });
   $('edit-meta-source').addEventListener('click',()=>{
     try{
-      const source=window.LambdaMeta.sourceOf(input.value);
+      const parsed=E.parse(input.value,dataEditor.entries(),Infinity,state.numberEncoding,state.numberFormats).term;
+      const named=window.LambdaGuide.compileInterpreterCall(parsed,workspace.functionEntries(),term=>workspace.expand(term));
+      const example=P.examples.find(item=>item.metaInterpreter&&P.inputSourceFor(item,state.decimalPlaces)===input.value);
+      const source=example?example.metaInput:window.LambdaMeta.sourceOf(named!==parsed?C.format(named):input.value);
       if(source!==input.value){input.value=source;changed();}
       input.focus();
     }catch(error){
@@ -639,6 +675,21 @@
       info.append(guide,document.createElement('br'));
     }
     if(example.description)info.append(`${window.LambdaGuide.lesson(example).purpose} 预期结果为${example.expectedLabel||expected}。`);
+    const doc=window.LambdaGuide.lesson(example,state.decimalPlaces),selectedNames=window.LambdaGuide.libraryNames(doc);
+    if(selectedNames.length){
+      const add=document.createElement('button'),feedback=document.createElement('span');
+      add.type='button';add.id='example-add-library';add.className='button';add.textContent='将此示例函数加入函数库';
+      feedback.id='example-library-feedback';feedback.setAttribute('role','status');
+      add.addEventListener('click',()=>{
+        try{
+          const result=workspace.importDefinitions(doc.symbols,selectedNames);
+          feedback.textContent=window.LambdaLibrary.importFeedback(result);
+          const calls=selectedNames.map(name=>result.bindings[name]??name).filter(name=>result.added.includes(name)||result.replaced.includes(name)||result.ready.includes(name)||result.reused.includes(name));
+          if(calls.length)feedback.textContent+=' 可调用：'+calls.join('、')+'。';
+        }catch(error){feedback.textContent='加入失败：'+error.message;}
+      });
+      workspace.attachCollisionControls(info);info.append(document.createElement('br'),add,document.createElement('br'),feedback);
+    }
     info.hidden=!info.hasChildNodes();
   });
   $('convert').addEventListener('click',convert);$('step').addEventListener('click',advance);$('run').addEventListener('click',()=>run());
@@ -676,6 +727,7 @@
     render();if(state.running)schedule();
   }
   $('unfold-functions').addEventListener('change',()=>{state.unfoldFunctions=$('unfold-functions').checked;changed();});
+  $('data-as-functions').addEventListener('change',()=>{state.dataAsFunctions=$('data-as-functions').checked;changed();});
   $('reduction-order').addEventListener('change',()=>setReductionPreference('strategy',$('reduction-order').value,C.STRATEGIES));
   $('reduction-direction').addEventListener('change',()=>setReductionPreference('direction',$('reduction-direction').value,C.DIRECTIONS));
   $('diagram-mount').addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&!e.repeat){const selection=captureTap(e.target);if(selection){e.preventDefault();manualStep(selection);}}});
@@ -705,9 +757,9 @@
   $('help-toggle').addEventListener('click',()=>{const show=$('help-panel').hidden;$('help-panel').hidden=!show;$('help-toggle').setAttribute('aria-expanded',String(show));save();});
   $('history-details').addEventListener('toggle',save);
   $('speed').addEventListener('change',save);
-  dataEditor=window.LambdaDataEncodingEditor.init({getSelection:()=>state.numberEncoding,setSelection:value=>{state.numberEncoding=value;},getNumberFormats:()=>state.numberFormats,expand:term=>workspace?workspace.expand(term):term,queueSave:save,onChange:()=>{if(compilingDefinitions&&(compilingDefinitions.size!==dataEditor.entries().length||dataEditor.entries().some(entry=>compilingDefinitions.get(entry.name)!==entry.term))){changed();queueLiteralPreparation();}else{render();save();}},currentTerm:()=>state.term&&!state.dirty?state.term:null,loadTerm:(term,name)=>{state.numberEncoding=`custom:${name}`;setSource(C.format(term));},toast});
+  dataEditor=window.LambdaDataEncodingEditor.init({getSelection:()=>state.numberEncoding,setSelection:value=>{state.numberEncoding=value;},getNumberFormats:()=>state.numberFormats,expand:term=>workspace?workspace.expand(term):term,queueSave:save,onChange:()=>{if(compilingDefinitions&&(compilingDefinitions.size!==dataEditor.entries().length||dataEditor.entries().some(entry=>compilingDefinitions.get(entry.name)!==entry))){changed();queueLiteralPreparation();}else{render();save();}},currentTerm:()=>state.term&&!state.dirty?F.expand(state.term,state.functionDefinitions):null,loadTerm:(term,name)=>{state.numberEncoding=`custom:${name}`;setSource(C.format(term));},toast});
   formatEditor=window.LambdaInputFormatEditor.init({getSelection:()=>state.numberEncoding,getEntries:()=>dataEditor.entries(),getNumberFormats:()=>state.numberFormats,setNumberFormats:formats=>{state.numberFormats=formats;},setCustomFormat:(name,template)=>dataEditor.setInputFormat(name,template),onChange:()=>{changed();queueLiteralPreparation();},queueSave:save,toast});
-  guide=window.LambdaGuide.init({precision:()=>state.decimalPlaces,save,load:example=>{
+  guide=window.LambdaGuide.init({precision:()=>state.decimalPlaces,save,addFunctions:(definitions,selected)=>workspace.importDefinitions(definitions,selected),load:example=>{
     stop();state.mode='free';state.numberEncoding=example.encoding??'church';
     renderMode();setSource(P.inputSourceFor(example,state.decimalPlaces));save();
     input.focus();input.scrollIntoView({block:'center'});
@@ -718,14 +770,28 @@
       if(busy){stop();cancelRewind();cancelConversion();if(valueJob)clearValue();render();}
     },
     getNumberEncoding:()=>state.numberEncoding,getDecimalPlaces:()=>state.decimalPlaces,getDataEncodings:()=>dataEditor.entries(),
-    compileSource:async(source,signal)=>{const compiled=await E.compile(source,dataEditor.entries(),state.numberEncoding,{signal,numberFormats:state.numberFormats});dataEditor.remember(compiled.mappings);return compiled;},
-    currentExpression:()=>state.term&&!state.dirty?C.format(state.term):input.value,
+    compileSource:async(source,signal)=>{const compiled=await E.compile(source,dataEditor.entries(),state.numberEncoding,{signal,numberFormats:state.numberFormats});const term=window.LambdaGuide.compileInterpreterCall(compiled.term,workspace.functionEntries(),value=>workspace.expand(value));dataEditor.remember(compiled.mappings);return {...compiled,term};},
+    currentExpression:()=>state.term&&!state.dirty?C.format(F.expand(state.term,state.functionDefinitions)):input.value,
     insertFunction:name=>{const start=input.selectionStart,end=input.selectionEnd;
       const before=start&&!/[\sλ\\.(\[]/.test(input.value[start-1])?' ':'';
       const after=end<input.value.length&&!/[\s.)\],]/.test(input.value[end])?' ':'';
       insert(before+C.formatName(name)+after);
     }});
+  sequenceEditor=window.LambdaSequences.init({functions:()=>workspace.functionEntries(),queueSave:()=>workspace.queueSave(),
+    load:source=>{stop();state.mode='free';state.numberEncoding='church';renderMode();input.value=source;changed();save();},
+    saveRule:async(name,source)=>{
+      const functions=workspace.functionEntries(),compiled=await E.compile(source,dataEditor.entries(),'church',{numberFormats:state.numberFormats});
+      const current=workspace.functionEntries();if(current.length!==functions.length||current.some((fn,index)=>fn!==functions[index]))throw new C.LambdaError('函数库已修改，请重新保存规则。');
+      const unknown=[...C.freeVars(workspace.expand(compiled.term))];if(unknown.length)throw new C.LambdaError('规则含未定义名称：'+unknown.join('、')+'。请先保存依赖函数。');
+      workspace.saveDefinition(name,source,compiled);dataEditor.remember(compiled.mappings);save();
+    },
+    guide:id=>{
+      const example=P.examples.find(example=>example.sequenceId===id)??P.examples.find(example=>example.sequenceId==='A001477');
+      guide.restore(example.name);stop();state.mode='guide';renderMode();render();save();
+      if(example.sequenceId!==id)toast('此编号使用个人规则，当前打开的是无限列表通用原理。');
+    }});
   workspace.restoreInitial().then(restored=>{
+    if(!restored)sequenceEditor.refresh();
     if(!restored){renderMode();convert();workspace.persist();}
   });
 })();

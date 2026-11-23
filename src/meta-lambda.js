@@ -59,8 +59,9 @@
   const pipelineMarker=C.parse('λa b c d e f g h.h g f e d c b a');
   const decoderDefinition='λfreeenv.fix (λdecode env term.term (λi.get i env) (λi.get i freeenv) (λbody.λx0.decode (cons x0 env) body) (λp q.(decode env p) (decode env q)))';
   const pipelineDefinitions=[...evaluatorDefinitions,['decode',decoderDefinition]];
-  const mainSource='λfreeenv input.decode freeenv nil (normalize input)';
-  let pipelineBody=C.parse(mainSource);
+  const legacyMainSource='λfreeenv input.decode freeenv nil (normalize input)';
+  const mainSource='λinput.input (λfreeenv.λsyntax.decode freeenv nil (normalize syntax))';
+  let pipelineBody=C.parse(legacyMainSource);
   for(const [name,source] of [...pipelineDefinitions].reverse())pipelineBody=A(L(name,pipelineBody),C.parse(source));
   const program=A(L('pipelineTag',pipelineBody),pipelineMarker);
 
@@ -130,6 +131,20 @@
     const args=[];
     for(;term.type==='app';term=term.fn)args.push(term.arg);
     return {head:term,args:args.reverse()};
+  }
+  const pipelineTags=new WeakMap();
+  function isPipeline(term){
+    if(!term)return false;
+    if(pipelineTags.has(term))return pipelineTags.get(term);
+    const pending=[term],seen=new WeakSet();let found=false;
+    while(pending.length){const node=pending.pop();if(seen.has(node))continue;seen.add(node);
+      if(node.type==='abs')pending.push(node.body);
+      else if(node.type==='app'){
+        if(node.fn.type==='abs'&&C.equal(node.arg,pipelineMarker)&&!C.freeVars(node.fn.body).has(node.fn.param)){found=true;break;}
+        pending.push(node.fn,node.arg);
+      }
+    }
+    pipelineTags.set(term,found);return found;
   }
   function readName(term){
     if(term.type!=='abs'||term.body.type!=='abs'||term.param===term.body.param)return null;
@@ -215,10 +230,10 @@
     sourceOf:source=>{const restored=unwrap(C.parse(source));return restored?C.format(restored.term):source;},
     isProgram:term=>{
       const {head,args}=application(term);
-      return args.length===3&&C.equal(args[0],pipelineMarker)&&C.equal(head,program.fn)||args.length===2&&C.equal(args[0],marker)&&C.equal(head,taggedProgram.fn);
+      return isPipeline(term)||args.length===2&&C.equal(args[0],marker)&&C.equal(head,taggedProgram.fn);
     },
-    isPipeline:term=>{const {head,args}=application(term);return args.length===3&&C.equal(args[0],pipelineMarker)&&C.equal(head,program.fn);},
-    definitions:pipelineDefinitions.map(([name,source])=>({name,source})),mainSource,
+    isPipeline,
+    definitions:pipelineDefinitions.map(([name,source])=>({name,source})),mainSource,legacyMainSource,
     stages:term=>{const expression=compileTerm(term);return {input:term,freeEnvironment:expression.fn.arg,encoded:expression.arg,expression};},
     needsRepair:term=>{const restored=unwrap(term);return !!(restored&&(restored.legacy||restored.previous||restored.tagged||restored.trailing));},
     repair:(term,expand=term=>term)=>{

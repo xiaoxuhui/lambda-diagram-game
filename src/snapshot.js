@@ -38,10 +38,12 @@
       if(!object(entry))fail('数据转换函数不完整。');
       if(entry.table!==undefined&&!Array.isArray(entry.table))fail('数字表达式对照表不合法。');
       const table=entry.table?.map(row=>{if(!object(row))fail('对照项不完整。');return {number:row.number,term:ast(row.term)};});
-      return {name:entry.name,source:entry.source,term:ast(entry.term),...(entry.inputFormat===undefined?{}:{inputFormat:entry.inputFormat}),...(table===undefined?{}:{table})};
+      return {name:entry.name,source:entry.source,term:ast(entry.term),...(entry.reductionSteps===undefined?{}:{reductionSteps:entry.reductionSteps}),...(entry.reduceInput===undefined?{}:{reduceInput:entry.reduceInput}),...(entry.inputFormat===undefined?{}:{inputFormat:entry.inputFormat}),...(table===undefined?{}:{table})};
     });E.validate(dataEncodings);
     const encodingDraft=raw.encodingDraft??{name:'',source:''};
     if(!object(encodingDraft)||typeof encodingDraft.name!=='string'||typeof encodingDraft.source!=='string')fail('数据编码草稿不合法。');
+    if(encodingDraft.reduceInput!==undefined&&typeof encodingDraft.reduceInput!=='boolean')fail('编码草稿自动归约开关不合法。');
+    if(encodingDraft.reductionSteps!==undefined&&typeof encodingDraft.reductionSteps!=='string')fail('编码草稿归约步数不合法。');
     const encodingEditing=encodingDraft.editing??null;
     if(encodingEditing!==null&&!dataEncodings.some(entry=>entry.name===encodingEditing))fail('正在编辑的数据编码不存在。');
     if(!Array.isArray(raw.completed)||raw.completed.length>P.levels.length||raw.completed.some(i=>!LEVEL_IDS.has(i)))fail('通关进度不合法。');
@@ -86,9 +88,14 @@
     const strategy=v.strategy===undefined?'normal':v.strategy;if(!C.STRATEGIES.includes(strategy))fail('归约顺序不合法。');
     const direction=v.direction===undefined?'left':v.direction;if(!C.DIRECTIONS.includes(direction))fail('归约方向不合法。');
     const unfoldFunctions=v.unfoldFunctions??false;if(typeof unfoldFunctions!=='boolean')fail('函数展开开关不合法。');
+    const dataAsFunctions=v.dataAsFunctions??true;if(typeof dataAsFunctions!=='boolean')fail('数字和列表函数开关不合法。');
+    const compilerSpecial=v.compilerSpecial===undefined?true:v.compilerSpecial;if(typeof compilerSpecial!=='boolean')fail('特殊化简开关不合法。');
+    const functionCollision=v.functionCollision===undefined?'skip':v.functionCollision;if(!L.COLLISIONS.includes(functionCollision))fail('函数重名处理方式不合法。');
     const numberEncoding=v.numberEncoding===undefined?'decimal':v.numberEncoding;if(!E.isBuiltin(numberEncoding)&&!dataEncodings.some(entry=>numberEncoding===`custom:${entry.name}`))fail('数字编码不合法。');
     const numberFormats=v.numberFormats??{};E.validateFormats(dataEncodings,numberFormats);
     const inputFormatDraft=v.inputFormatDraft;
+    const sequenceDraft=v.sequenceDraft;
+    if(sequenceDraft!==undefined&&(!object(sequenceDraft)||['id','start','count','source'].some(key=>typeof sequenceDraft[key]!=='string')||typeof sequenceDraft.open!=='boolean'))fail('数列生成规则草稿不合法。');
     if(v.guideExample!==undefined&&typeof v.guideExample!=='string')fail('讲解示例不合法。');
     if(inputFormatDraft!==undefined&&(!object(inputFormatDraft)||typeof inputFormatDraft.encoding!=='string'||typeof inputFormatDraft.text!=='string'))fail('输入形式草稿不合法。');
     const decimalPlaces=v.decimalPlaces===undefined?6:v.decimalPlaces;if(!Number.isSafeInteger(decimalPlaces)||decimalPlaces<0)fail('小数位数不合法。');
@@ -109,8 +116,8 @@
     const draftFunction=raw.functions.find(fn=>fn.name===editing);
     const functionSource=functionDraft.syntax==='math'&&draftFunction?.sourceSyntax==='math'&&functionDraft.source===draftFunction.source?C.format(functions.find(fn=>fn.name===editing).term):functionDraft.source;
     return {version,savedAt:typeof raw.savedAt==='string'&&Number.isFinite(Date.parse(raw.savedAt))?raw.savedAt:new Date().toISOString(),draft,
-      functions,dataEncodings,encodingDraft:{name:encodingDraft.name,source:encodingDraft.source,...(encodingEditing===null?{}:{editing:encodingEditing})},completed:[...new Set(raw.completed)],mode:raw.mode,level:raw.level,
-      session:{original,...(functionDefinitions===undefined?{}:{functionDefinitions}),steps:s.steps,dirty:s.dirty,halt:s.halt,...(s.encodings===undefined?{}:{encodings:[...new Set(encodings)]}),...(paths===undefined?{}:{paths}),...(choices===undefined?{}:{choices})},view:{growthWindowMs,speed:v.speed,strategy,direction,unfoldFunctions,numberEncoding,decimalPlaces,decimalDigitsOrder,...(v.guideExample===undefined?{}:{guideExample:v.guideExample}),...(v.numberFormats===undefined?{}:{numberFormats:{...numberFormats}}),...(inputFormatDraft===undefined?{}:{inputFormatDraft:{encoding:inputFormatDraft.encoding,text:inputFormatDraft.text}}),...(palette===undefined?{}:{palette}),scale:v.scale,autoFit:v.autoFit,panX,panY,historyOpen:v.historyOpen,helpOpen:v.helpOpen,hintOpen:v.hintOpen},
+      functions,dataEncodings,encodingDraft:{name:encodingDraft.name,source:encodingDraft.source,...(encodingDraft.reductionSteps===undefined?{}:{reductionSteps:encodingDraft.reductionSteps}),...(encodingDraft.reduceInput===undefined?{}:{reduceInput:encodingDraft.reduceInput}),...(encodingEditing===null?{}:{editing:encodingEditing})},completed:[...new Set(raw.completed)],mode:raw.mode,level:raw.level,
+      session:{original,...(functionDefinitions===undefined?{}:{functionDefinitions}),steps:s.steps,dirty:s.dirty,halt:s.halt,...(s.encodings===undefined?{}:{encodings:[...new Set(encodings)]}),...(paths===undefined?{}:{paths}),...(choices===undefined?{}:{choices})},view:{...(sequenceDraft===undefined?{}:{sequenceDraft:{id:sequenceDraft.id,start:sequenceDraft.start,count:sequenceDraft.count,source:sequenceDraft.source,open:sequenceDraft.open}}),growthWindowMs,speed:v.speed,strategy,direction,unfoldFunctions,dataAsFunctions,compilerSpecial,functionCollision,numberEncoding,decimalPlaces,decimalDigitsOrder,...(v.guideExample===undefined?{}:{guideExample:v.guideExample}),...(v.numberFormats===undefined?{}:{numberFormats:{...numberFormats}}),...(inputFormatDraft===undefined?{}:{inputFormatDraft:{encoding:inputFormatDraft.encoding,text:inputFormatDraft.text}}),...(palette===undefined?{}:{palette}),scale:v.scale,autoFit:v.autoFit,panX,panY,historyOpen:v.historyOpen,helpOpen:v.helpOpen,hintOpen:v.hintOpen},
       selection:{start:Math.min(selection.start,draft.length),end:Math.min(selection.end,draft.length)},error:raw.error||(unconverted?'数学写法已移除。原草稿已保留，请改写为 λ 表达式。':''),functionDraft:{name:functionDraft.name,source:functionSource,...(editing===null?{}:{editing})}};
   }
   function* replay(s,compact) {

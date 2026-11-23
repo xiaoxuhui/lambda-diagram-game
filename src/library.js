@@ -3,6 +3,8 @@
   const C=root.LambdaCore || require('./core.js');
   const LIMITS={count:Infinity,nodes:Infinity,nameChars:Infinity};
   const validName=C.validName;
+  const COLLISIONS=['skip','replace','rename','reuse'];
+  function availableName(base,functions=[],reserved=[]){const used=new Set([...functions.map(fn=>fn.name),...reserved]);let index=2n,name=base;while(used.has(name)){name=base+index;index++;}return name;}
   function names(t,out=new Set()) {
     if(t.type==='var')out.add(t.name);
     else if(t.type==='abs'){out.add(t.param);names(t.body,out);}
@@ -59,6 +61,179 @@
     return functions.map(fn=>fn.name===originalName?replacement:fn);
   }
   function encodingsFor(term,functions){const names=C.freeVars(term);return [...new Set(functions.filter(fn=>names.has(fn.name)).flatMap(fn=>fn.encodings??[]))];}
-  const API={LIMITS,validName,validate,expand,encodingsFor,add,update,remove};root.LambdaLibrary=API;
+  // Capture lexical helper declarations without executing or duplicating them.
+  // Free references to surrounding data become explicit closure parameters.
+  function captureHelpers(term,patterns,functions=[]){
+    const registry=new Map(),used=new Set(),definitions=[];
+    for(const entry of patterns){const values=registry.get(entry.name)??[];values.push(entry.term);registry.set(entry.name,values);}
+    const pending=[term,...functions.map(entry=>entry.term)],seen=new WeakSet();let hasHelpers=false;
+    while(pending.length){const node=pending.pop();if(seen.has(node))continue;seen.add(node);if(node.type==='var')used.add(node.name);else if(node.type==='abs'){used.add(node.param);pending.push(node.body);}else{
+      const candidates=node.fn.type==='abs'?registry.get(node.fn.param):null;
+      if(candidates?.some(value=>C.equal(value,node.arg)))hasHelpers=true;
+      pending.push(node.fn,node.arg);
+    }}
+    if(!hasHelpers)return {term,definitions:functions};
+    for(const entry of functions)used.add(entry.name);
+    const reserve=base=>{let name=base;while(used.has(name))name+="'";used.add(name);return name;};
+    const isBound=(name,bound)=>{for(let scope=bound;scope;scope=scope.parent)if(scope.name===name)return true;return false;};
+    function walk(root){
+      const work=[{node:root,environment:new Map(),bound:null}],values=[];
+      while(work.length){
+        const frame=work.pop(),{node,environment,bound}=frame;
+        if(frame.stage==='abs'){
+          const body=values.pop();values.push(frame.param===node.param&&body===node.body?node:C.L(frame.param,body));continue;
+        }
+        if(frame.stage==='app'){
+          const arg=values.pop(),fn=values.pop();values.push(fn===node.fn&&arg===node.arg?node:C.A(fn,arg));continue;
+        }
+        if(frame.stage==='helper'){
+          const value=values.pop(),parameters=[...C.freeVars(value)].filter(name=>isBound(name,bound)),name=reserve(node.fn.param);
+          definitions.push({name,term:parameters.reduceRight((body,param)=>C.L(param,body),value)});
+          const reference=parameters.reduce((body,param)=>C.A(body,C.V(param)),C.V(name)),scope=new Map(environment);scope.set(node.fn.param,reference);
+          work.push({node:node.fn.body,environment:scope,bound});continue;
+        }
+        if(node.type==='var'){
+          const value=environment.get(node.name);values.push(!value||value.type==='var'&&value.name===node.name?node:value);continue;
+        }
+        if(node.type==='abs'){
+          const scope=new Map(environment);scope.delete(node.param);let param=node.param;
+          if([...scope.values()].some(value=>C.freeVars(value).has(param)))param=reserve(param);
+          if(param!==node.param)scope.set(node.param,C.V(param));
+          work.push({node,stage:'abs',param},{node:node.body,environment:scope,bound:{name:param,parent:bound}});continue;
+        }
+        const candidates=node.fn.type==='abs'?registry.get(node.fn.param):null;
+        if(candidates?.some(value=>C.equal(value,node.arg)))work.push({...frame,stage:'helper'},{node:node.arg,environment,bound});
+        else work.push({node,stage:'app'},{node:node.arg,environment,bound},{node:node.fn,environment,bound});
+      }
+      return values[0];
+    }
+    const prepared=walk(term),named=functions.map(entry=>({name:entry.name,term:walk(entry.term)}));
+    return {term:prepared,definitions:[...named,...definitions]};
+  }
+  function closeHelpers(term,definitions=[]){
+    if(!definitions.length)return term;
+    const names=new Set(definitions.map(entry=>entry.name));
+    function occurrences(term,name){
+      const pending=[term];let count=0;
+      while(pending.length&&count<2){const node=pending.pop();if(node.type==='var'){if(node.name===name)count++;}else if(node.type==='abs'){if(node.param!==name)pending.push(node.body);}else pending.push(node.fn,node.arg);}
+      return count;
+    }
+    function walk(root){
+      const work=[{node:root}],values=[];
+      while(work.length){
+        const {node,finish}=work.pop();
+        if(node.type==='var'){values.push(node);continue;}
+        if(!finish){work.push({node,finish:true});if(node.type==='abs')work.push({node:node.body});else work.push({node:node.arg},{node:node.fn});continue;}
+        if(node.type==='abs'){const body=values.pop();values.push(body===node.body?node:C.L(node.param,body));continue;}
+        const arg=values.pop(),fn=values.pop();
+        if(fn.type==='abs'&&names.has(fn.param)){
+          const count=occurrences(fn.body,fn.param);
+          if(!count){values.push(fn.body);continue;}
+          if(count===1){values.push(C.substitute(fn.body,fn.param,arg));continue;}
+        }
+        values.push(fn===node.fn&&arg===node.arg?node:C.A(fn,arg));
+      }
+      return values[0];
+    }
+    return walk(definitions.reduceRight((body,entry)=>C.A(C.L(entry.name,body),entry.term),term));
+  }
+  // Resolve declared helpers where they were written. Hoisting them around
+  // the whole call would move actual data underneath new lambda binders.
+  function linkHelpersInPlace(term,patterns=[]){
+    const registry=new Map();for(const entry of patterns){const values=registry.get(entry.name)??[];values.push(entry.term);registry.set(entry.name,values);}
+    const occurrences=(term,name)=>{const work=[term];let count=0;while(work.length&&count<2){const node=work.pop();if(node.type==='var'){if(node.name===name)count++;}else if(node.type==='abs'){if(node.param!==name)work.push(node.body);}else work.push(node.fn,node.arg);}return count;};
+    const work=[{node:term}],values=[];
+    while(work.length){
+      const {node,finish}=work.pop();
+      if(node.type==='var'){values.push(node);continue;}
+      if(!finish){work.push({node,finish:true});if(node.type==='abs')work.push({node:node.body});else work.push({node:node.arg},{node:node.fn});continue;}
+      if(node.type==='abs'){const body=values.pop();values.push(body===node.body?node:C.L(node.param,body));continue;}
+      const arg=values.pop(),fn=values.pop(),candidates=node.fn.type==='abs'?registry.get(node.fn.param):null;
+      if(fn.type==='abs'&&candidates?.some(value=>C.equal(value,node.arg))){
+        const count=occurrences(fn.body,fn.param);
+        if(!count){values.push(fn.body);continue;}
+        if(count===1){values.push(C.substitute(fn.body,fn.param,arg));continue;}
+      }
+      values.push(fn===node.fn&&arg===node.arg?node:C.A(fn,arg));
+    }
+    return values[0];
+  }
+  function importDefinitions(functions,definitions,selected=null,{collision='skip'}={}) {
+    if(!COLLISIONS.includes(collision))throw new C.LambdaError('函数重名处理方式不合法。');
+    const registry=new Map(),resolved=new Map(),visiting=new Set(),desired=new Map(),packed=new Map(),next=functions.slice(),added=[],skipped=new Set(),ready=new Set(),inlined=[],renamed=[],replaced=[],reused=new Set(),bindings=Object.create(null);
+    for(const entry of definitions){
+      if(!validName(entry.name)||registry.has(entry.name))throw new C.LambdaError('教程函数名称无效或重复。');
+      const existing=collision==='reuse'?functions.find(fn=>fn.name===entry.name):null;
+      registry.set(entry.name,{...entry,parsed:existing?.term??C.parse(entry.source,Infinity),existing});
+    }
+    function intended(name){
+      if(desired.has(name))return desired.get(name);
+      const entry=registry.get(name);if(!entry)throw new C.LambdaError(`没有找到教程函数 ${name}。`);
+      if(entry.existing){reused.add(name);desired.set(name,entry.existing.term);return entry.existing.term;}
+      if(visiting.has(name))throw new C.LambdaError(`教程函数存在循环引用：${name}`);
+      visiting.add(name);
+      const dependencies=[...C.freeVars(entry.parsed)].filter(name=>registry.has(name)).map(name=>({name,term:intended(name)}));
+      const term=expand(entry.parsed,dependencies);visiting.delete(name);desired.set(name,term);return term;
+    }
+    const requested=selected===null?[...registry.keys()]:[...selected];
+    function visit(name){
+      if(resolved.has(name))return resolved.get(name);
+      const entry=registry.get(name);if(!entry)throw new C.LambdaError(`没有找到教程函数 ${name}。`);
+      const existing=next.find(fn=>fn.name===name);
+      if(existing){
+        if(collision==='reuse'){reused.add(name);bindings[name]=name;resolved.set(name,existing);return existing;}
+        if(C.equal(existing.term,intended(name))||C.equal(existing.term,bundle(name))){ready.add(name);bindings[name]=name;resolved.set(name,existing);return existing;}
+        if(collision==='skip'){skipped.add(name);bindings[name]=name;resolved.set(name,existing);return existing;}
+      }
+      intended(name); // Validate this dependency graph before creating entries.
+      const body=bundle(name);let actual=name;
+      if(existing&&collision==='rename'){
+        const prefix=name,numbered=next.find(fn=>fn.name.startsWith(prefix)&&/^[0-9]+$/.test(fn.name.slice(prefix.length))&&(C.equal(fn.term,intended(name))||C.equal(fn.term,body)));
+        if(numbered){ready.add(numbered.name);bindings[name]=numbered.name;renamed.push({from:name,to:numbered.name});resolved.set(name,numbered);return numbered;}
+        actual=availableName(name,next,[...requested,...C.freeVars(body)]);renamed.push({from:name,to:actual});
+      }
+      const definition={name:actual,source:C.equal(body,entry.parsed)?entry.source:C.format(body),body,term:body};
+      if(existing&&collision==='replace'){next[next.indexOf(existing)]=definition;replaced.push(name);}else{next.push(definition);added.push(actual);}
+      bindings[name]=actual;
+      resolved.set(name,definition);return definition;
+    }
+    function bundle(name){
+      if(packed.has(name))return packed.get(name);
+      intended(name);
+      const bindings=[],seen=new Set();
+      function dependency(key){if(seen.has(key))return;seen.add(key);const entry=registry.get(key);if(!entry.existing)for(const child of C.freeVars(entry.parsed))if(registry.has(child))dependency(child);bindings.push(entry);}
+      for(const key of C.freeVars(registry.get(name).parsed))if(registry.has(key))dependency(key);
+      let body=registry.get(name).parsed;
+      const protectedNames=new Set(bindings.map(entry=>entry.name)),used=new Set(protectedNames);
+      for(const entry of bindings)for(const free of C.freeVars(intended(entry.name)))protectedNames.add(free);
+      const stack=[body,...bindings.map(entry=>entry.parsed)];while(stack.length){const t=stack.pop();if(t.type==='var')used.add(t.name);else if(t.type==='abs'){used.add(t.param);stack.push(t.body);}else stack.push(t.fn,t.arg);}
+      const parameters=[];
+      while(body.type==='abs'){
+        let param=body.param,next=body.body;
+        if(protectedNames.has(param)){let fresh=param;do{fresh+="'";}while(used.has(fresh)||protectedNames.has(fresh));used.add(fresh);next=C.substitute(next,param,C.V(fresh));param=fresh;}
+        parameters.push(param);body=next;
+      }
+      const opaqueFree=new Set(bindings.filter(entry=>entry.existing).flatMap(entry=>[...C.freeVars(entry.parsed)])),localNames=new Map();
+      for(const entry of bindings)if(opaqueFree.has(entry.name)){let fresh=entry.name;do{fresh+="'";}while(used.has(fresh)||protectedNames.has(fresh));used.add(fresh);localNames.set(entry.name,fresh);}
+      const local=term=>{for(const [name,fresh]of localNames)term=C.substitute(term,name,C.V(fresh));return term;};
+      body=local(body);
+      for(const entry of [...bindings].reverse())body=C.A(C.L(localNames.get(entry.name)??entry.name,body),entry.existing?entry.parsed:local(entry.parsed));
+      for(const param of parameters.reverse())body=C.L(param,body);
+      packed.set(name,body);return body;
+    }
+    for(const name of requested)visit(name);
+    validate(next);return {functions:next,added,skipped:[...skipped],ready:[...ready],inlined,renamed,replaced,reused:[...reused],bindings};
+  }
+  function importFeedback(result){
+    let text=result.added.length?`已加入 ${result.added.length} 个函数并保存存档。`:'未新增函数。';
+    if(result.ready.length)text+=' 已有相同定义，已准备好：'+result.ready.join('、')+'。';
+    if(result.skipped.length)text+=' 重名已跳过：'+result.skipped.join('、')+'。';
+    if(result.replaced?.length)text+=' 重名已替换：'+result.replaced.join('、')+'。';
+    if(result.renamed?.length)text+=' 重名已加数字：'+result.renamed.map(item=>item.from+' → '+item.to).join('、')+'。';
+    if(result.reused?.length)text+=' 已直接使用同名函数：'+result.reused.join('、')+'（沿用现有定义）。';
+    if(result.added.length)text+=' 所需辅助定义已封装在入口函数内部。';
+    return text;
+  }
+  const API={LIMITS,COLLISIONS,availableName,validName,validate,expand,encodingsFor,captureHelpers,closeHelpers,linkHelpersInPlace,add,update,remove,importDefinitions,importFeedback};root.LambdaLibrary=API;
   if(typeof module!=='undefined'&&module.exports)module.exports=API;
 })(typeof globalThis!=='undefined'?globalThis:window);

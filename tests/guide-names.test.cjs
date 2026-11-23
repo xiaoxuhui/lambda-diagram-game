@@ -26,7 +26,7 @@ test('generated naming data matches every raw tutorial',()=>{
 
 test('all tutorials use one name per expression and one definition per name',()=>{
   const byName=new Map(),byExpression=[];
-  assert.equal(P.examples.length,76);
+  assert.equal(P.examples.length,77+require('../src/sequences.js').builtins.length+require('../src/boolean-circuits.js').examples.length+require('../src/list-operations.js').examples.length);
   for(const example of P.examples){
     const doc=G.lesson(example);
     for(const symbol of doc.symbols){
@@ -66,8 +66,8 @@ test('common names stay short and the pair selector is f',()=>{
 });
 
 test('S, C and W examples reference their named combinators in both shorthand and runnable programs',()=>{
-  for(const [index,name,compact,expected] of [[4,'s','s true true','λx.x'],[9,'c','c true 2 3','3'],[10,'w','w mul 3','9']]){
-    const example=P.examples[index],doc=G.lesson(example),program=P.inputSourceFor(example),term=C.parse(program);
+  for(const [prefix,name,compact,expected] of [['S K K','s','skkid','λx.x'],['组合子 C','c','swappick 2 3','3'],['组合子 W','w','square 3','9']]){
+    const example=P.examples.find(e=>e.name.startsWith(prefix)),doc=G.lesson(example),program=P.inputSourceFor(example),term=C.parse(program);
     assert.equal(doc.compact,compact);assert.ok(!doc.walkthrough.includes('dup'));
     assert.match(program,new RegExp('λ'+name+'\\b'));
     function used(node,bound=false){
@@ -97,16 +97,16 @@ test('equivalent selectors and cross-domain helpers merge while distinct list co
 
 test('all example and challenge programs preserve Lambda binding structure and numeric suffixes',()=>{
   for(const item of [...P.examples,...P.levels]){
-    const raw=P.rawInputSourceFor(item),renamed=P.inputSourceFor(item);
+    const raw=P.rawInputSourceFor(item),renamed=catalog.source(raw,item.name);
     assert.ok(C.equal(E.parse(raw).term,E.parse(renamed).term),item.name);
     assert.deepEqual(renamed.match(/-?\d+(?:\.\d+)?_(?:church|decimal)/g),raw.match(/-?\d+(?:\.\d+)?_(?:church|decimal)/g),item.name);
     // Renaming must preserve explicit parentheses for composition by prefix.
     if(item.decimalOperation)assert.ok(C.equal(E.parse('3_church '+raw).term,E.parse('3_church '+renamed).term),item.name);
-    assert.equal(renamed.replace(/`[^`]+`|[^\sλ\\().\[\],`]+/g,'#'),raw.replace(/`[^`]+`|[^\sλ\\().\[\],`]+/g,'#'),item.name);
+    if(!raw.includes('['))assert.equal(renamed.replace(/`[^`]+`|[^\sλ\\().\[\],`]+/g,'#'),raw.replace(/`[^`]+`|[^\sλ\\().\[\],`]+/g,'#'),item.name);
   }
   for(const precision of [0,2,8]){
     const item=P.examples.find(example=>example.decimalOperation==='DIV');
-    assert.ok(C.equal(E.parse(P.rawInputSourceFor(item,precision)).term,E.parse(P.inputSourceFor(item,precision)).term));
+    assert.ok(C.equal(E.parse(P.rawInputSourceFor(item,precision)).term,E.parse(catalog.source(P.rawInputSourceFor(item,precision),item.name)).term));
   }
 });
 

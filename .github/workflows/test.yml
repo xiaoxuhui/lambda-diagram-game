@@ -42,6 +42,20 @@ jobs:
       - run: node tests/combinator-compiler-browser.cjs
       - run: node tests/function-reduction-browser.cjs
       - run: node tests/unfold-animation-browser.cjs
+      - run: node tests/guide-library-browser.cjs
+      - run: node tests/inverse-guide-browser.cjs && node tests/combinator-roundtrip-browser.cjs
+      - run: node tests/click-unfold-browser.cjs
+      - run: node tests/sequences-browser.cjs
+      - run: node tests/data-unfold-browser.cjs
+      - run: node tests/static-link-browser.cjs
+      - run: node tests/boolean-circuits-browser.cjs
+      - run: node tests/power-zero-browser.cjs
+      - run: node tests/compiler-standard-browser.cjs
+      - run: node tests/encoding-deferred-browser.cjs
+      - run: node tests/interpret-call-browser.cjs
+      - run: node tests/all-entry-contracts-browser.cjs
+      - run: node tests/list-operations-browser.cjs
+      - run: node tests/function-collision-browser.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

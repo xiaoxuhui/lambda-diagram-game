@@ -115,10 +115,38 @@
       }
       return C.format(result).replace(/讲解数值占位_[0-9]+_/g,name=>literals.get(name)??name);
     }
+    function factorClosed(term,ctx,literals,self=null,choose=group=>group.name){
+      const allowed=new Map([...ctx.resolved.values()].map(group=>[group.id,group]));
+      const literalId=name=>{
+        const raw=literals.get(name);if(raw===undefined)return undefined;
+        return /^[0-9]+(?:_(?:church|丘奇数))?$/.test(raw)?fingerprint(C.parse(raw.split('_')[0]),()=>undefined):intern('literal:'+raw);
+      };
+      function walk(node,bound=new Set(),allow=true){
+        if(node.type==='var')return node;
+        if(allow&&[...C.freeVars(node)].every(name=>literals.has(name))){
+          const group=allowed.get(fingerprint(node,literalId));
+          if(group&&group.id!==self&&!bound.has(group.name)){
+            const name=choose(group,bound);if(name!==null)return C.V(name);
+          }
+        }
+        if(node.type==='abs'){const scope=new Set(bound);scope.add(node.param);return C.L(node.param,walk(node.body,scope,node.body.type!=='abs'));}
+        // A named local definition is already a helper binding. Keep its
+        // defining value here instead of introducing helper2 and passing it
+        // back into the original helper parameter.
+        let definition=false;
+        if(node.fn.type==='abs'&&[...C.freeVars(node.arg)].every(name=>literals.has(name))){
+          const group=allowed.get(fingerprint(node.arg,literalId)),param=node.fn.param.replace(/'+$/,'');
+          definition=!!group&&(param===group.name||group.aliases.has(param));
+        }
+        return C.A(walk(node.fn,bound),walk(node.arg,bound,!definition));
+      }
+      return walk(term);
+    }
     for(const group of groups.values()){
       const {term,context:ctx}=group.representative;
-      group.source=fragment(group.representative.symbol.source,term=>renamed(term,ctx));
+      group.source=fragment(group.representative.symbol.source,(term,literals)=>renamed(factorClosed(term,ctx,literals,group.id),ctx));
     }
+    const byName=new Map([...groups.values()].map(group=>[group.name,group]));
     const parseable=text=>!/[=→←≡≈≤≥×÷+−²³Σ∫…：，。；]/u.test(text)&&!/[fF][′']*\(/.test(text);
     function code(text,ctx){
       return C.explicitLambdas([...new Set(text.split('\n').map(line=>codeLine(line,ctx)))].join('\n'));
@@ -178,12 +206,16 @@
       // The selected main function and any locally named teaching functions use
       // this same registry, rather than opening another private naming scheme.
       for(const group of ctx.resolved.values())if(!seen.has(group.id)){seen.add(group.id);symbols.push({name:group.name,source:group.source,meaning:scan(group.representative.symbol.meaning,ctx),uses:[...group.aliases]});}
+      for(let index=0;index<symbols.length;index++)for(const name of C.freeVars(parse(symbols[index].source))){
+        const group=byName.get(name);if(!group||seen.has(group.id))continue;seen.add(group.id);
+        symbols.push({name:group.name,source:group.source,meaning:scan(group.representative.symbol.meaning,ctx),uses:[...group.aliases]});
+      }
       result.symbols=symbols;
       // These opening paragraphs teach syntax, where f is an arbitrary variable.
       result.basics=doc.basics.map(text=>text.startsWith('λx.body')||text.startsWith('f a b 按')||text.startsWith('箭头 →')?text:scan(text,ctx));
       result.featured=doc.featured?.map(name=>ctx.resolve(name)?.name??name);
       result.core=code(doc.core,ctx);result.foundation=code(doc.foundation,ctx);
-      if(doc.compact)result.compact=code(doc.compact,ctx);
+      if(doc.compact)result.compact=doc.compact.includes('[')&&!/[λ\\]/.test(doc.compact)?scan(doc.compact,ctx,true):code(doc.compact,ctx);
       result.steps=doc.steps.map(([title,explanation,expression,calculation])=>[scan(title,ctx),scan(explanation,ctx),expression===undefined?undefined:code(expression,ctx),calculation?mapValue(calculation):undefined]);
       result.walkthrough=code(doc.walkthrough,ctx);
       result.namingNote='函数名使用能看懂的小写简写，不限制字数：S组合子写作s，add、mul表示加法、乘法，pair构造序对，succ、pred表示后继、前驱，fac、fib表示迭代阶乘、斐波那契。较复杂的辅助函数保留完整含义；同一 λ 结构共用一个名称。局部变量尽量用单个小写字母，并避开函数名冲突。';
@@ -219,7 +251,69 @@
       },true);
       sources.set(text,result);return result;
     }
-    return {normalize,source,text:(text,key)=>scan(text,contexts.get(key)??{resolve:()=>undefined}),canonicalTerm:(term,key)=>renamed(term,contexts.get(key)),entries:()=>[...groups.values()].map(group=>({name:group.name,source:group.source,aliases:[...group.aliases]}))};
+    const programs=new Map();
+    function program(text,key){
+      const cacheKey=key+'\0'+text;if(programs.has(cacheKey))return programs.get(cacheKey);
+      const ctx=contexts.get(key),original=source(text,key);
+      if(!ctx)return {source:original,call:original,definitions:[]};
+      const used=new Map(),occupied=new Set(),definitions=[],visiting=new Set();
+      const atoms=[];
+      if(/^[λ\\]/.test(original))atoms.push({start:0,end:original.length});
+      else{
+        let start=-1,depth=0,brackets=0,quoted=false;
+        for(let index=0;index<=original.length;index++){
+          const char=original[index];
+          if(start<0){if(char===undefined||/\s/.test(char))continue;start=index;}
+          if(char==='`')quoted=!quoted;
+          if(!quoted){if(char==='(')depth++;else if(char===')')depth--;else if(char==='[')brackets++;else if(char===']')brackets--;}
+          if(char===undefined||!quoted&&!depth&&!brackets&&/\s/.test(char)){atoms.push({start,end:index});start=-1;}
+        }
+      }
+      // Unrelated bound variables do not reserve global helper names. Protect
+      // free names, existing applied bindings and the actual insertion scope.
+      fragment(original,(term,literals)=>{
+        for(const name of C.freeVars(term))if(!literals.has(name))occupied.add(name);
+        const pending=[term];while(pending.length){const node=pending.pop();
+          if(node.type==='abs')pending.push(node.body);
+          else if(node.type==='app'){if(node.fn.type==='abs')occupied.add(node.fn.param);pending.push(node.fn,node.arg);}
+        }return term;
+      });
+      const choose=(group,bound=new Set())=>{
+        if(used.has(group.name)&&bound.has(used.get(group.name)))return null;
+        if(!used.has(group.name)){let name=group.name;while(occupied.has(name)||bound.has(name))name+="'";occupied.add(name);used.set(group.name,name);}
+        return used.get(group.name);
+      };
+      function visit(name){
+        if(definitions.some(item=>item.originalName===name))return;
+        if(visiting.has(name))throw new Error('辅助函数定义循环：'+name);visiting.add(name);
+        const group=byName.get(name);if(!group)throw new Error('缺少辅助函数：'+name);
+        choose(group);for(const dependency of C.freeVars(parse(group.source)))if(byName.has(dependency)){choose(byName.get(dependency));visit(dependency);}
+        const source=fragment(group.source,(term,literals)=>{
+          for(const dependency of C.freeVars(term))if(used.has(dependency))term=C.substitute(term,dependency,C.V(used.get(dependency)));
+          // Helper definitions always use Church constants, independent of the
+          // selected encoding for the sample's actual input values.
+          for(const [placeholder,raw] of literals)if(/^[0-9]+$/.test(raw))literals.set(placeholder,raw+'_church');
+          return term;
+        });
+        definitions.push({name:used.get(name),source,originalName:name});visiting.delete(name);
+      }
+      let output='',call='',offset=0;const argumentFunctions=new Set();
+      for(const atom of atoms){
+        const raw=original.slice(atom.start,atom.end),roots=new Set();
+        const expression=raw.startsWith('[')?raw:fragment(raw,(term,literals)=>factorClosed(term,ctx,literals,null,(group,bound)=>{const name=choose(group,bound);if(name!==null)roots.add(group.name);return name;}));
+        if(atom!==atoms[0])roots.forEach(name=>argumentFunctions.add(name));
+        for(const name of roots)visit(name);
+        const required=new Set();
+        const need=name=>{if(required.has(name))return;required.add(name);for(const dep of C.freeVars(parse(byName.get(name).source)))if(byName.has(dep))need(dep);};
+        roots.forEach(need);
+        const local=definitions.filter(item=>required.has(item.originalName));
+        const linked=local.reduceRight((body,item)=>`(λ${item.name}.${body}) (${item.source})`,expression);
+        const gap=original.slice(offset,atom.start);output+=gap+(local.length?'('+linked+')':raw);call+=gap+(local.length?'('+expression+')':raw);offset=atom.end;
+      }
+      output+=original.slice(offset);call+=original.slice(offset);
+      const result={source:C.explicitLambdas(output),call,definitions,argumentFunctions:[...argumentFunctions]};programs.set(cacheKey,result);return result;
+    }
+    return {normalize,source,program,text:(text,key)=>scan(text,contexts.get(key)??{resolve:()=>undefined}),canonicalTerm:(term,key)=>renamed(term,contexts.get(key)),entries:()=>[...groups.values()].map(group=>({name:group.name,source:group.source,aliases:[...group.aliases]}))};
   }
   let shared;
   function catalog(){
