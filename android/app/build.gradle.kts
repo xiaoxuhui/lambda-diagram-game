@@ -12,7 +12,7 @@ android {
         minSdk = 24
         targetSdk = 34
         versionCode = 8
-        versionName = "0.3.9"
+        versionName = "0.4.0"
 
         // 应用为单语言中文工具，去掉无用资源以减小体积
         resourceConfigurations += listOf("zh", "en")
