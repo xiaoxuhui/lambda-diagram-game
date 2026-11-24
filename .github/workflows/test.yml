@@ -23,7 +23,9 @@ jobs:
       - run: npm run check:android
       - run: npm test
   browser:
-    runs-on: ubuntu-latest
+    # ubuntu-latest 已切到 26.04，Playwright 1.56.1 没有对应 chromium 构建，
+    # 固定在 22.04 上跑浏览器回归，等升级 Playwright 再放开。
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
