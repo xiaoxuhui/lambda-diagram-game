@@ -25,6 +25,10 @@
     mode:'free', level:0, completed:new Set(), halt:'', scale:1, autoFit:true, model:null, speed:600, strategy:'normal', direction:'left',numberEncoding:'church',numberFormats:{},decimalPlaces:6,decimalDigitsOrder:'forward',growthWindowMs:Guard.DEFAULT_MS,unfoldFunctions:false,dataAsFunctions:true,compilerSpecial:true,functionDefinitions:[],fast:false,encodings:null,encodingBusy:false };
   let toastTimer,workspace,viewer,dataEditor,formatEditor,guide,sequenceEditor=null,conversionController=null,compilingDefinitions=null,preparationTimer=null,historySource=null,renderedCount=0,diagramTerm=null,diagramRoute=null;
   const RUN_PAINT_INTERVAL=120;
+  // 用 λ 解释 λ 时，解释器程序本身就得上万步，且在构造正常形的过程中栈一定持续变长。
+  // 观察窗口默认 1 秒会把这类有限但很长的解释过程误判成"持续增长"而暂停，
+  // 所以程序模式至少用界面允许的最大窗口（30 秒）：发散仍会被拦下，只是不再秒级误伤。
+  const PROGRAM_GROWTH_WINDOW=30000;
   const INLINE_HISTORY_NODES=256;
   const HISTORY_PAGE_SIZE=32;
   let historyPage=null,shownStart=0,rewindJob=null,historyJob=null,openHistoryEntry=null;
@@ -511,7 +515,9 @@
       state.strategy='normal';state.direction='left';
     }
     state.halt='';state.running=true;state.fast=fast;repeatedTerm=C.cycleCheck(state.term);
-    runGuard=fast?Guard.create({windowMs:()=>state.growthWindowMs,initial:C.inspect(state.term).nodes}):null;
+    // 快速运行解释器程序时，一个观察窗口内会推进上万步且栈必然变长；
+    // 默认 1 秒窗口会把有限但很长的解释误判成持续增长，程序模式至少用界面允许的最大窗口。
+    runGuard=state.fast?Guard.create({windowMs:()=>window.LambdaMeta.isProgram(state.original)?Math.max(state.growthWindowMs,PROGRAM_GROWTH_WINDOW):state.growthWindowMs,initial:C.inspect(state.term).nodes}):null;
     lastRunPaint=performance.now();render();
     if(!findReduction()){advance();if(!state.running)return;}
     schedule();

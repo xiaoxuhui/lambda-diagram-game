@@ -11,9 +11,9 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
    const runResult=async(text)=>{await page.locator('#fast-run').click();await page.waitForFunction(()=>document.getElementById('state-badge').textContent==='已到正规形',null,{timeout:180000});assert.equal(await page.locator('#decoded').textContent(),text);};
    const run=(number,kind='Church 数')=>runResult(`${kind} ${number}`);
    await check(`${width}px higher mathematics contains combinations and all choices render`,async()=>{
-    assert.equal(await page.locator('#examples optgroup').count(),9);assert.equal(await page.locator('#examples optgroup[label="高等数学"] option').count(),23);
+    assert.equal(await page.locator('#examples optgroup').count(),13);assert.equal(await page.locator('#examples optgroup[label="高等数学"] option').count(),22);
     const combo=page.locator('#examples option').filter({hasText:'组合数'});assert.equal(await combo.evaluate(el=>el.parentElement.label),'高等数学');
-    for(const e of P.examples.filter(e=>e.category==='高等数学')){await select(e.name);assert.equal(await page.locator('#expression').inputValue(),e.term);assert.ok(await page.locator('#error-message').isHidden());assert.ok(await page.locator('#diagram-mount line').count()>0);assert.ok((await page.locator('#example-info').textContent()).includes(e.description));}
+    for(const e of P.examples.filter(e=>e.category==='高等数学')){await select(e.name);assert.equal(await page.locator('#expression').inputValue(),P.inputSourceFor(e,6));assert.ok(await page.locator('#error-message').isHidden());assert.ok(await page.locator('#diagram-mount line').count()>0);assert.ok((await page.locator('#example-info').textContent()).includes(e.description.slice(0,12)));}
     assert.equal(await page.locator('#function-count').textContent(),'0 个函数');
    });
    await check(`${width}px original-polynomial symbolic derivative evaluates to 7`,async()=>{await select('符号求导并求值');await run(7,'有理数');});
@@ -23,7 +23,7 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
     await page.locator('#expression').fill(M.differentiate([0,0,3]));await page.locator('#convert').click();await runResult('多项式：6x');
    });
    await check(`${width}px original 2x integrates to x squared and x retains its half coefficient`,async()=>{
-    await select('生成原函数');assert.match(await page.locator('#example-info').textContent(),/原式：2x/);await runResult('多项式：x²');
+    await select('生成原函数');assert.match(await page.locator('#example-info').textContent(),/f\(x\)=2x/);await runResult('多项式：x²');
     fs.mkdirSync(path.join(__dirname,'artifacts'),{recursive:true});await page.locator('.execution-card').screenshot({path:path.join(__dirname,'artifacts',`symbolic-integral-${width}.png`)});
     await page.locator('#expression').fill(M.integrate([0,1]));await page.locator('#convert').click();await runResult('多项式：1/2x²');
    });
@@ -62,7 +62,7 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
    });await context.close();
   }
   await check('offline bundle contains and renders the higher mathematics group',async()=>{
-   const context=await browser.newContext(),page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));await page.goto(base+'/dist/lambda-lab.html');assert.equal(await page.locator('#examples optgroup[label="高等数学"] option').count(),23);await page.locator('#examples').selectOption(String(P.examples.findIndex(e=>e.name.includes('符号求导并求值'))));assert.ok(await page.locator('#example-info').isVisible());assert.ok(await page.locator('#diagram-mount line').count()>0);await context.close();
+   const context=await browser.newContext(),page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));await page.goto(base+'/dist/lambda-lab.html');assert.equal(await page.locator('#examples optgroup[label="高等数学"] option').count(),22);await page.locator('#examples').selectOption(String(P.examples.findIndex(e=>e.name.includes('符号求导并求值'))));assert.ok(await page.locator('#example-info').isVisible());assert.ok(await page.locator('#diagram-mount line').count()>0);await context.close();
   });assert.deepEqual(errors,[]);console.log(`Higher mathematics: ${passed} passed, 0 failed; Chromium ${browser.version()}; page errors 0.`);
  }finally{await browser.close();server.close();}
 })().catch(e=>{console.error(e);server.close();process.exitCode=1;});
