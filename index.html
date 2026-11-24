@@ -54,6 +54,10 @@
           <p id="syntax-note" class="syntax-note">在下方选择小数四则示例，直接编辑完整 λ 表达式。输入和函数定义无字数上限；所有函数名均由你自定义。旧丘奇示例会选择兼容编码。</p>
           <div id="error-message" class="error-message" role="alert" hidden></div>
           <button id="convert" class="button primary convert-button">转换成图示 <span>→</span></button>
+          <button id="save-inline-definitions" type="button" class="button">保存等号定义</button><p id="inline-definition-feedback" class="syntax-note" role="status" hidden></p>
+          <details class="input-format-panel"><summary>用“名称 = 表达式”定义函数</summary><p>在上方输入框中，每行写一个定义，按从上到下的顺序保存；最后可写要运行的算式。跨行的定义请用括号包住。重名沿用当前选择。“保存等号定义”只保存函数；“转换成图示”保存定义后准备末尾算式，不自动运行。</p><pre><code>id = λx.x
+double = λn.λf.λx.n f (n f x)
+double 3_church</code></pre></details>
           <p class="key-hint">Ctrl / ⌘ + Enter 快速转换</p>
           <div class="input-format-panel">
             <button type="button" id="compile-combinators" class="button">编译成组合子</button>
@@ -62,6 +66,7 @@
             <label class="compiler-option"><input type="checkbox" id="compiler-special" checked> 使用特殊化简</label>
             <p>关闭「使用特殊化简」后，以上三种转换均使用通用括号抽象，不匹配数字、布尔、后继等专用形式，也不进行转换后的化简；结果可能更长。开启时沿用原来的自动化简。BCKW 只用 b、c、k、w，SK 只用 s、k。缺少的定义自动加入函数库；函数重名时按下方按钮选择替换、加数字改名或跳过；默认跳过并保留原式。转换后可接着输入，点击「转换成图示」后再运行。</p>
             <p id="combinator-status" role="status" hidden></p>
+            <details id="combinator-catalog"></details>
             <details id="bckw-rules"><summary>BCKW 自动化简规则</summary><p>开启「使用特殊化简」后，转换成 BCKW 时应用；关闭时只做通用转换。这里 i 表示 w k，p、q、r、x 是任意表达式；按实际函数定义识别组合子，用户的同名函数不会被当成这些组合子。</p><ul><li><code>k p q → p</code></li><li><code>b p q x → p (q x)</code></li><li><code>c p q x → p x q</code></li><li><code>w k x → x</code></li><li><code>c k x → w k</code>：假值接收一个参数后得到恒等函数。</li><li><code>k (w k) → c k</code>；<code>w (c k) → w k</code></li><li><code>b (k p) q → k p</code>；<code>b p (k q) → k (p q)</code></li><li><code>c (k p) q → k (p q)</code>；<code>c b (w k) → b (w k)</code></li><li><code>b (b p q) r → b p (b q r)</code>：整理连续复合。</li><li><code>b i p → p</code>、<code>b p i → p</code>、<code>w (k p) → p</code>：仅在能确认 p 至少接收一个参数时使用，包含尚未传满参数的组合子。</li><li><code>c (c p) → p</code>：仅在能确认 p 至少接收两个参数时使用。</li><li><code>h = c (b c (b (b b) (c b i))) i</code> 可整理为 <code>b (b i)</code>，即 <code>λf.λx.λy.f x y</code>；<code>b succ h → succ</code> 仅按丘奇后继的实际定义匹配。在 BCKW 中后继写成 <code>b w (c (b b b))</code>。</li></ul><p>未知自由变量保留必要的 λ 结构；复制规则只处理能安全展开的结构，w w w 留给运行按钮计算。规则不保证结果最短。</p></details>
           </div>
           <details id="sequences-panel" class="input-format-panel">
@@ -88,7 +93,7 @@
           <p class="function-note">保存后按名称调用，如 <code>ID (λy.y)</code>。名称可以用中文、数字开头或符号，如 <code>1号函数</code>、<code>_加法</code>、<code>+</code>；纯数字名称用反引号调用，如 <code>`123`</code>。</p>
           <p id="function-edit-status" class="function-note" role="status" hidden></p>
           <form id="function-form"><label for="function-name">函数名称</label><input id="function-name" placeholder="例如 ID、ADD、SUCC" autocomplete="off" spellcheck="false"><label for="function-source">函数定义</label><textarea id="function-source" placeholder="例如 λx.x" spellcheck="false" autocapitalize="off" aria-describedby="function-error"></textarea><div id="function-keys" class="function-keys" role="group" aria-label="函数定义快捷输入"><button type="button" data-function-insert="λ" aria-label="函数定义插入 λ">λ</button></div><p id="function-error" class="error-message" role="alert" hidden></p><div class="function-actions"><button id="function-use-current" type="button" class="button">使用当前式</button><button id="function-add" type="submit" class="button primary">新增函数 +</button></div></form>
-          <div id="function-list" class="function-list"></div><p class="function-foot">定义在保存时展开。删除函数后，已转换的图示仍可运行；再次转换会使用最新函数库。</p>
+          <div id="function-list" class="function-list"></div><p class="function-foot">示例函数按原文逐个保存。已转换的图示保持原状态；编辑或删除函数后，再次转换会使用最新函数库。</p>
         </section>
         <section class="card rules-card"><div class="section-heading"><div><span class="section-number">λ</span><h2>读懂线路</h2></div></div><div class="rule"><span class="legend-line lambda-line"></span><p><strong>抽象</strong><span>一条横线，绑定一个变量。</span></p></div><div class="rule"><span class="legend-line var-line"></span><p><strong>变量</strong><span>竖线连接到它所属的 λ。</span></p></div><div class="rule"><span class="legend-line app-line"></span><p><strong>应用</strong><span>横线连接函数与参数。</span></p></div><p class="rules-foot">颜色辅助追踪绑定；连线结构决定含义。</p></section>
       </aside>
@@ -133,6 +138,6 @@
   <dialog id="restore-progress" aria-label="正在恢复归约进度"><p id="restore-progress-text" role="status">正在重放存档…</p><button class="button" type="button" id="cancel-restore">取消重放</button></dialog>
   <div id="toast" class="toast" role="status" hidden></div>
   <script src="src/core.js"></script><script src="src/function-reduction.js"></script><script src="src/trace.js"></script><script src="src/run-guard.js"></script><script src="src/lazy-eval.js"></script><script src="src/meta-lambda.js"></script><script src="src/decimal.js"></script><script src="src/data-encoding.js"></script><script src="src/palette.js"></script><script src="src/diagram.js"></script><script src="src/diagram-view.js"></script><script src="src/polynomial.js"></script><script src="src/sequences.js"></script><script src="src/boolean-circuits.js"></script><script src="src/list-operations.js"></script><script src="src/guide-name-data.js"></script><script src="src/guide-names.js"></script><script src="src/presets.js"></script><script src="src/guide-polynomial.js"></script><script src="src/guide-advanced.js"></script>
-  <script src="src/guide-details.js"></script><script src="src/guide-pairs.js"></script><script src="src/guide.js"></script><script src="src/challenges.js"></script><script src="src/library.js"></script><script src="src/snapshot.js"></script><script src="src/download.js"></script><script src="src/default-state.js"></script><script src="src/workspace-tools.js"></script><script src="src/viewport.js"></script><script src="src/encoding-table.js"></script><script src="src/data-encoding-editor.js"></script><script src="src/input-format-editor.js"></script><script src="src/combinator-compiler.js"></script><script src="src/app.js"></script>
+  <script src="src/guide-details.js"></script><script src="src/guide-pairs.js"></script><script src="src/guide.js"></script><script src="src/challenges.js"></script><script src="src/library.js"></script><script src="src/snapshot.js"></script><script src="src/download.js"></script><script src="src/default-state.js"></script><script src="src/workspace-tools.js"></script><script src="src/definitions.js"></script><script src="src/viewport.js"></script><script src="src/encoding-table.js"></script><script src="src/data-encoding-editor.js"></script><script src="src/input-format-editor.js"></script><script src="src/combinator-compiler.js"></script><script src="src/app.js"></script>
 </body>
 </html>

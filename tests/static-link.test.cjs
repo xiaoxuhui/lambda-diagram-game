@@ -46,15 +46,15 @@ test('captured helpers retain lexical data and respect shadowing in every reduct
     assert.ok(C.equal(t,C.parse('λx.4')),strategy+' '+direction);
   }
 });
-test('pair division starts with its real data parameters instead of helper setup',async()=>{
-  const example=P.examples.find(e=>e.name.startsWith('序对除法')),before=E.parse(P.inputSourceFor(example)).term,compiled=P.prepare(before),after=compiled.term;
+test('named pair division starts with its real data parameters instead of helper setup',async()=>{
+  const example=P.examples.find(e=>e.name.startsWith('序对除法')),doc=G.lesson(example),functions=L.importDefinitions([],doc.symbols,null,{exact:true}).functions,before=E.parse(P.inputSourceFor(example)).term,call=E.parse(doc.compact).term,compiled=P.prepare(call,F.capture(call,functions)),after=compiled.term;
   const args=[];let main=after;while(main.type==='app'){args.unshift(main.arg);main=main.fn;}
   assert.deepEqual(args.map(C.churchNumber),[7,2]);assert.equal(main.type,'var');assert.ok(compiled.definitions.some(fn=>fn.name===main.name));
   assert.equal(C.inspect(after).nodes,args.reduce((sum,arg)=>sum+C.inspect(arg).nodes,0)+3);
   const a=C.normalize(before,30000),b=await Lazy.normalize(after,{functions:compiled.definitions});assert.ok(C.equal(a.term,b));
 });
-test('scientific programs have no helper setup before precision and input',async()=>{
-  const example=P.examples.find(e=>e.decimalOperation==='SIN'),compiled=P.prepare(E.parse(P.inputSourceFor(example)).term),term=compiled.term;
+test('named scientific calls keep dependencies separate from precision and input',async()=>{
+  const example=P.examples.find(e=>e.decimalOperation==='SIN'),doc=G.lesson(example),functions=L.importDefinitions([],doc.symbols,null,{exact:true}).functions,call=E.parse(doc.compact).term,compiled=P.prepare(call,F.capture(call,functions)),term=compiled.term;
   const args=[];let main=term;while(main.type==='app'){args.unshift(main.arg);main=main.fn;}
   assert.equal(args.length,2);assert.equal(C.churchNumber(args[0]),6);
   assert.ok(C.inspect(term).nodes<100,'do not duplicate the scientific helper graph into the diagram');

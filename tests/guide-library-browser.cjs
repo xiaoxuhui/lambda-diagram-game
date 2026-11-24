@@ -1,5 +1,5 @@
 const assert=require('node:assert/strict'),path=require('node:path');
-const P=require('../src/presets.js'),C=require('../src/core.js');
+const P=require('../src/presets.js'),C=require('../src/core.js'),G=require('../src/guide.js');
 let pw;try{pw=require('playwright');}catch{pw=require(path.resolve(path.dirname(process.execPath),'../node_modules/playwright'));}
 process.env.PORT='0';const server=require('../scripts/serve.cjs');
 (async()=>{
@@ -18,13 +18,14 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
     await page.locator('#mode-guide').click();
     await page.locator('#guide-example').selectOption(String(P.examples.findIndex(e=>e.name.startsWith('阶乘 · 迭代'))));
     await page.locator('#guide-add-library').click();
-    assert.match(await page.locator('#guide-library-feedback').textContent(),/重名已跳过：fac/);
+    assert.match(await page.locator('#guide-library-feedback').textContent(),/示例定义不一致：fac/);
+    await page.waitForFunction(()=>JSON.parse(localStorage.getItem('lambda-lab-v2')).functionDraft.source==='λx.');
     const saved=await page.evaluate(()=>{
       const s=LambdaSnapshot.decodeStartingState(localStorage.getItem('lambda-lab-v2'));
       return {names:s.functions.map(fn=>fn.name),fac:LambdaCore.format(s.functions.find(fn=>fn.name==='fac').term),draft:s.functionDraft};
     });
     assert.equal(saved.fac,'λx.x');assert.deepEqual(saved.names,['fac']);assert.equal(saved.draft.source,'λx.');
-    await page.locator('#guide-add-library').click();assert.match(await page.locator('#guide-library-feedback').textContent(),/重名已跳过：fac/);
+    await page.locator('#guide-add-library').click();assert.match(await page.locator('#guide-library-feedback').textContent(),/示例定义不一致：fac/);
     await page.locator('#guide-all-symbols > summary').click();
     const identity=page.locator('#guide-symbols details').filter({has:page.locator('summary',{hasText:/^id：/})}).last();
     await identity.locator('summary').click();await identity.getByRole('button',{name:'加入函数 id 到函数库',exact:true}).click();
@@ -40,10 +41,10 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
     await page.waitForFunction(()=>document.getElementById('state-badge').textContent==='已到正规形');
     assert.equal(await page.evaluate(()=>LambdaCore.churchNumber(LambdaCore.parse(document.getElementById('current-expression').textContent))),6);
     for(const [name,input,expected] of [['incmap','[0,2,4]','[1,3,5]'],['sumlist','[2,3,4]','9'],['prodlist','[2,3,4]','24']]){
-      const before=await page.locator('.function-item').count();
+      const before=await page.evaluate(()=>LambdaSnapshot.decodeStartingState(localStorage.getItem('lambda-lab-v2')).functions.map(fn=>fn.name)),doc=G.lesson(P.examples.find(e=>e.capsule?.name===name));
       await page.locator('#mode-guide').click();await page.locator('#guide-example').selectOption(String(P.examples.findIndex(e=>e.capsule?.name===name)));
       await page.locator('#guide-add-library').click();await page.locator('#guide-back').click();
-      assert.equal(await page.locator('.function-item').count(),before+1,'only the selected entry is added');
+      assert.equal(await page.locator('.function-item').count(),new Set([...before,...doc.symbols.map(fn=>fn.name)]).size,'each displayed definition is imported exactly once');
       assert.equal(await page.locator(`.function-item[data-name="${name}"]`).count(),1);
       await page.locator('#expression').fill(`${name} ${input}`);await page.locator('#convert').click();await page.locator('#fast-run').click();
       await page.waitForFunction(()=>document.getElementById('state-badge').textContent==='已到正规形');

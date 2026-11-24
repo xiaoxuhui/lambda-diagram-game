@@ -2,9 +2,19 @@
   'use strict';
   const C=root.LambdaCore||require('./core.js');
   const definitions=[
-    ['i','i','λx.x'],['k','true','λa b.a'],['b','b','λf g x.f (g x)'],
-    ['c','c','λf x y.f y x'],['s','s','λf g x.f x (g x)'],['w','w','λf x.f x x']
-  ].map(([key,name,source])=>({key,name,source:C.explicitLambdas(source),term:C.parse(source)}));
+    ['i','i','λx.x','原样返回输入。'],['k','true','λa b.a','保留第一项，忽略第二项。'],['b','b','λf g x.f (g x)','复合：先g后f。'],
+    ['c','c','λf x y.f y x','交换两个输入。'],['s','s','λf g x.f x (g x)','把同一输入交给两个函数。'],['w','w','λf x.f x x','把一个输入复制为两个参数。'],
+    ['m','m','λx.x x','自应用：把输入应用于自身。'],['a','a','λf x.f x','显式函数应用；也与丘奇数1同形。'],
+    ['t','t','λx f.f x','把已保存的值交给后来的函数。'],['v','v','λx y f.f x y','保存两个值，再交给读取函数。'],
+    ['q','q','λf g x.g (f x)','反向复合：先f后g。'],['f','f','λx y g.g y x','保存两个值，按交换后的顺序读取。'],
+    ['r','r','λx f y.f y x','保存一个值作为函数的第二个输入。'],['d','d','λf g x y.f (g x) y','只对第一个输入预处理。'],
+    ['e','e','λf g h x.f g (h x)','保留第一个输入，只预处理第二个输入。'],['j','j','λf x y z.f x (f z y)','将同一个函数嵌套调用两次。'],
+    ['h','h','λf x y.f x y x','在第一和第三个位置使用同一输入。'],['l','l','λf g.f (g g)','自应用后把结果交给函数。'],
+    ['o','o','λf g.g (f g)','把处理结果交回原输入函数。'],['phi','phi','λf g h x.f (g x) (h x)','同一输入经两路处理后合并。'],
+    ['psi','psi','λf g x y.f (g x) (g y)','两个输入先经过同一个处理函数再合并。'],
+    ['y','y','λf.(λx.f (x x)) (λx.f (x x))','正规序不动点组合子，供递归使用。'],
+    ['z','z','λf.(λx.f (λv.x x v)) (λx.f (λv.x x v))','以额外函数延迟递归的应用序不动点组合子。']
+  ].map(([key,name,source,description],index)=>({key,name,source:C.explicitLambdas(source),term:C.parse(source),description,extended:index>=6}));
   const combinators=new Map(definitions.map(d=>[d.key,{type:'combinator',key:d.key}]));
   const app=(fn,arg)=>({type:'app',fn,arg}),call=(key,...args)=>args.reduce(app,combinators.get(key));
   const SK={s:combinators.get('s'),k:combinators.get('k')};
@@ -187,7 +197,7 @@
     }
     return values[0];
   }
-  function* compileSteps(term,basis,simplify,recognize=true){
+  function* compileSteps(term,basis,simplify,recognize=true,extended=false){
     const pending=[{term}],values=[];
     while(pending.length){
       yield;const entry=pending.pop(),t=entry.term;
@@ -201,7 +211,7 @@
           if(C.equal(t,selfApply)){values.push(call('w',BCKW.i));continue;}
         }
         if(simplify){const value=C.churchNumber(t);if(value!==null){values.push(yield* numeral(value));continue;}if(C.equal(t,falseLambda)){values.push(SK.false);continue;}}
-        const known=!recognize||basis==='sk'&&!simplify?null:definitions.find(d=>C.equal(t,d.term));
+        const known=!recognize||basis==='sk'&&!simplify?null:definitions.find(d=>(extended||!d.extended)&&C.equal(t,d.term));
         if(known)values.push(simplify?SK[known.key]:combinators.get(known.key));
         else pending.push({term:t,finish:'abs'},{term:t.body});
       }else if(t.type==='app')pending.push({term:t,finish:'app'},{term:t.arg},{term:t.fn});
@@ -219,9 +229,9 @@
     // Preserve the explicitly unsimplified SK API. UI conversions share the
     // same structural representation, then emit only the requested primitives.
     if(basis==='sk'&&!simplify)return yield* compileSteps(term,basis,false);
-    const compiled=yield* compileSteps(term,basis==='bckw'?'bckw':'optimized',false);
+    const compiled=yield* compileSteps(term,basis==='bckw'?'bckw':'optimized',false,true,basis==='optimized');
     const canonical=yield* simplifySteps(compiled,false,canonicalRewrite);
-    return basis==='optimized'?canonical:yield* lowerBasis(canonical,basis);
+    return basis==='optimized'?yield* simplifySteps(canonical,false,term=>term.type==='app'&&isKey(term.fn,'b')&&isKey(term.arg,'i')?combinators.get('a'):term):yield* lowerBasis(canonical,basis);
   }
   function link(term,original,functions,basis,collision){
     const free=C.freeVars(original),occupied=new Set([...free,...functions.map(f=>f.name)]),required=new Set(),pending=[term];
@@ -261,6 +271,14 @@
     }while(!next.done);
     return link(next.value,term,functions,basis,collision);
   }
-  const API={compileTerm};root.LambdaCombinatorCompiler=API;
+  const catalog=()=>definitions.map(({key,name,source,description,extended})=>({key,name,source,description,extended}));
+  function initCatalog(mount){
+    if(!mount)return;const summary=document.createElement('summary');summary.textContent='可用的组合子（'+definitions.length+'种）';
+    const note=document.createElement('p');note.textContent='“编译成组合子”在开启特殊化简时识别以下结构，按需要加入完整定义。SK仅用s、k，BCKW仅用b、c、k、w；关闭特殊化简时仍使用通用括号抽象。';
+    const list=document.createElement('div');list.className='combinator-catalog-list';
+    for(const entry of definitions){const row=document.createElement('div'),label=document.createElement('strong'),description=document.createElement('span'),code=document.createElement('code');label.textContent=entry.name;description.textContent=entry.description;code.textContent=entry.source;row.append(label,description,code);list.append(row);}
+    mount.replaceChildren(summary,note,list);
+  }
+  const API={compileTerm,catalog,initCatalog};root.LambdaCombinatorCompiler=API;
   if(typeof module!=='undefined'&&module.exports)module.exports=API;
 })(typeof globalThis!=='undefined'?globalThis:window);

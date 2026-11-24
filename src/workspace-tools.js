@@ -114,7 +114,7 @@
         });
         const del=document.createElement('button');del.textContent='删除';del.className='delete-function';del.setAttribute('aria-label',`删除函数 ${fn.name}`);
         del.addEventListener('click',()=>{functions=L.remove(functions,fn.name);if(editing===fn.name)clearEditor();renderLibrary();persist();api.toast(`已删除函数 ${fn.name}`);});
-        buttons.append(insert,edit,del);head.append(title,buttons);const definition=document.createElement('code');definition.textContent=C.format(fn.term);row.append(head,definition);list.append(row);
+        buttons.append(insert,edit,del);head.append(title,buttons);const definition=document.createElement('code');definition.textContent=fn.source??C.format(fn.term);row.append(head,definition);list.append(row);
       });
     }
     function apply(snapshot) {
@@ -127,7 +127,7 @@
     function recoverDraft(text,message,draftOnly=false){
       const snapshot=S.decodeStartingState(text,{draftOnly});
       apply(snapshot);recoveredDraft=snapshot.draft;checkpoint=text;
-      const original=JSON.parse(text);if([2,3,4,5].includes(original.version))recoveredSession=S.validate(original).session;
+      const original=JSON.parse(text);if([2,3,4,5,6].includes(original.version))recoveredSession=S.validate(original).session;
       $('storage-status').textContent='已保留原自动存档';
       feedback(message);
     }
@@ -250,6 +250,12 @@
     return {expand:t=>L.expand(t,functions),encodingsFor:t=>L.encodingsFor(t,functions),persist,queueSave,restoreInitial,attachCollisionControls,collisionPolicy:()=>collision,
       beginSession:()=>{recoveredDraft=null;recoveredSession=null;},
       functionEntries:()=>functions.slice(),
+      commitFunctions:(next,expected,policy=collision)=>{
+        if(collision!==policy||functions.length!==expected.length||functions.some((fn,index)=>fn!==expected[index]))throw new C.LambdaError('函数库或重名处理方式已改变，请重试。');
+        const previous=functions;functions=next;
+        try{const snapshot=captured();storeSnapshot(snapshot);lastCaptured=signature(snapshot);}catch(error){functions=previous;throw error;}
+        renderLibrary();
+      },
       saveDefinition:(name,source,prepared)=>{
         const previous=functions;
         const next=functions.some(fn=>fn.name===name)?L.update(functions,name,name,source,'church',6,null,prepared):L.add(functions,name,source,Infinity,'church',6,null,prepared);

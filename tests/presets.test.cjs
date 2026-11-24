@@ -70,7 +70,8 @@ test('scientific decimal programs respond to edits, including domain errors',asy
     ['SINH',['2_decimal'],'双曲示例的输入范围是 −1 到 1']
   ]){
     const term=E.parse(D.expression(op,args,(op==='SIN'&&args[0]==='10_decimal')||(op==='COS'&&args[0]==='2_decimal')?3:6)).term;
-    const value=await Lazy.normalize(term,{signal:AbortSignal.timeout(15000),onPause:()=>true});
+    // 慢机上 SIN(10) 单次求值约 15--20 秒，超时只用于防止跑飞。
+    const value=await Lazy.normalize(term,{signal:AbortSignal.timeout(60000),onPause:()=>true});
     assert.equal(D.format(D.read(value)),expected,op+' '+args.join(' '));
   }
 });

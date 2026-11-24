@@ -23,7 +23,7 @@
     const term=walk(raw,1);C.inspect(term);return term;
   }
   function validate(raw) {
-    if(!object(raw)||![2,3,4,5].includes(raw.version))fail('不支持这个存档版本。');
+    if(!object(raw)||![2,3,4,5,6].includes(raw.version))fail('不支持这个存档版本。');
     if(typeof raw.draft!=='string')fail('草稿缺失或不是文本。');
     if(!Array.isArray(raw.functions))fail('函数库不合法。');
     const functions=raw.functions.map(f=>{
@@ -31,7 +31,7 @@
       if(f.source!==undefined&&typeof f.source!=='string')fail('函数原始定义需为文本。');
       const term=ast(f.term),retired=f.sourceSyntax==='math';
       // Keep functions saved by the removed input mode usable without its parser.
-      return {name:f.name,term,...(f.body===undefined?{}:{body:ast(f.body)}),...(retired?{source:C.format(term)}:f.source===undefined?{}:{source:f.source}),...(f.encodings===undefined?{}:{encodings:f.encodings}),...(retired?{sourceFree:[...C.freeVars(term)]}:f.sourceFree===undefined?{}:{sourceFree:f.sourceFree})};
+      return {name:f.name,term,...(f.named===undefined?{}:{named:f.named}),...(f.body===undefined?{}:{body:ast(f.body)}),...(retired?{source:C.format(term)}:f.source===undefined?{}:{source:f.source}),...(f.encodings===undefined?{}:{encodings:f.encodings}),...(retired?{sourceFree:[...C.freeVars(term)]}:f.sourceFree===undefined?{}:{sourceFree:f.sourceFree})};
     });L.validate(functions);
     if(raw.dataEncodings!==undefined&&!Array.isArray(raw.dataEncodings))fail('数据编码列表不合法。');
     const dataEncodings=(raw.dataEncodings??[]).map(entry=>{
@@ -82,6 +82,7 @@
       version=4;
     }
     if(functionDefinitions!==undefined)version=5;
+    if(functions.some(fn=>fn.named))version=6;
     if(typeof s.halt!=='string'||s.halt.length>500)fail('暂停信息不合法。');
     const v=raw.view;if(!object(v)||!Number.isInteger(v.speed)||v.speed<1||v.speed>60000||!Number.isFinite(v.scale)||v.scale<.02||v.scale>16)fail('视图设置不合法。');
     const growthWindowMs=v.growthWindowMs??Guard.DEFAULT_MS;if(![0,1000,3000,10000,30000].includes(growthWindowMs))fail('运行增长观察窗口不合法。');

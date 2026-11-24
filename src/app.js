@@ -7,6 +7,13 @@
   function reductionStep(){return state.unfoldFunctions?functionReducer.step(state.term,state.strategy,state.direction):C.step(state.term,state.strategy,state.direction);}
   const $=id=>document.getElementById(id);
   const input=$('expression');
+  const Definitions=window.LambdaDefinitions,definitionFeedback=$('inline-definition-feedback');
+  const prepareDefinitions=(source,functions,options={})=>Definitions.prepare(source,functions,{collision:workspace?.collisionPolicy()??'skip',encodings:dataEditor.entries(),encoding:state.numberEncoding,numberFormats:state.numberFormats,prepareTerm:(term,entries)=>window.LambdaGuide.compileInterpreterCall(term,entries,value=>window.LambdaLibrary.expand(value,entries)),...options});
+  function showDefinitions(result){definitionFeedback.textContent=window.LambdaLibrary.importFeedback(result);definitionFeedback.hidden=false;}
+  function exampleFreeNames(source){
+    const text=source.trim();for(const example of P.examples.filter(example=>example.metaInterpreter||example.name==='防止变量捕获'))if([P.inputSourceFor(example,state.decimalPlaces),window.LambdaGuide.lesson(example,state.decimalPlaces).compact].some(value=>value?.trim()===text))return [...C.freeVars(C.parse(example.metaInput??example.term))];return [];
+  }
+  window.LambdaCombinatorCompiler.initCatalog($('combinator-catalog'));
   const valueButton=$('decimal-value'),valueResult=$('decimal-value-result'),valueDetails=$('normal-form');
   const interpretedDetails=$('interpreted-result'),interpretedExpression=$('interpreted-expression');
   let valueJob=null,valueSource=null,normalForm=null,valueResume=null;
@@ -88,7 +95,9 @@
     $('history-details').open=s.view.historyOpen;$('help-panel').hidden=!s.view.helpOpen;$('help-toggle').setAttribute('aria-expanded',String(s.view.helpOpen));
     $('hint').hidden=!s.view.hintOpen;$('hint-toggle').textContent=s.view.hintOpen?'收起提示':'显示提示';$('hint-toggle').setAttribute('aria-expanded',String(s.view.hintOpen));
     $('challenge-feedback').textContent='';$('next-level').hidden=true;$('error-message').textContent=s.error;$('error-message').hidden=!s.error;
-    renderMode();if(s.hasSession)render();else convert();input.setSelectionRange(s.selection.start,s.selection.end);
+    let definitionDraft=false;try{definitionDraft=!E.isLiteral(input.value,dataEditor.entries(),state.numberFormats)&&Definitions.parseProgram(input.value).definitions.length>0;}catch{definitionDraft=true;}
+    if(!s.hasSession&&definitionDraft)state.dirty=true;
+    renderMode();if(s.hasSession||definitionDraft)render();else convert();input.setSelectionRange(s.selection.start,s.selection.end);
     if(implicitFunctions)toast('旧会话的隐式函数定义与历史已保留。点击「转换成图示」即可按关闭状态生成普通 λ 表达式。');
     if(!state.term){$('zoom-label').textContent=`${Math.round(state.scale*100)}%`;$('fit').setAttribute('aria-pressed',String(state.autoFit));}
     $('diagram-viewport').scrollLeft=s.view.panX;$('diagram-viewport').scrollTop=s.view.panY;
@@ -100,6 +109,7 @@
   function stop() { clearTimeout(state.timer); state.timer=null; state.running=false;state.fast=false;repeatedTerm=null;runGuard=null; }
   function cancelRewind(){rewindJob?.abort();rewindJob=null;}
   function changed() {
+    definitionFeedback.hidden=true;
     cancelRewind();
     cancelConversion();
     $('example-info').hidden=true;
@@ -123,22 +133,24 @@
     $('challenge-feedback').textContent=''; $('next-level').hidden=true;
     try {
       if(state.numberEncoding==='decimal'&&!$('decimal-places').checkValidity())throw new C.LambdaError('输出小数位数需为非负整数。');
-      const compiled=await E.compile(input.value,dataEditor.entries(),state.numberEncoding,{numberFormats:state.numberFormats,signal:controller.signal,onProgress:literal=>{if(!showedProgress){state.encodingBusy=true;render();showedProgress=true;}encodingProgress.hidden=false;cancelEncoding.hidden=false;encodingProgress.textContent=`正在自动编码 ${literal.number}_${literal.name} · ${literal.steps} 步`;}});
+      const before=workspace?.functionEntries()??[],policy=workspace?.collisionPolicy()??'skip',staged=await prepareDefinitions(input.value,before,{signal:controller.signal,onProgress:literal=>{if(!showedProgress){state.encodingBusy=true;render();showedProgress=true;}encodingProgress.hidden=false;cancelEncoding.hidden=false;encodingProgress.textContent=`正在自动编码 ${literal.number}_${literal.name} · ${literal.steps} 步`;}}),compiled=staged.compiled;
       if(controller.signal.aborted||conversionController!==controller)return false;
-      if(compiled.mappings.some(mapping=>!dataEditor.entries().some(entry=>entry.name===mapping.name&&entry.term===mapping.definition)))return false;
-      state.inputCall=window.LambdaGuide.pendingCall(compiled.term,workspace?.functionEntries()??[]);
-      const expanded=term=>workspace?workspace.expand(term):term;
-      const interpreted=window.LambdaGuide.compileInterpreterCall(compiled.term,workspace?.functionEntries()??[],expanded);
+      if(staged.mappings.some(mapping=>!dataEditor.entries().some(entry=>entry.name===mapping.name&&entry.term===mapping.definition)))return false;
+      if(!compiled){workspace.commitFunctions(staged.functions,before,policy);dataEditor.remember(staged.mappings);showDefinitions(staged.result);definitionFeedback.textContent+=' 末行可追加要运行的算式。';render();save();return true;}
+      state.inputCall=window.LambdaGuide.pendingCall(compiled.term,staged.functions);
+      const preserve=staged.program.definitions.length?[]:exampleFreeNames(input.value),expanded=term=>window.LambdaLibrary.expand(term,staged.functions,{preserve});
+      const interpreted=window.LambdaGuide.compileInterpreterCall(compiled.term,staged.functions,expanded);
       const parsed=window.LambdaMeta.repair(interpreted,expanded);
       if(interpreted!==compiled.term)toast('解释器输入已自动编码，环境已封装；运行时执行解释并还原表达式。');
       else if(parsed!==compiled.term){
         input.value=C.format(parsed);
         toast('解释器表达式已更新，待计算表达式会在解释器内部执行。');
       }
-      dataEditor.remember(compiled.mappings);
-      const base=state.unfoldFunctions&&parsed===compiled.term?{term:parsed,definitions:F.capture(parsed,workspace?.functionEntries()??[])}:{term:parsed===compiled.term?expanded(parsed):parsed,definitions:[]};
+      const base=state.unfoldFunctions&&parsed===compiled.term?{term:parsed,definitions:F.capture(parsed,staged.functions.filter(fn=>!preserve.includes(fn.name)))}:{term:parsed===compiled.term?expanded(parsed):parsed,definitions:[]};
       const linked=state.unfoldFunctions?P.prepare(base.term,base.definitions):{term:P.preparePlain(base.term),definitions:[]};
-      const prepared=state.unfoldFunctions&&state.dataAsFunctions?F.prepare(linked.term,linked.definitions,compiled.dataTerms):linked;
+      const prepared=state.unfoldFunctions&&state.dataAsFunctions?F.prepare(linked.term,linked.definitions,staged.dataTerms):linked;
+      if(staged.program.definitions.length){workspace.commitFunctions(staged.functions,before,policy);showDefinitions(staged.result);}
+      dataEditor.remember(staged.mappings);
       state.functionDefinitions=prepared.definitions;
       functionReducer=F.create(state.functionDefinitions);
       const term=prepared.term;
@@ -146,7 +158,7 @@
       workspace?.beginSession();
       state.decimalDigitsOrder='forward';
       decodedTerms=new WeakMap();
-      state.term=term; state.original=term; state.history=Trace.create(term,state.functionDefinitions);state.dirty=false;state.encodingBusy=false;state.encodings=[...new Set([...compiled.encodings,...(workspace?.encodingsFor(parsed)??[])])];
+      state.term=term; state.original=term; state.history=Trace.create(term,state.functionDefinitions);state.dirty=false;state.encodingBusy=false;state.encodings=[...new Set([...compiled.encodings,...window.LambdaLibrary.encodingsFor(parsed,staged.functions)])];
       state.autoFit=true; render(); save(); return true;
     } catch(e) {
       if(e.name==='AbortError'||controller.signal.aborted)return false;
@@ -582,17 +594,19 @@
     const controller=new AbortController(),entries=dataEditor.entries(),source=input.value,functions=workspace.functionEntries(),buttons=[$('compile-combinators'),$('compile-sk'),$('compile-bckw')];
     conversionController=controller;compilingDefinitions=new Map(entries.map(entry=>[entry.name,entry]));buttons.forEach(button=>button.disabled=true);$('compiler-special').disabled=true;
     try{
-      const parsed=await E.compile(source,entries,state.numberEncoding,{numberFormats:state.numberFormats,signal:controller.signal});
-      const syntax=window.LambdaGuide.compileInterpreterCall(parsed.term,functions,term=>workspace.expand(term));
-      const result=await window.LambdaCombinatorCompiler.compileTerm(syntax===parsed.term?workspace.expand(parsed.term):syntax,{basis,simplify,specialize,collision,functions,signal:controller.signal,onProgress:()=>{
+      const staged=await prepareDefinitions(source,functions,{signal:controller.signal}),parsed=staged.compiled;
+      if(!parsed)throw new C.LambdaError('请在定义后写出要编译的算式；只保存函数可点“保存等号定义”。');
+      const preserve=staged.program.definitions.length?[]:exampleFreeNames(source),expanded=term=>window.LambdaLibrary.expand(term,staged.functions,{preserve}),syntax=window.LambdaGuide.compileInterpreterCall(parsed.term,staged.functions,expanded);
+      const result=await window.LambdaCombinatorCompiler.compileTerm(syntax===parsed.term?expanded(parsed.term):syntax,{basis,simplify,specialize,collision,functions:staged.functions,signal:controller.signal,onProgress:()=>{
         encodingProgress.hidden=false;cancelEncoding.hidden=false;encodingProgress.textContent='正在外部编译组合子…';
       }});
       if(controller.signal.aborted||conversionController!==controller||input.value!==source)return;
       const current=workspace.functionEntries();
       if(current.length!==functions.length||current.some((fn,index)=>fn!==functions[index]))throw new C.LambdaError('函数库已修改，请重新编译。');
       if(workspace.collisionPolicy()!==collision)throw new C.LambdaError('重名处理方式已改变，请重新编译。');
-      const imported=workspace.importDefinitions(result.definitions,undefined,{collision});dataEditor.remember(parsed.mappings);
+      const imported=window.LambdaLibrary.importDefinitions(staged.functions,result.definitions,null,{collision});workspace.commitFunctions(imported.functions,functions,collision);dataEditor.remember(staged.mappings);
       input.value=result.source;changed();workspace.persist();
+      if(staged.program.definitions.length)showDefinitions(staged.result);
       $('combinator-status').hidden=false;$('combinator-status').textContent=result.used.length?`已在外部编译${basis==='sk'?'为 SK':basis==='bckw'?'为 BCKW':''}；算式使用 ${result.used.join('、')}。缺少的定义已加入函数库，可编辑和删除。`:'编译完成，输入不需要组合子。';
       if(result.ready.length)$('combinator-status').textContent+=' 已有相同定义，已准备好：'+result.ready.join('、')+'。';
       if(result.reused.length)$('combinator-status').textContent+=' 已直接使用同名函数：'+result.reused.join('、')+'（沿用现有定义）。';
@@ -680,9 +694,10 @@
       const add=document.createElement('button'),feedback=document.createElement('span');
       add.type='button';add.id='example-add-library';add.className='button';add.textContent='将此示例函数加入函数库';
       feedback.id='example-library-feedback';feedback.setAttribute('role','status');
+      const exactNote=document.createElement('p');exactNote.className='syntax-note';exactNote.textContent='逐个导入示例原始定义，并逐字核对；同名原文不一致会停止，选择“重名替换”才覆盖。';info.append(exactNote);
       add.addEventListener('click',()=>{
         try{
-          const result=workspace.importDefinitions(doc.symbols,selectedNames);
+          const result=workspace.importDefinitions(doc.symbols,null,{exact:true});
           feedback.textContent=window.LambdaLibrary.importFeedback(result);
           const calls=selectedNames.map(name=>result.bindings[name]??name).filter(name=>result.added.includes(name)||result.replaced.includes(name)||result.ready.includes(name)||result.reused.includes(name));
           if(calls.length)feedback.textContent+=' 可调用：'+calls.join('、')+'。';
@@ -693,6 +708,16 @@
     info.hidden=!info.hasChildNodes();
   });
   $('convert').addEventListener('click',convert);$('step').addEventListener('click',advance);$('run').addEventListener('click',()=>run());
+  $('save-inline-definitions').addEventListener('click',async()=>{
+    cancelConversion();const controller=new AbortController();conversionController=controller;const source=input.value,before=workspace.functionEntries(),policy=workspace.collisionPolicy(),button=$('save-inline-definitions');button.disabled=true;$('error-message').hidden=true;
+    try{
+      if(!Definitions.parseProgram(source).definitions.length)throw new C.LambdaError('请先在输入框写“名称 = 表达式”，每行一个定义。');
+      const staged=await prepareDefinitions(source,before,{compileExpression:false,signal:controller.signal,onProgress:literal=>{encodingProgress.hidden=false;cancelEncoding.hidden=false;encodingProgress.textContent=`正在准备函数中的数字编码 ${literal.number}_${literal.name} · ${literal.steps} 步`;}});
+      if(controller.signal.aborted||conversionController!==controller||input.value!==source)return;
+      workspace.commitFunctions(staged.functions,before,policy);dataEditor.remember(staged.mappings);showDefinitions(staged.result);workspace.persist();
+    }catch(error){if(!controller.signal.aborted){$('error-message').textContent=error.message;$('error-message').hidden=false;}}
+    finally{button.disabled=false;if(conversionController===controller)cancelConversion();}
+  });
   $('fast-run').addEventListener('click',()=>run(true));
   $('number-encoding').addEventListener('change',()=>{const previous=state.numberEncoding;state.numberEncoding=$('number-encoding').value;dataEditor.select(state.numberEncoding);if(previous!==state.numberEncoding){changed();queueLiteralPreparation();}else{render();save();}});
   $('decimal-places').addEventListener('input',()=>{const n=$('decimal-places').valueAsNumber;if(!Number.isSafeInteger(n)||n<0){$('decimal-places').setCustomValidity('请输入非负整数');return;}$('decimal-places').setCustomValidity('');state.decimalPlaces=n;if(state.numberEncoding==='decimal')changed();else save();});
@@ -759,7 +784,7 @@
   $('speed').addEventListener('change',save);
   dataEditor=window.LambdaDataEncodingEditor.init({getSelection:()=>state.numberEncoding,setSelection:value=>{state.numberEncoding=value;},getNumberFormats:()=>state.numberFormats,expand:term=>workspace?workspace.expand(term):term,queueSave:save,onChange:()=>{if(compilingDefinitions&&(compilingDefinitions.size!==dataEditor.entries().length||dataEditor.entries().some(entry=>compilingDefinitions.get(entry.name)!==entry))){changed();queueLiteralPreparation();}else{render();save();}},currentTerm:()=>state.term&&!state.dirty?F.expand(state.term,state.functionDefinitions):null,loadTerm:(term,name)=>{state.numberEncoding=`custom:${name}`;setSource(C.format(term));},toast});
   formatEditor=window.LambdaInputFormatEditor.init({getSelection:()=>state.numberEncoding,getEntries:()=>dataEditor.entries(),getNumberFormats:()=>state.numberFormats,setNumberFormats:formats=>{state.numberFormats=formats;},setCustomFormat:(name,template)=>dataEditor.setInputFormat(name,template),onChange:()=>{changed();queueLiteralPreparation();},queueSave:save,toast});
-  guide=window.LambdaGuide.init({precision:()=>state.decimalPlaces,save,addFunctions:(definitions,selected)=>workspace.importDefinitions(definitions,selected),load:example=>{
+  guide=window.LambdaGuide.init({precision:()=>state.decimalPlaces,save,addFunctions:(definitions,selected,options)=>workspace.importDefinitions(definitions,selected,options),load:example=>{
     stop();state.mode='free';state.numberEncoding=example.encoding??'church';
     renderMode();setSource(P.inputSourceFor(example,state.decimalPlaces));save();
     input.focus();input.scrollIntoView({block:'center'});

@@ -35,7 +35,7 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
       await run(page,examples.at(-1));
       await page.locator('#example-add-library').click();
       assert.equal(await page.locator('.function-item[data-name="dropzero"]').count(),1);
-      for(const name of ['filter','nonzero'])assert.equal(await page.locator(`.function-item[data-name="${name}"]`).count(),0);
+      for(const definition of G.lesson(examples.at(-1)).symbols){assert.equal(await page.locator(`.function-item[data-name="${definition.name}"] > code`).textContent(),definition.source);}
       await page.locator('#mode-guide').click();
       await page.locator('#guide-example').selectOption(String(P.examples.indexOf(examples.at(-1))));
       assert.equal(await page.locator('#guide-expression-short').textContent(),'dropzero [0,2,0,3]');

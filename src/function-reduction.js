@@ -58,7 +58,7 @@
       const name=pending.pop();if(seen.has(name))continue;seen.add(name);const fn=registry.get(name);if(!fn)continue;
       let body=fn.body;
       if(!body&&typeof fn.source==='string')try{body=C.parse(fn.source);}catch{}
-      const term=body&&C.equal(L.expand(body,functions),fn.term)?body:fn.term;
+      const term=fn.named?fn.term:body&&C.equal(L.expand(body,functions),fn.term)?body:fn.term;
       result.push({name,term});pending.push(...C.freeVars(term));
     }
     return result;

@@ -423,21 +423,22 @@
     const roles=[['加法',['第一个加数','第二个加数']],['乘法',['第一个因数','第二个因数']],['乘方',['底数','指数']],['零判断',['待判断的自然数']],['前驱',['原自然数']],['减法',['被减数','减数']],['比较',['第一项','第二项']],['阶乘',['求阶乘的自然数']],['斐波那契',['数列下标']]].find(([prefix])=>example.name.startsWith(prefix))?.[1];
     if(!doc.inputs)doc.inputs=args.map((value,index)=>({name:'p'+(index+1),value,encoding:/^[0-9]+(?:_church)?$/.test(value)?'丘奇自然数':'λ表达式',role:roles?.[index]??'实际输入'+(index+1)}));
     doc.libraryEntries=[name];doc.entryContract={kind:example.category==='归约与终止'?'program':args.length||doc.inputs.length?'function':'value',name,inputs:doc.inputs.map(input=>({...input})),variadic:!!example.booleanCircuit&&['bits','delay','delayi','delayat','allbits','anybits','parity'].includes(example.booleanCircuit.name)};
-    doc.parameterNote=(doc.parameterNote??'外部只传实际数据参数。')+' 加入函数库只添加入口 '+name+'，辅助定义和固定值封装在内部。结果中的丘奇数、列表或布尔值自带的选择参数不需要额外传入。';
+    doc.parameterNote=(doc.parameterNote??'外部只传实际数据参数。').replace('加入函数库时只添加入口函数，辅助定义随它封装保存。','')+' 加入函数库会按示例原文逐个保存命名函数，逐字核对名称和表达式；不一致时停止，选择“重名替换”才覆盖。结果中的丘奇数、列表或布尔值自带的选择参数不需要额外传入。';
   }
   let interpreterTemplates;
+  let interpreterNamedTemplates;
   let listCallTemplates;
   const callContracts=new WeakMap();
   function pendingCall(input,functions=[]){
     if(!functions.length)return null;
     const C=root.LambdaCore||require('./core.js'),Library=root.LambdaLibrary||require('./library.js');let head=input,supplied=0;
-    if(typeof input==='string'){try{head=C.parse(input,Infinity,()=>C.V('callLiteral'),{suffixes:true});}catch{return null;}}
+    if(typeof input==='string'){try{const program=root.LambdaDefinitions?.parseProgram(input);if(program?.definitions.length){if(program.expression===null)return null;input=program.expression;}head=C.parse(input,Infinity,()=>C.V('callLiteral'),{suffixes:true});}catch{return null;}}
     while(head.type==='app'){supplied++;head=head.fn;}
     if(head.type!=='var')return null;
     const fn=functions.find(entry=>entry.name===head.name);if(!fn)return null;
     if(!callContracts.has(fn.term)){
       if(!listCallTemplates)listCallTemplates=P.examples.filter(example=>example.listOperation).map(example=>{const doc=lesson(example),term=Library.importDefinitions([],doc.symbols,libraryNames(doc)).functions[0].term;return {term,inputs:doc.inputs};});
-      callContracts.set(fn.term,listCallTemplates.find(template=>C.equal(template.term,fn.term))??null);
+      const value=Library.functionValue(fn,functions);callContracts.set(fn.term,listCallTemplates.find(template=>C.equal(template.term,value))??null);
     }
     const contract=callContracts.get(fn.term);if(!contract||supplied>=contract.inputs.length)return null;
     const missing=contract.inputs.slice(supplied),message='等待参数：'+fn.name+' 还需'+missing.length+'个参数（'+missing.map(input=>input.role).join('、')+'）。';
@@ -450,8 +451,9 @@
     if(!interpreterTemplates){
       const example=P.examples.find(entry=>entry.metaInterpreter),doc=lesson(example),name=libraryNames(doc)[0];
       const legacy=C.format(catalog().canonicalTerm(C.parse(Meta.legacyMainSource),example.name));
-      interpreterTemplates=[];
+      interpreterTemplates=[];interpreterNamedTemplates=[];
       for(const source of [doc.symbols.find(entry=>entry.name===name).source,legacy]){
+        interpreterNamedTemplates.push(C.parse(source));
         const entries=doc.symbols.map(entry=>entry.name===name?{...entry,source}:entry);
         interpreterTemplates.push(Library.importDefinitions([],entries,[name]).functions[0].term);
         const registry=new Map(entries.map(entry=>[entry.name,C.parse(entry.source)])),resolved=new Map();
@@ -459,7 +461,7 @@
         interpreterTemplates.push(resolve(name));
       }
     }
-    const names=new Set(functions.filter(fn=>interpreterTemplates.some(template=>C.equal(template,fn.term))).map(fn=>fn.name));
+    const names=new Set(functions.filter(fn=>{if(fn.named&&!interpreterNamedTemplates.some(template=>C.equal(template,fn.term)))return false;const value=Library.functionValue(fn,functions);return interpreterTemplates.some(template=>C.equal(template,value));}).map(fn=>fn.name));
     if(!names.size)return term;
     const bound=(name,scope)=>{for(let current=scope;current;current=current.parent)if(current.name===name)return true;return false;};
     const work=[{node:term,scope:null}],values=[];let found=false;
@@ -517,7 +519,7 @@
       try{
         const doc=lesson(P.examples[selected],api.precision()),selectedNames=names??coreNames(doc);
         if(!selectedNames.length)throw new Error('本篇是表达式演示，没有可直接导入的命名函数。');
-        const result=api.addFunctions(doc.symbols,selectedNames);
+        const result=api.addFunctions(doc.symbols,names===null?null:selectedNames,{exact:true});
         feedback.textContent=root.LambdaLibrary.importFeedback(result);
         const calls=selectedNames.map(name=>result.bindings[name]??name).filter(name=>result.added.includes(name)||result.replaced.includes(name)||result.ready.includes(name)||result.reused.includes(name));
         if(calls.length)feedback.textContent+=' 可调用：'+calls.join('、')+'。';

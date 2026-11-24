@@ -22,7 +22,7 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
       assert.equal(await page.locator('#expression').inputValue(),before);assert.equal(await page.locator('#current-expression').textContent(),diagram);
       assert.equal(await page.locator('#function-source').inputValue(),'λx.');
       if(prefix==='整数除法'){
-        assert.match(await page.locator('#example-library-feedback').textContent(),/重名已跳过：quot/);
+        assert.match(await page.locator('#example-library-feedback').textContent(),/示例定义不一致：quot/);
         assert.equal(await page.locator('.function-item[data-name="quot2"]').count(),0);
         await page.getByRole('button',{name:'删除函数 quot',exact:true}).click();await page.locator('#example-add-library').click();
       }

@@ -23,6 +23,7 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
     await page.locator('#growth-window').selectOption('10000');await page.locator('#decimal-value').click();
     await page.waitForFunction(()=>document.getElementById('decimal-value-result').textContent.startsWith('小数'),{},{timeout:20000});
     assert.match(await page.locator('#decimal-value-result').textContent(),/-?0\.479425/);
+    await page.locator('#example-add-library').click();await page.locator('#expression').fill(require('../src/guide.js').lesson(sin).compact);
     await page.locator('#unfold-functions').check();await page.locator('#data-as-functions').uncheck();await page.locator('#convert').click();assert.ok(await page.locator('[data-unfold-hit]').count()>0);
     await page.locator('#save-state').click();
     await page.evaluate(()=>{const s=JSON.parse(localStorage.getItem('lambda-lab-v2'));s.view.unfoldFunctions=false;localStorage.setItem('lambda-lab-v2',JSON.stringify(s));});

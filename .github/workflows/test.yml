@@ -56,6 +56,10 @@ jobs:
       - run: node tests/all-entry-contracts-browser.cjs
       - run: node tests/list-operations-browser.cjs
       - run: node tests/function-collision-browser.cjs
+      - run: node tests/extended-combinators-browser.cjs
+      - run: node tests/definitions-browser.cjs
+      - run: node tests/exact-example-import-browser.cjs
+      - run: node tests/conversion-preserves-source-browser.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

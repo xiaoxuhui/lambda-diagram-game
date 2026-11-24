@@ -302,31 +302,13 @@
   function sourceFor(item,precision=item.decimalPlaces??6){const raw=rawSourceFor(item,precision);return naming()?.catalog().source(raw,item.name)??raw;}
   function programFor(item,precision=item.decimalPlaces??6){const raw=rawInputSourceFor(item,precision),catalog=naming()?.catalog();return catalog?.program(raw,item.name)??{source:raw,call:raw,definitions:[]};}
   function inputSourceFor(item,precision=item.decimalPlaces??6){return programFor(item,precision).source;}
-  let runtimeHelpers;
-  function helperPatterns(){
-    const catalog=naming()?.catalog();if(!catalog)return [];
-    if(!runtimeHelpers){
-      runtimeHelpers=catalog.entries().map(entry=>({name:entry.name,term:C.parse(entry.source,Infinity)}));
-      const helperNames=new Set(runtimeHelpers.map(entry=>entry.name)),encoding=root.LambdaDataEncoding||(typeof require==='function'?require('./data-encoding.js'):null);
-      // Record the exact declarations emitted by the generator too: their
-      // private names and literal representations may differ from the guide.
-      for(const item of [...examples,...levels]){
-        const source=inputSourceFor(item),pending=[encoding?encoding.parse(source).term:C.parse(source,Infinity)];
-        while(pending.length){const node=pending.pop();if(node.type==='abs')pending.push(node.body);else if(node.type==='app'){
-          if(node.fn.type==='abs'&&(helperNames.has(node.fn.param.replace(/'+$/,''))||node.fn.param.includes("'")))runtimeHelpers.push({name:node.fn.param,term:node.arg});
-          pending.push(node.fn,node.arg);
-        }}
-      }
-    }
-    return runtimeHelpers;
-  }
   function prepare(term,functions=[]){
     const library=root.LambdaLibrary||(typeof require==='function'?require('./library.js'):null);
-    return library?library.captureHelpers(term,helperPatterns(),functions):{term,definitions:functions};
+    return library?library.captureHelpers(term,[],functions,{declaredOnly:true}):{term,definitions:functions};
   }
   function preparePlain(term){
     const library=root.LambdaLibrary||(typeof require==='function'?require('./library.js'):null);
-    return library?library.linkHelpersInPlace(term,helperPatterns()):term;
+    return library?library.linkHelpersInPlace(term,[],{declaredOnly:true}):term;
   }
   function parametersFor(item,precision=item.decimalPlaces??6){
     if(item.fixedNumerator)return ['输出小数位数 '+precision+'_church','要求倒数的小数 '+item.operands[1]+'_decimal'];

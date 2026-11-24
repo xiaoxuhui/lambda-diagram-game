@@ -104,6 +104,7 @@
 
 .input-format-panel .compiler-option{display:flex;align-items:center;gap:7px;margin-top:10px}.input-format-panel .compiler-option input{width:auto;min-width:0;padding:0;accent-color:var(--mint)}
 .function-collision-controls{display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin:10px 0;min-width:0;font-size:11px;color:#436b51}.function-collision-controls .button{padding:6px 8px;font-size:11px;white-space:normal}.function-collision-controls .button[aria-pressed=true]{background:#d9eacd;border-color:#67865d;box-shadow:inset 0 0 0 1px #67865d}
+.combinator-catalog-list{display:grid;gap:6px;margin-top:10px}.combinator-catalog-list>div{display:grid;grid-template-columns:42px minmax(0,1fr);gap:3px 7px;padding:7px;border:1px solid #dce5d6;border-radius:5px;min-width:0;font-size:11px}.combinator-catalog-list code{grid-column:1/-1;white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px}.combinator-catalog-list strong{font-family:var(--mono);color:#365f43}
 
 </style>
 </head>
@@ -154,6 +155,10 @@
           <p id="syntax-note" class="syntax-note">在下方选择小数四则示例，直接编辑完整 λ 表达式。输入和函数定义无字数上限；所有函数名均由你自定义。旧丘奇示例会选择兼容编码。</p>
           <div id="error-message" class="error-message" role="alert" hidden></div>
           <button id="convert" class="button primary convert-button">转换成图示 <span>→</span></button>
+          <button id="save-inline-definitions" type="button" class="button">保存等号定义</button><p id="inline-definition-feedback" class="syntax-note" role="status" hidden></p>
+          <details class="input-format-panel"><summary>用“名称 = 表达式”定义函数</summary><p>在上方输入框中，每行写一个定义，按从上到下的顺序保存；最后可写要运行的算式。跨行的定义请用括号包住。重名沿用当前选择。“保存等号定义”只保存函数；“转换成图示”保存定义后准备末尾算式，不自动运行。</p><pre><code>id = λx.x
+double = λn.λf.λx.n f (n f x)
+double 3_church</code></pre></details>
           <p class="key-hint">Ctrl / ⌘ + Enter 快速转换</p>
           <div class="input-format-panel">
             <button type="button" id="compile-combinators" class="button">编译成组合子</button>
@@ -162,6 +167,7 @@
             <label class="compiler-option"><input type="checkbox" id="compiler-special" checked> 使用特殊化简</label>
             <p>关闭「使用特殊化简」后，以上三种转换均使用通用括号抽象，不匹配数字、布尔、后继等专用形式，也不进行转换后的化简；结果可能更长。开启时沿用原来的自动化简。BCKW 只用 b、c、k、w，SK 只用 s、k。缺少的定义自动加入函数库；函数重名时按下方按钮选择替换、加数字改名或跳过；默认跳过并保留原式。转换后可接着输入，点击「转换成图示」后再运行。</p>
             <p id="combinator-status" role="status" hidden></p>
+            <details id="combinator-catalog"></details>
             <details id="bckw-rules"><summary>BCKW 自动化简规则</summary><p>开启「使用特殊化简」后，转换成 BCKW 时应用；关闭时只做通用转换。这里 i 表示 w k，p、q、r、x 是任意表达式；按实际函数定义识别组合子，用户的同名函数不会被当成这些组合子。</p><ul><li><code>k p q → p</code></li><li><code>b p q x → p (q x)</code></li><li><code>c p q x → p x q</code></li><li><code>w k x → x</code></li><li><code>c k x → w k</code>：假值接收一个参数后得到恒等函数。</li><li><code>k (w k) → c k</code>；<code>w (c k) → w k</code></li><li><code>b (k p) q → k p</code>；<code>b p (k q) → k (p q)</code></li><li><code>c (k p) q → k (p q)</code>；<code>c b (w k) → b (w k)</code></li><li><code>b (b p q) r → b p (b q r)</code>：整理连续复合。</li><li><code>b i p → p</code>、<code>b p i → p</code>、<code>w (k p) → p</code>：仅在能确认 p 至少接收一个参数时使用，包含尚未传满参数的组合子。</li><li><code>c (c p) → p</code>：仅在能确认 p 至少接收两个参数时使用。</li><li><code>h = c (b c (b (b b) (c b i))) i</code> 可整理为 <code>b (b i)</code>，即 <code>λf.λx.λy.f x y</code>；<code>b succ h → succ</code> 仅按丘奇后继的实际定义匹配。在 BCKW 中后继写成 <code>b w (c (b b b))</code>。</li></ul><p>未知自由变量保留必要的 λ 结构；复制规则只处理能安全展开的结构，w w w 留给运行按钮计算。规则不保证结果最短。</p></details>
           </div>
           <details id="sequences-panel" class="input-format-panel">
@@ -188,7 +194,7 @@
           <p class="function-note">保存后按名称调用，如 <code>ID (λy.y)</code>。名称可以用中文、数字开头或符号，如 <code>1号函数</code>、<code>_加法</code>、<code>+</code>；纯数字名称用反引号调用，如 <code>`123`</code>。</p>
           <p id="function-edit-status" class="function-note" role="status" hidden></p>
           <form id="function-form"><label for="function-name">函数名称</label><input id="function-name" placeholder="例如 ID、ADD、SUCC" autocomplete="off" spellcheck="false"><label for="function-source">函数定义</label><textarea id="function-source" placeholder="例如 λx.x" spellcheck="false" autocapitalize="off" aria-describedby="function-error"></textarea><div id="function-keys" class="function-keys" role="group" aria-label="函数定义快捷输入"><button type="button" data-function-insert="λ" aria-label="函数定义插入 λ">λ</button></div><p id="function-error" class="error-message" role="alert" hidden></p><div class="function-actions"><button id="function-use-current" type="button" class="button">使用当前式</button><button id="function-add" type="submit" class="button primary">新增函数 +</button></div></form>
-          <div id="function-list" class="function-list"></div><p class="function-foot">定义在保存时展开。删除函数后，已转换的图示仍可运行；再次转换会使用最新函数库。</p>
+          <div id="function-list" class="function-list"></div><p class="function-foot">示例函数按原文逐个保存。已转换的图示保持原状态；编辑或删除函数后，再次转换会使用最新函数库。</p>
         </section>
         <section class="card rules-card"><div class="section-heading"><div><span class="section-number">λ</span><h2>读懂线路</h2></div></div><div class="rule"><span class="legend-line lambda-line"></span><p><strong>抽象</strong><span>一条横线，绑定一个变量。</span></p></div><div class="rule"><span class="legend-line var-line"></span><p><strong>变量</strong><span>竖线连接到它所属的 λ。</span></p></div><div class="rule"><span class="legend-line app-line"></span><p><strong>应用</strong><span>横线连接函数与参数。</span></p></div><p class="rules-foot">颜色辅助追踪绑定；连线结构决定含义。</p></section>
       </aside>
@@ -643,7 +649,7 @@
       const name=pending.pop();if(seen.has(name))continue;seen.add(name);const fn=registry.get(name);if(!fn)continue;
       let body=fn.body;
       if(!body&&typeof fn.source==='string')try{body=C.parse(fn.source);}catch{}
-      const term=body&&C.equal(L.expand(body,functions),fn.term)?body:fn.term;
+      const term=fn.named?fn.term:body&&C.equal(L.expand(body,functions),fn.term)?body:fn.term;
       result.push({name,term});pending.push(...C.freeVars(term));
     }
     return result;
@@ -3096,31 +3102,13 @@
   function sourceFor(item,precision=item.decimalPlaces??6){const raw=rawSourceFor(item,precision);return naming()?.catalog().source(raw,item.name)??raw;}
   function programFor(item,precision=item.decimalPlaces??6){const raw=rawInputSourceFor(item,precision),catalog=naming()?.catalog();return catalog?.program(raw,item.name)??{source:raw,call:raw,definitions:[]};}
   function inputSourceFor(item,precision=item.decimalPlaces??6){return programFor(item,precision).source;}
-  let runtimeHelpers;
-  function helperPatterns(){
-    const catalog=naming()?.catalog();if(!catalog)return [];
-    if(!runtimeHelpers){
-      runtimeHelpers=catalog.entries().map(entry=>({name:entry.name,term:C.parse(entry.source,Infinity)}));
-      const helperNames=new Set(runtimeHelpers.map(entry=>entry.name)),encoding=root.LambdaDataEncoding||(typeof require==='function'?require('./data-encoding.js'):null);
-      // Record the exact declarations emitted by the generator too: their
-      // private names and literal representations may differ from the guide.
-      for(const item of [...examples,...levels]){
-        const source=inputSourceFor(item),pending=[encoding?encoding.parse(source).term:C.parse(source,Infinity)];
-        while(pending.length){const node=pending.pop();if(node.type==='abs')pending.push(node.body);else if(node.type==='app'){
-          if(node.fn.type==='abs'&&(helperNames.has(node.fn.param.replace(/'+$/,''))||node.fn.param.includes("'")))runtimeHelpers.push({name:node.fn.param,term:node.arg});
-          pending.push(node.fn,node.arg);
-        }}
-      }
-    }
-    return runtimeHelpers;
-  }
   function prepare(term,functions=[]){
     const library=root.LambdaLibrary||(typeof require==='function'?require('./library.js'):null);
-    return library?library.captureHelpers(term,helperPatterns(),functions):{term,definitions:functions};
+    return library?library.captureHelpers(term,[],functions,{declaredOnly:true}):{term,definitions:functions};
   }
   function preparePlain(term){
     const library=root.LambdaLibrary||(typeof require==='function'?require('./library.js'):null);
-    return library?library.linkHelpersInPlace(term,helperPatterns()):term;
+    return library?library.linkHelpersInPlace(term,[],{declaredOnly:true}):term;
   }
   function parametersFor(item,precision=item.decimalPlaces??6){
     if(item.fixedNumerator)return ['输出小数位数 '+precision+'_church','要求倒数的小数 '+item.operands[1]+'_decimal'];
@@ -4327,21 +4315,22 @@
     const roles=[['加法',['第一个加数','第二个加数']],['乘法',['第一个因数','第二个因数']],['乘方',['底数','指数']],['零判断',['待判断的自然数']],['前驱',['原自然数']],['减法',['被减数','减数']],['比较',['第一项','第二项']],['阶乘',['求阶乘的自然数']],['斐波那契',['数列下标']]].find(([prefix])=>example.name.startsWith(prefix))?.[1];
     if(!doc.inputs)doc.inputs=args.map((value,index)=>({name:'p'+(index+1),value,encoding:/^[0-9]+(?:_church)?$/.test(value)?'丘奇自然数':'λ表达式',role:roles?.[index]??'实际输入'+(index+1)}));
     doc.libraryEntries=[name];doc.entryContract={kind:example.category==='归约与终止'?'program':args.length||doc.inputs.length?'function':'value',name,inputs:doc.inputs.map(input=>({...input})),variadic:!!example.booleanCircuit&&['bits','delay','delayi','delayat','allbits','anybits','parity'].includes(example.booleanCircuit.name)};
-    doc.parameterNote=(doc.parameterNote??'外部只传实际数据参数。')+' 加入函数库只添加入口 '+name+'，辅助定义和固定值封装在内部。结果中的丘奇数、列表或布尔值自带的选择参数不需要额外传入。';
+    doc.parameterNote=(doc.parameterNote??'外部只传实际数据参数。').replace('加入函数库时只添加入口函数，辅助定义随它封装保存。','')+' 加入函数库会按示例原文逐个保存命名函数，逐字核对名称和表达式；不一致时停止，选择“重名替换”才覆盖。结果中的丘奇数、列表或布尔值自带的选择参数不需要额外传入。';
   }
   let interpreterTemplates;
+  let interpreterNamedTemplates;
   let listCallTemplates;
   const callContracts=new WeakMap();
   function pendingCall(input,functions=[]){
     if(!functions.length)return null;
     const C=root.LambdaCore||require('./core.js'),Library=root.LambdaLibrary||require('./library.js');let head=input,supplied=0;
-    if(typeof input==='string'){try{head=C.parse(input,Infinity,()=>C.V('callLiteral'),{suffixes:true});}catch{return null;}}
+    if(typeof input==='string'){try{const program=root.LambdaDefinitions?.parseProgram(input);if(program?.definitions.length){if(program.expression===null)return null;input=program.expression;}head=C.parse(input,Infinity,()=>C.V('callLiteral'),{suffixes:true});}catch{return null;}}
     while(head.type==='app'){supplied++;head=head.fn;}
     if(head.type!=='var')return null;
     const fn=functions.find(entry=>entry.name===head.name);if(!fn)return null;
     if(!callContracts.has(fn.term)){
       if(!listCallTemplates)listCallTemplates=P.examples.filter(example=>example.listOperation).map(example=>{const doc=lesson(example),term=Library.importDefinitions([],doc.symbols,libraryNames(doc)).functions[0].term;return {term,inputs:doc.inputs};});
-      callContracts.set(fn.term,listCallTemplates.find(template=>C.equal(template.term,fn.term))??null);
+      const value=Library.functionValue(fn,functions);callContracts.set(fn.term,listCallTemplates.find(template=>C.equal(template.term,value))??null);
     }
     const contract=callContracts.get(fn.term);if(!contract||supplied>=contract.inputs.length)return null;
     const missing=contract.inputs.slice(supplied),message='等待参数：'+fn.name+' 还需'+missing.length+'个参数（'+missing.map(input=>input.role).join('、')+'）。';
@@ -4354,8 +4343,9 @@
     if(!interpreterTemplates){
       const example=P.examples.find(entry=>entry.metaInterpreter),doc=lesson(example),name=libraryNames(doc)[0];
       const legacy=C.format(catalog().canonicalTerm(C.parse(Meta.legacyMainSource),example.name));
-      interpreterTemplates=[];
+      interpreterTemplates=[];interpreterNamedTemplates=[];
       for(const source of [doc.symbols.find(entry=>entry.name===name).source,legacy]){
+        interpreterNamedTemplates.push(C.parse(source));
         const entries=doc.symbols.map(entry=>entry.name===name?{...entry,source}:entry);
         interpreterTemplates.push(Library.importDefinitions([],entries,[name]).functions[0].term);
         const registry=new Map(entries.map(entry=>[entry.name,C.parse(entry.source)])),resolved=new Map();
@@ -4363,7 +4353,7 @@
         interpreterTemplates.push(resolve(name));
       }
     }
-    const names=new Set(functions.filter(fn=>interpreterTemplates.some(template=>C.equal(template,fn.term))).map(fn=>fn.name));
+    const names=new Set(functions.filter(fn=>{if(fn.named&&!interpreterNamedTemplates.some(template=>C.equal(template,fn.term)))return false;const value=Library.functionValue(fn,functions);return interpreterTemplates.some(template=>C.equal(template,value));}).map(fn=>fn.name));
     if(!names.size)return term;
     const bound=(name,scope)=>{for(let current=scope;current;current=current.parent)if(current.name===name)return true;return false;};
     const work=[{node:term,scope:null}],values=[];let found=false;
@@ -4421,7 +4411,7 @@
       try{
         const doc=lesson(P.examples[selected],api.precision()),selectedNames=names??coreNames(doc);
         if(!selectedNames.length)throw new Error('本篇是表达式演示，没有可直接导入的命名函数。');
-        const result=api.addFunctions(doc.symbols,selectedNames);
+        const result=api.addFunctions(doc.symbols,names===null?null:selectedNames,{exact:true});
         feedback.textContent=root.LambdaLibrary.importFeedback(result);
         const calls=selectedNames.map(name=>result.bindings[name]??name).filter(name=>result.added.includes(name)||result.replaced.includes(name)||result.ready.includes(name)||result.reused.includes(name));
         if(calls.length)feedback.textContent+=' 可调用：'+calls.join('、')+'。';
@@ -4558,6 +4548,9 @@
   const LIMITS={count:Infinity,nodes:Infinity,nameChars:Infinity};
   const validName=C.validName;
   const COLLISIONS=['skip','replace','rename','reuse'];
+  const namedSources=new WeakMap();
+  const generatedBindings=new WeakSet();
+  function helperBinding(name,body,value){const term=C.A(C.L(name,body),value);generatedBindings.add(term);return term;}
   function availableName(base,functions=[],reserved=[]){const used=new Set([...functions.map(fn=>fn.name),...reserved]);let index=2n,name=base;while(used.has(name)){name=base+index;index++;}return name;}
   function names(t,out=new Set()) {
     if(t.type==='var')out.add(t.name);
@@ -4568,6 +4561,12 @@
     if(!Array.isArray(functions))throw new C.LambdaError('函数库格式不合法。');
     const seen=new Set();let nodes=0,nameChars=0;
     for(const fn of functions) {
+      if(fn.named!==undefined&&typeof fn.named!=='boolean')throw new C.LambdaError('命名函数定义标记不合法。');
+      if(fn.named){
+        if(typeof fn.source!=='string')throw new C.LambdaError('命名函数缺少原始定义。');
+        if(namedSources.get(fn.term)!==fn.source){if(C.format(fn.term)!==C.format(C.parse(fn.source,Infinity)))throw new C.LambdaError('函数原文与表达式不一致：'+fn.name);namedSources.set(fn.term,fn.source);}
+        if(fn.body&&C.format(fn.body)!==C.format(fn.term))throw new C.LambdaError('函数体与原始定义不一致：'+fn.name);
+      }
       if(fn.body!==undefined)C.inspect(fn.body);
       if(fn.source!==undefined&&typeof fn.source!=='string')throw new C.LambdaError('函数原始定义需为文本。');
       if(fn.encodings!==undefined&&(!Array.isArray(fn.encodings)||fn.encodings.some(name=>!C.validName(name))))throw new C.LambdaError('函数编码标记不合法。');
@@ -4579,17 +4578,43 @@
     }
     return functions;
   }
-  function expand(term,functions) {
-    const registry=new Map(functions.map(f=>[f.name,f.term])),free=C.freeVars(term);
+  function expand(term,functions,{preserve=[]}={}) {
+    const registry=new Map(functions.map(f=>[f.name,f])),free=C.freeVars(term);
+    const protectedNames=new Set(preserve);
     const used=names(term);for(const f of functions)names(f.term,used);
     const replacements=[];let next=0,result=term;
     for(const name of free) {
-      if(!registry.has(name))continue;
+      if(!registry.has(name)||protectedNames.has(name))continue;
       let placeholder;do{placeholder=`lambdaMacro${++next}`;}while(used.has(placeholder));used.add(placeholder);
-      result=C.substitute(result,name,C.V(placeholder));replacements.push([placeholder,registry.get(name)]);
+      result=C.substitute(result,name,C.V(placeholder));replacements.push([placeholder,functionValue(registry.get(name),functions)]);
     }
     for(const [placeholder,definition] of replacements)result=C.substitute(result,placeholder,definition);
     C.inspect(result);return result;
+  }
+  function functionValue(fn,functions){
+    if(!fn.named)return fn.term;
+    const registry=new Map(functions.map(entry=>[entry.name,entry])),ordered=[],seen=new Set(),active=new Set();
+    function visit(entry){if(seen.has(entry.name))return;if(active.has(entry.name))throw new C.LambdaError('函数定义存在循环引用：'+entry.name+'；递归请使用显式不动点组合子。');active.add(entry.name);if(entry.named)for(const name of C.freeVars(entry.term)){const dependency=registry.get(name);if(dependency)visit(dependency);}active.delete(entry.name);seen.add(entry.name);ordered.push(entry);}
+    visit(fn);const dependencies=ordered.filter(entry=>entry!==fn),used=new Set(),external=new Set();
+    const pending=ordered.map(entry=>entry.term);while(pending.length){const node=pending.pop();if(node.type==='var')used.add(node.name);else if(node.type==='abs'){used.add(node.param);pending.push(node.body);}else pending.push(node.fn,node.arg);}
+    for(const entry of ordered)for(const name of C.freeVars(entry.term))if(!entry.named||!registry.has(name))external.add(name);
+    const locals=new Map(),fresh=base=>{let name=base;do{name+="'";}while(used.has(name)||external.has(name));used.add(name);return name;};
+    for(const entry of dependencies)if(external.has(entry.name))locals.set(entry.name,fresh(entry.name));
+    const protect=new Set([...dependencies.map(entry=>entry.name),...external]),parameters=[];let body=fn.term;
+    while(body.type==='abs'){let name=body.param,next=body.body;if(protect.has(name)){const renamed=fresh(name);next=C.substitute(next,name,C.V(renamed));name=renamed;}parameters.push(name);body=next;}
+    const local=term=>{for(const [name,renamed]of locals)term=C.substitute(term,name,C.V(renamed));return term;};body=local(body);
+    for(const entry of dependencies.reverse())body=helperBinding(locals.get(entry.name)??entry.name,body,entry.named?local(entry.term):entry.term);
+    for(const name of parameters.reverse())body=C.L(name,body);return body;
+  }
+  function importExact(functions,definitions,selected,collision){
+    const registry=new Map(),next=functions.slice(),added=[],ready=[],replaced=[],bindings=Object.create(null);
+    for(const definition of definitions){if(!validName(definition.name)||registry.has(definition.name)||typeof definition.source!=='string')throw new C.LambdaError('示例函数定义不完整或重名。');registry.set(definition.name,{...definition,term:C.parse(definition.source,Infinity)});}
+    const wanted=new Set(),active=new Set();function visit(name){if(wanted.has(name))return;if(active.has(name))throw new C.LambdaError('示例函数循环引用：'+name);const entry=registry.get(name);if(!entry)throw new C.LambdaError('示例缺少函数：'+name);active.add(name);for(const dependency of C.freeVars(entry.term))if(registry.has(dependency))visit(dependency);active.delete(name);wanted.add(name);}
+    for(const name of selected??registry.keys())visit(name);
+    const conflicts=[...wanted].filter(name=>functions.some(fn=>fn.name===name&&fn.source!==registry.get(name).source));
+    if(conflicts.length&&collision!=='replace'){const error=new C.LambdaError('示例定义不一致：'+conflicts.join('、')+'。未更改函数库；选择“重名替换”可按示例原文导入。');error.conflicts=conflicts;throw error;}
+    for(const name of wanted){const entry=registry.get(name),existing=next.find(fn=>fn.name===name),definition={name,source:entry.source,term:entry.term,body:entry.term,named:true,sourceFree:[...C.freeVars(entry.term)]};bindings[name]=name;if(existing){next[next.indexOf(existing)]=definition;(existing.source===entry.source?ready:replaced).push(name);}else{next.push(definition);added.push(name);}}
+    validate(next);return {functions:next,added,ready,replaced,skipped:[],renamed:[],reused:[],inlined:[],bindings,exact:true,verified:[...wanted]};
   }
   function add(functions,name,source,maxChars=C.LIMITS.chars,numberEncoding='church',precision=6,dataEncodings=null,prepared=null) {
     name=name.trim();
@@ -4617,13 +4642,13 @@
   function encodingsFor(term,functions){const names=C.freeVars(term);return [...new Set(functions.filter(fn=>names.has(fn.name)).flatMap(fn=>fn.encodings??[]))];}
   // Capture lexical helper declarations without executing or duplicating them.
   // Free references to surrounding data become explicit closure parameters.
-  function captureHelpers(term,patterns,functions=[]){
+  function captureHelpers(term,patterns,functions=[],{declaredOnly=false}={}){
     const registry=new Map(),used=new Set(),definitions=[];
     for(const entry of patterns){const values=registry.get(entry.name)??[];values.push(entry.term);registry.set(entry.name,values);}
     const pending=[term,...functions.map(entry=>entry.term)],seen=new WeakSet();let hasHelpers=false;
     while(pending.length){const node=pending.pop();if(seen.has(node))continue;seen.add(node);if(node.type==='var')used.add(node.name);else if(node.type==='abs'){used.add(node.param);pending.push(node.body);}else{
       const candidates=node.fn.type==='abs'?registry.get(node.fn.param):null;
-      if(candidates?.some(value=>C.equal(value,node.arg)))hasHelpers=true;
+      if(declaredOnly?generatedBindings.has(node):candidates?.some(value=>C.equal(value,node.arg)))hasHelpers=true;
       pending.push(node.fn,node.arg);
     }}
     if(!hasHelpers)return {term,definitions:functions};
@@ -4656,7 +4681,7 @@
           work.push({node,stage:'abs',param},{node:node.body,environment:scope,bound:{name:param,parent:bound}});continue;
         }
         const candidates=node.fn.type==='abs'?registry.get(node.fn.param):null;
-        if(candidates?.some(value=>C.equal(value,node.arg)))work.push({...frame,stage:'helper'},{node:node.arg,environment,bound});
+        if(declaredOnly?generatedBindings.has(node):candidates?.some(value=>C.equal(value,node.arg)))work.push({...frame,stage:'helper'},{node:node.arg,environment,bound});
         else work.push({node,stage:'app'},{node:node.arg,environment,bound},{node:node.fn,environment,bound});
       }
       return values[0];
@@ -4693,7 +4718,7 @@
   }
   // Resolve declared helpers where they were written. Hoisting them around
   // the whole call would move actual data underneath new lambda binders.
-  function linkHelpersInPlace(term,patterns=[]){
+  function linkHelpersInPlace(term,patterns=[],{declaredOnly=false}={}){
     const registry=new Map();for(const entry of patterns){const values=registry.get(entry.name)??[];values.push(entry.term);registry.set(entry.name,values);}
     const occurrences=(term,name)=>{const work=[term];let count=0;while(work.length&&count<2){const node=work.pop();if(node.type==='var'){if(node.name===name)count++;}else if(node.type==='abs'){if(node.param!==name)work.push(node.body);}else work.push(node.fn,node.arg);}return count;};
     const work=[{node:term}],values=[];
@@ -4703,7 +4728,7 @@
       if(!finish){work.push({node,finish:true});if(node.type==='abs')work.push({node:node.body});else work.push({node:node.arg},{node:node.fn});continue;}
       if(node.type==='abs'){const body=values.pop();values.push(body===node.body?node:C.L(node.param,body));continue;}
       const arg=values.pop(),fn=values.pop(),candidates=node.fn.type==='abs'?registry.get(node.fn.param):null;
-      if(fn.type==='abs'&&candidates?.some(value=>C.equal(value,node.arg))){
+      if(fn.type==='abs'&&(declaredOnly?generatedBindings.has(node):candidates?.some(value=>C.equal(value,node.arg)))){
         const count=occurrences(fn.body,fn.param);
         if(!count){values.push(fn.body);continue;}
         if(count===1){values.push(C.substitute(fn.body,fn.param,arg));continue;}
@@ -4712,8 +4737,9 @@
     }
     return values[0];
   }
-  function importDefinitions(functions,definitions,selected=null,{collision='skip'}={}) {
+  function importDefinitions(functions,definitions,selected=null,{collision='skip',exact=false}={}) {
     if(!COLLISIONS.includes(collision))throw new C.LambdaError('函数重名处理方式不合法。');
+    if(exact)return importExact(functions,definitions,selected,collision);
     const registry=new Map(),resolved=new Map(),visiting=new Set(),desired=new Map(),packed=new Map(),next=functions.slice(),added=[],skipped=new Set(),ready=new Set(),inlined=[],renamed=[],replaced=[],reused=new Set(),bindings=Object.create(null);
     for(const entry of definitions){
       if(!validName(entry.name)||registry.has(entry.name))throw new C.LambdaError('教程函数名称无效或重复。');
@@ -4771,7 +4797,7 @@
       for(const entry of bindings)if(opaqueFree.has(entry.name)){let fresh=entry.name;do{fresh+="'";}while(used.has(fresh)||protectedNames.has(fresh));used.add(fresh);localNames.set(entry.name,fresh);}
       const local=term=>{for(const [name,fresh]of localNames)term=C.substitute(term,name,C.V(fresh));return term;};
       body=local(body);
-      for(const entry of [...bindings].reverse())body=C.A(C.L(localNames.get(entry.name)??entry.name,body),entry.existing?entry.parsed:local(entry.parsed));
+      for(const entry of [...bindings].reverse())body=helperBinding(localNames.get(entry.name)??entry.name,body,entry.existing?entry.parsed:local(entry.parsed));
       for(const param of parameters.reverse())body=C.L(param,body);
       packed.set(name,body);return body;
     }
@@ -4785,10 +4811,10 @@
     if(result.replaced?.length)text+=' 重名已替换：'+result.replaced.join('、')+'。';
     if(result.renamed?.length)text+=' 重名已加数字：'+result.renamed.map(item=>item.from+' → '+item.to).join('、')+'。';
     if(result.reused?.length)text+=' 已直接使用同名函数：'+result.reused.join('、')+'（沿用现有定义）。';
-    if(result.added.length)text+=' 所需辅助定义已封装在入口函数内部。';
+    if(result.exact)text+=' 已逐字核对'+result.verified.length+'个函数定义；名称和原始表达式与示例一致。';else if(result.added.length)text+=' 所需辅助定义已封装在入口函数内部。';
     return text;
   }
-  const API={LIMITS,COLLISIONS,availableName,validName,validate,expand,encodingsFor,captureHelpers,closeHelpers,linkHelpersInPlace,add,update,remove,importDefinitions,importFeedback};root.LambdaLibrary=API;
+  const API={LIMITS,COLLISIONS,availableName,validName,validate,expand,functionValue,encodingsFor,captureHelpers,closeHelpers,linkHelpersInPlace,add,update,remove,importDefinitions,importFeedback};root.LambdaLibrary=API;
   if(typeof module!=='undefined'&&module.exports)module.exports=API;
 })(typeof globalThis!=='undefined'?globalThis:window);
 
@@ -4818,7 +4844,7 @@
     const term=walk(raw,1);C.inspect(term);return term;
   }
   function validate(raw) {
-    if(!object(raw)||![2,3,4,5].includes(raw.version))fail('不支持这个存档版本。');
+    if(!object(raw)||![2,3,4,5,6].includes(raw.version))fail('不支持这个存档版本。');
     if(typeof raw.draft!=='string')fail('草稿缺失或不是文本。');
     if(!Array.isArray(raw.functions))fail('函数库不合法。');
     const functions=raw.functions.map(f=>{
@@ -4826,7 +4852,7 @@
       if(f.source!==undefined&&typeof f.source!=='string')fail('函数原始定义需为文本。');
       const term=ast(f.term),retired=f.sourceSyntax==='math';
       // Keep functions saved by the removed input mode usable without its parser.
-      return {name:f.name,term,...(f.body===undefined?{}:{body:ast(f.body)}),...(retired?{source:C.format(term)}:f.source===undefined?{}:{source:f.source}),...(f.encodings===undefined?{}:{encodings:f.encodings}),...(retired?{sourceFree:[...C.freeVars(term)]}:f.sourceFree===undefined?{}:{sourceFree:f.sourceFree})};
+      return {name:f.name,term,...(f.named===undefined?{}:{named:f.named}),...(f.body===undefined?{}:{body:ast(f.body)}),...(retired?{source:C.format(term)}:f.source===undefined?{}:{source:f.source}),...(f.encodings===undefined?{}:{encodings:f.encodings}),...(retired?{sourceFree:[...C.freeVars(term)]}:f.sourceFree===undefined?{}:{sourceFree:f.sourceFree})};
     });L.validate(functions);
     if(raw.dataEncodings!==undefined&&!Array.isArray(raw.dataEncodings))fail('数据编码列表不合法。');
     const dataEncodings=(raw.dataEncodings??[]).map(entry=>{
@@ -4877,6 +4903,7 @@
       version=4;
     }
     if(functionDefinitions!==undefined)version=5;
+    if(functions.some(fn=>fn.named))version=6;
     if(typeof s.halt!=='string'||s.halt.length>500)fail('暂停信息不合法。');
     const v=raw.view;if(!object(v)||!Number.isInteger(v.speed)||v.speed<1||v.speed>60000||!Number.isFinite(v.scale)||v.scale<.02||v.scale>16)fail('视图设置不合法。');
     const growthWindowMs=v.growthWindowMs??Guard.DEFAULT_MS;if(![0,1000,3000,10000,30000].includes(growthWindowMs))fail('运行增长观察窗口不合法。');
@@ -5197,7 +5224,7 @@
         });
         const del=document.createElement('button');del.textContent='删除';del.className='delete-function';del.setAttribute('aria-label',`删除函数 ${fn.name}`);
         del.addEventListener('click',()=>{functions=L.remove(functions,fn.name);if(editing===fn.name)clearEditor();renderLibrary();persist();api.toast(`已删除函数 ${fn.name}`);});
-        buttons.append(insert,edit,del);head.append(title,buttons);const definition=document.createElement('code');definition.textContent=C.format(fn.term);row.append(head,definition);list.append(row);
+        buttons.append(insert,edit,del);head.append(title,buttons);const definition=document.createElement('code');definition.textContent=fn.source??C.format(fn.term);row.append(head,definition);list.append(row);
       });
     }
     function apply(snapshot) {
@@ -5210,7 +5237,7 @@
     function recoverDraft(text,message,draftOnly=false){
       const snapshot=S.decodeStartingState(text,{draftOnly});
       apply(snapshot);recoveredDraft=snapshot.draft;checkpoint=text;
-      const original=JSON.parse(text);if([2,3,4,5].includes(original.version))recoveredSession=S.validate(original).session;
+      const original=JSON.parse(text);if([2,3,4,5,6].includes(original.version))recoveredSession=S.validate(original).session;
       $('storage-status').textContent='已保留原自动存档';
       feedback(message);
     }
@@ -5333,6 +5360,12 @@
     return {expand:t=>L.expand(t,functions),encodingsFor:t=>L.encodingsFor(t,functions),persist,queueSave,restoreInitial,attachCollisionControls,collisionPolicy:()=>collision,
       beginSession:()=>{recoveredDraft=null;recoveredSession=null;},
       functionEntries:()=>functions.slice(),
+      commitFunctions:(next,expected,policy=collision)=>{
+        if(collision!==policy||functions.length!==expected.length||functions.some((fn,index)=>fn!==expected[index]))throw new C.LambdaError('函数库或重名处理方式已改变，请重试。');
+        const previous=functions;functions=next;
+        try{const snapshot=captured();storeSnapshot(snapshot);lastCaptured=signature(snapshot);}catch(error){functions=previous;throw error;}
+        renderLibrary();
+      },
       saveDefinition:(name,source,prepared)=>{
         const previous=functions;
         const next=functions.some(fn=>fn.name===name)?L.update(functions,name,name,source,'church',6,null,prepared):L.add(functions,name,source,Infinity,'church',6,null,prepared);
@@ -5355,6 +5388,67 @@
       }};
   }
   root.LambdaWorkspace={init};
+})(typeof globalThis!=='undefined'?globalThis:window);
+
+</script><script>
+(function(root){
+  'use strict';
+  const C=root.LambdaCore||require('./core.js'),L=root.LambdaLibrary||require('./library.js'),E=root.LambdaDataEncoding||require('./data-encoding.js');
+  function statements(source){
+    const out=[];let start=0,depth=0,quoted=false;
+    for(let i=0;i<=source.length;i++){
+      const char=source[i];if(char==='`')quoted=!quoted;
+      if(!quoted){if(char==='('||char==='[')depth++;else if(char===')'||char===']')depth--;}
+      if(i===source.length||char==='\n'&&!quoted&&depth===0){const raw=source.slice(start,i),leading=raw.search(/\S/);if(leading>=0)out.push({text:raw.trim(),offset:start+leading});start=i+1;}
+    }return out;
+  }
+  function assignment(statement){
+    let quoted=false,depth=0;
+    for(let i=0;i<statement.text.length;i++){
+      const char=statement.text[i];if(char==='`')quoted=!quoted;
+      if(!quoted){if(char==='('||char==='[')depth++;else if(char===')'||char===']')depth--;}
+      if(char!=='='||quoted||depth)continue;
+      let name=statement.text.slice(0,i).trim();if(name.startsWith('`')&&name.endsWith('`'))name=name.slice(1,-1);
+      if(!C.validName(name))return null;
+      const tail=statement.text.slice(i+1),leading=tail.search(/\S/);if(leading<0)throw new C.LambdaError('等号后请填写函数定义；跨行表达式请放在括号内。',statement.offset+i+1);
+      return {name,source:tail.trim(),offset:statement.offset+i+1+leading};
+    }return null;
+  }
+  function parseProgram(source){
+    if(!source.includes('='))return {definitions:[],expression:source,expressionOffset:0};
+    const definitions=[],parts=statements(source);let expression=null,expressionOffset=source.length;
+    for(const part of parts){const definition=assignment(part);if(expression!==null){if(definition)throw new C.LambdaError('函数定义请写在要运行的算式之前。',part.offset);continue;}if(definition)definitions.push(definition);else{expression=source.slice(part.offset);expressionOffset=part.offset;}}
+    return definitions.length?{definitions,expression,expressionOffset}:{definitions:[],expression:source,expressionOffset:0};
+  }
+  function aliasesOf(term,aliases){const entries=[...aliases].filter(([from,to])=>from!==to).map(([name,to])=>({name,term:C.V(to)}));return entries.length?L.expand(term,entries):term;}
+  async function prepare(source,functions=[],{collision='skip',encodings=[],encoding='church',numberFormats={},signal,onProgress,compileExpression=true,prepareTerm=term=>term}={}){
+    if(!L.COLLISIONS.includes(collision))throw new C.LambdaError('函数重名处理方式不合法。');
+    const program=E.isLiteral(source,encodings,numberFormats)?{definitions:[],expression:source,expressionOffset:0}:parseProgram(source),aliases=new Map(),result={added:[],ready:[],skipped:[],renamed:[],replaced:[],reused:[]},mappings=[],dataTerms=[],seenEncodings=new Set();let next=functions.slice();
+    const canceled=()=>{if(signal?.aborted){const error=new Error('定义已取消。');error.name='AbortError';throw error;}};
+    const compile=async(text,offset)=>{try{return await E.compile(text,encodings,encoding,{numberFormats,signal,onProgress});}catch(error){if(error.position!==null&&error.position!==undefined)error.position+=offset;throw error;}};
+    const remember=compiled=>{mappings.push(...compiled.mappings);dataTerms.push(...compiled.dataTerms);for(const name of compiled.encodings)seenEncodings.add(name);};
+    const reserved=program.definitions.map(definition=>definition.name);
+    for(const definition of program.definitions){
+      canceled();const {name}=definition,existing=next.find(fn=>fn.name===name);
+      if(existing&&collision==='reuse'){aliases.set(name,name);result.reused.push(name);continue;}
+      const compiled=await compile(definition.source,definition.offset),term=prepareTerm(aliasesOf(compiled.term,aliases),next),prepared={...compiled,term},expanded=L.expand(term,next);let actual=name;
+      if(existing){
+        if(C.equal(existing.term,expanded)){result.ready.push(name);aliases.set(name,name);continue;}
+        if(collision==='skip'){result.skipped.push(name);aliases.set(name,name);continue;}
+        if(collision==='rename'){
+          const numbered=next.find(fn=>fn.name.startsWith(name)&&/^[0-9]+$/.test(fn.name.slice(name.length))&&C.equal(fn.term,expanded));
+          if(numbered){aliases.set(name,numbered.name);result.ready.push(numbered.name);result.renamed.push({from:name,to:numbered.name});continue;}
+          actual=L.availableName(name,next,[...reserved,...C.freeVars(term)]);result.renamed.push({from:name,to:actual});
+        }
+      }
+      try{next=existing&&collision==='replace'?L.update(next,name,name,definition.source,encoding,6,encodings,prepared):L.add(next,actual,definition.source,Infinity,encoding,6,encodings,prepared);}catch(error){if(error.position!==null&&error.position!==undefined)error.position+=definition.offset;throw error;}
+      aliases.set(name,actual);(existing&&collision==='replace'?result.replaced:result.added).push(actual);remember(compiled);
+    }
+    canceled();let compiled=null;
+    if(compileExpression&&program.expression!==null){const value=await compile(program.expression,program.expressionOffset);compiled={...value,term:aliasesOf(value.term,aliases)};remember(value);}
+    return {program,functions:next,compiled,mappings,dataTerms,encodings:[...seenEncodings],aliases,result};
+  }
+  const API={parseProgram,prepare};root.LambdaDefinitions=API;if(typeof module!=='undefined'&&module.exports)module.exports=API;
 })(typeof globalThis!=='undefined'?globalThis:window);
 
 </script><script>
@@ -5662,9 +5756,19 @@
   'use strict';
   const C=root.LambdaCore||require('./core.js');
   const definitions=[
-    ['i','i','λx.x'],['k','true','λa b.a'],['b','b','λf g x.f (g x)'],
-    ['c','c','λf x y.f y x'],['s','s','λf g x.f x (g x)'],['w','w','λf x.f x x']
-  ].map(([key,name,source])=>({key,name,source:C.explicitLambdas(source),term:C.parse(source)}));
+    ['i','i','λx.x','原样返回输入。'],['k','true','λa b.a','保留第一项，忽略第二项。'],['b','b','λf g x.f (g x)','复合：先g后f。'],
+    ['c','c','λf x y.f y x','交换两个输入。'],['s','s','λf g x.f x (g x)','把同一输入交给两个函数。'],['w','w','λf x.f x x','把一个输入复制为两个参数。'],
+    ['m','m','λx.x x','自应用：把输入应用于自身。'],['a','a','λf x.f x','显式函数应用；也与丘奇数1同形。'],
+    ['t','t','λx f.f x','把已保存的值交给后来的函数。'],['v','v','λx y f.f x y','保存两个值，再交给读取函数。'],
+    ['q','q','λf g x.g (f x)','反向复合：先f后g。'],['f','f','λx y g.g y x','保存两个值，按交换后的顺序读取。'],
+    ['r','r','λx f y.f y x','保存一个值作为函数的第二个输入。'],['d','d','λf g x y.f (g x) y','只对第一个输入预处理。'],
+    ['e','e','λf g h x.f g (h x)','保留第一个输入，只预处理第二个输入。'],['j','j','λf x y z.f x (f z y)','将同一个函数嵌套调用两次。'],
+    ['h','h','λf x y.f x y x','在第一和第三个位置使用同一输入。'],['l','l','λf g.f (g g)','自应用后把结果交给函数。'],
+    ['o','o','λf g.g (f g)','把处理结果交回原输入函数。'],['phi','phi','λf g h x.f (g x) (h x)','同一输入经两路处理后合并。'],
+    ['psi','psi','λf g x y.f (g x) (g y)','两个输入先经过同一个处理函数再合并。'],
+    ['y','y','λf.(λx.f (x x)) (λx.f (x x))','正规序不动点组合子，供递归使用。'],
+    ['z','z','λf.(λx.f (λv.x x v)) (λx.f (λv.x x v))','以额外函数延迟递归的应用序不动点组合子。']
+  ].map(([key,name,source,description],index)=>({key,name,source:C.explicitLambdas(source),term:C.parse(source),description,extended:index>=6}));
   const combinators=new Map(definitions.map(d=>[d.key,{type:'combinator',key:d.key}]));
   const app=(fn,arg)=>({type:'app',fn,arg}),call=(key,...args)=>args.reduce(app,combinators.get(key));
   const SK={s:combinators.get('s'),k:combinators.get('k')};
@@ -5847,7 +5951,7 @@
     }
     return values[0];
   }
-  function* compileSteps(term,basis,simplify,recognize=true){
+  function* compileSteps(term,basis,simplify,recognize=true,extended=false){
     const pending=[{term}],values=[];
     while(pending.length){
       yield;const entry=pending.pop(),t=entry.term;
@@ -5861,7 +5965,7 @@
           if(C.equal(t,selfApply)){values.push(call('w',BCKW.i));continue;}
         }
         if(simplify){const value=C.churchNumber(t);if(value!==null){values.push(yield* numeral(value));continue;}if(C.equal(t,falseLambda)){values.push(SK.false);continue;}}
-        const known=!recognize||basis==='sk'&&!simplify?null:definitions.find(d=>C.equal(t,d.term));
+        const known=!recognize||basis==='sk'&&!simplify?null:definitions.find(d=>(extended||!d.extended)&&C.equal(t,d.term));
         if(known)values.push(simplify?SK[known.key]:combinators.get(known.key));
         else pending.push({term:t,finish:'abs'},{term:t.body});
       }else if(t.type==='app')pending.push({term:t,finish:'app'},{term:t.arg},{term:t.fn});
@@ -5879,9 +5983,9 @@
     // Preserve the explicitly unsimplified SK API. UI conversions share the
     // same structural representation, then emit only the requested primitives.
     if(basis==='sk'&&!simplify)return yield* compileSteps(term,basis,false);
-    const compiled=yield* compileSteps(term,basis==='bckw'?'bckw':'optimized',false);
+    const compiled=yield* compileSteps(term,basis==='bckw'?'bckw':'optimized',false,true,basis==='optimized');
     const canonical=yield* simplifySteps(compiled,false,canonicalRewrite);
-    return basis==='optimized'?canonical:yield* lowerBasis(canonical,basis);
+    return basis==='optimized'?yield* simplifySteps(canonical,false,term=>term.type==='app'&&isKey(term.fn,'b')&&isKey(term.arg,'i')?combinators.get('a'):term):yield* lowerBasis(canonical,basis);
   }
   function link(term,original,functions,basis,collision){
     const free=C.freeVars(original),occupied=new Set([...free,...functions.map(f=>f.name)]),required=new Set(),pending=[term];
@@ -5921,7 +6025,15 @@
     }while(!next.done);
     return link(next.value,term,functions,basis,collision);
   }
-  const API={compileTerm};root.LambdaCombinatorCompiler=API;
+  const catalog=()=>definitions.map(({key,name,source,description,extended})=>({key,name,source,description,extended}));
+  function initCatalog(mount){
+    if(!mount)return;const summary=document.createElement('summary');summary.textContent='可用的组合子（'+definitions.length+'种）';
+    const note=document.createElement('p');note.textContent='“编译成组合子”在开启特殊化简时识别以下结构，按需要加入完整定义。SK仅用s、k，BCKW仅用b、c、k、w；关闭特殊化简时仍使用通用括号抽象。';
+    const list=document.createElement('div');list.className='combinator-catalog-list';
+    for(const entry of definitions){const row=document.createElement('div'),label=document.createElement('strong'),description=document.createElement('span'),code=document.createElement('code');label.textContent=entry.name;description.textContent=entry.description;code.textContent=entry.source;row.append(label,description,code);list.append(row);}
+    mount.replaceChildren(summary,note,list);
+  }
+  const API={compileTerm,catalog,initCatalog};root.LambdaCombinatorCompiler=API;
   if(typeof module!=='undefined'&&module.exports)module.exports=API;
 })(typeof globalThis!=='undefined'?globalThis:window);
 
@@ -5935,6 +6047,13 @@
   function reductionStep(){return state.unfoldFunctions?functionReducer.step(state.term,state.strategy,state.direction):C.step(state.term,state.strategy,state.direction);}
   const $=id=>document.getElementById(id);
   const input=$('expression');
+  const Definitions=window.LambdaDefinitions,definitionFeedback=$('inline-definition-feedback');
+  const prepareDefinitions=(source,functions,options={})=>Definitions.prepare(source,functions,{collision:workspace?.collisionPolicy()??'skip',encodings:dataEditor.entries(),encoding:state.numberEncoding,numberFormats:state.numberFormats,prepareTerm:(term,entries)=>window.LambdaGuide.compileInterpreterCall(term,entries,value=>window.LambdaLibrary.expand(value,entries)),...options});
+  function showDefinitions(result){definitionFeedback.textContent=window.LambdaLibrary.importFeedback(result);definitionFeedback.hidden=false;}
+  function exampleFreeNames(source){
+    const text=source.trim();for(const example of P.examples.filter(example=>example.metaInterpreter||example.name==='防止变量捕获'))if([P.inputSourceFor(example,state.decimalPlaces),window.LambdaGuide.lesson(example,state.decimalPlaces).compact].some(value=>value?.trim()===text))return [...C.freeVars(C.parse(example.metaInput??example.term))];return [];
+  }
+  window.LambdaCombinatorCompiler.initCatalog($('combinator-catalog'));
   const valueButton=$('decimal-value'),valueResult=$('decimal-value-result'),valueDetails=$('normal-form');
   const interpretedDetails=$('interpreted-result'),interpretedExpression=$('interpreted-expression');
   let valueJob=null,valueSource=null,normalForm=null,valueResume=null;
@@ -6016,7 +6135,9 @@
     $('history-details').open=s.view.historyOpen;$('help-panel').hidden=!s.view.helpOpen;$('help-toggle').setAttribute('aria-expanded',String(s.view.helpOpen));
     $('hint').hidden=!s.view.hintOpen;$('hint-toggle').textContent=s.view.hintOpen?'收起提示':'显示提示';$('hint-toggle').setAttribute('aria-expanded',String(s.view.hintOpen));
     $('challenge-feedback').textContent='';$('next-level').hidden=true;$('error-message').textContent=s.error;$('error-message').hidden=!s.error;
-    renderMode();if(s.hasSession)render();else convert();input.setSelectionRange(s.selection.start,s.selection.end);
+    let definitionDraft=false;try{definitionDraft=!E.isLiteral(input.value,dataEditor.entries(),state.numberFormats)&&Definitions.parseProgram(input.value).definitions.length>0;}catch{definitionDraft=true;}
+    if(!s.hasSession&&definitionDraft)state.dirty=true;
+    renderMode();if(s.hasSession||definitionDraft)render();else convert();input.setSelectionRange(s.selection.start,s.selection.end);
     if(implicitFunctions)toast('旧会话的隐式函数定义与历史已保留。点击「转换成图示」即可按关闭状态生成普通 λ 表达式。');
     if(!state.term){$('zoom-label').textContent=`${Math.round(state.scale*100)}%`;$('fit').setAttribute('aria-pressed',String(state.autoFit));}
     $('diagram-viewport').scrollLeft=s.view.panX;$('diagram-viewport').scrollTop=s.view.panY;
@@ -6028,6 +6149,7 @@
   function stop() { clearTimeout(state.timer); state.timer=null; state.running=false;state.fast=false;repeatedTerm=null;runGuard=null; }
   function cancelRewind(){rewindJob?.abort();rewindJob=null;}
   function changed() {
+    definitionFeedback.hidden=true;
     cancelRewind();
     cancelConversion();
     $('example-info').hidden=true;
@@ -6051,22 +6173,24 @@
     $('challenge-feedback').textContent=''; $('next-level').hidden=true;
     try {
       if(state.numberEncoding==='decimal'&&!$('decimal-places').checkValidity())throw new C.LambdaError('输出小数位数需为非负整数。');
-      const compiled=await E.compile(input.value,dataEditor.entries(),state.numberEncoding,{numberFormats:state.numberFormats,signal:controller.signal,onProgress:literal=>{if(!showedProgress){state.encodingBusy=true;render();showedProgress=true;}encodingProgress.hidden=false;cancelEncoding.hidden=false;encodingProgress.textContent=`正在自动编码 ${literal.number}_${literal.name} · ${literal.steps} 步`;}});
+      const before=workspace?.functionEntries()??[],policy=workspace?.collisionPolicy()??'skip',staged=await prepareDefinitions(input.value,before,{signal:controller.signal,onProgress:literal=>{if(!showedProgress){state.encodingBusy=true;render();showedProgress=true;}encodingProgress.hidden=false;cancelEncoding.hidden=false;encodingProgress.textContent=`正在自动编码 ${literal.number}_${literal.name} · ${literal.steps} 步`;}}),compiled=staged.compiled;
       if(controller.signal.aborted||conversionController!==controller)return false;
-      if(compiled.mappings.some(mapping=>!dataEditor.entries().some(entry=>entry.name===mapping.name&&entry.term===mapping.definition)))return false;
-      state.inputCall=window.LambdaGuide.pendingCall(compiled.term,workspace?.functionEntries()??[]);
-      const expanded=term=>workspace?workspace.expand(term):term;
-      const interpreted=window.LambdaGuide.compileInterpreterCall(compiled.term,workspace?.functionEntries()??[],expanded);
+      if(staged.mappings.some(mapping=>!dataEditor.entries().some(entry=>entry.name===mapping.name&&entry.term===mapping.definition)))return false;
+      if(!compiled){workspace.commitFunctions(staged.functions,before,policy);dataEditor.remember(staged.mappings);showDefinitions(staged.result);definitionFeedback.textContent+=' 末行可追加要运行的算式。';render();save();return true;}
+      state.inputCall=window.LambdaGuide.pendingCall(compiled.term,staged.functions);
+      const preserve=staged.program.definitions.length?[]:exampleFreeNames(input.value),expanded=term=>window.LambdaLibrary.expand(term,staged.functions,{preserve});
+      const interpreted=window.LambdaGuide.compileInterpreterCall(compiled.term,staged.functions,expanded);
       const parsed=window.LambdaMeta.repair(interpreted,expanded);
       if(interpreted!==compiled.term)toast('解释器输入已自动编码，环境已封装；运行时执行解释并还原表达式。');
       else if(parsed!==compiled.term){
         input.value=C.format(parsed);
         toast('解释器表达式已更新，待计算表达式会在解释器内部执行。');
       }
-      dataEditor.remember(compiled.mappings);
-      const base=state.unfoldFunctions&&parsed===compiled.term?{term:parsed,definitions:F.capture(parsed,workspace?.functionEntries()??[])}:{term:parsed===compiled.term?expanded(parsed):parsed,definitions:[]};
+      const base=state.unfoldFunctions&&parsed===compiled.term?{term:parsed,definitions:F.capture(parsed,staged.functions.filter(fn=>!preserve.includes(fn.name)))}:{term:parsed===compiled.term?expanded(parsed):parsed,definitions:[]};
       const linked=state.unfoldFunctions?P.prepare(base.term,base.definitions):{term:P.preparePlain(base.term),definitions:[]};
-      const prepared=state.unfoldFunctions&&state.dataAsFunctions?F.prepare(linked.term,linked.definitions,compiled.dataTerms):linked;
+      const prepared=state.unfoldFunctions&&state.dataAsFunctions?F.prepare(linked.term,linked.definitions,staged.dataTerms):linked;
+      if(staged.program.definitions.length){workspace.commitFunctions(staged.functions,before,policy);showDefinitions(staged.result);}
+      dataEditor.remember(staged.mappings);
       state.functionDefinitions=prepared.definitions;
       functionReducer=F.create(state.functionDefinitions);
       const term=prepared.term;
@@ -6074,7 +6198,7 @@
       workspace?.beginSession();
       state.decimalDigitsOrder='forward';
       decodedTerms=new WeakMap();
-      state.term=term; state.original=term; state.history=Trace.create(term,state.functionDefinitions);state.dirty=false;state.encodingBusy=false;state.encodings=[...new Set([...compiled.encodings,...(workspace?.encodingsFor(parsed)??[])])];
+      state.term=term; state.original=term; state.history=Trace.create(term,state.functionDefinitions);state.dirty=false;state.encodingBusy=false;state.encodings=[...new Set([...compiled.encodings,...window.LambdaLibrary.encodingsFor(parsed,staged.functions)])];
       state.autoFit=true; render(); save(); return true;
     } catch(e) {
       if(e.name==='AbortError'||controller.signal.aborted)return false;
@@ -6510,17 +6634,19 @@
     const controller=new AbortController(),entries=dataEditor.entries(),source=input.value,functions=workspace.functionEntries(),buttons=[$('compile-combinators'),$('compile-sk'),$('compile-bckw')];
     conversionController=controller;compilingDefinitions=new Map(entries.map(entry=>[entry.name,entry]));buttons.forEach(button=>button.disabled=true);$('compiler-special').disabled=true;
     try{
-      const parsed=await E.compile(source,entries,state.numberEncoding,{numberFormats:state.numberFormats,signal:controller.signal});
-      const syntax=window.LambdaGuide.compileInterpreterCall(parsed.term,functions,term=>workspace.expand(term));
-      const result=await window.LambdaCombinatorCompiler.compileTerm(syntax===parsed.term?workspace.expand(parsed.term):syntax,{basis,simplify,specialize,collision,functions,signal:controller.signal,onProgress:()=>{
+      const staged=await prepareDefinitions(source,functions,{signal:controller.signal}),parsed=staged.compiled;
+      if(!parsed)throw new C.LambdaError('请在定义后写出要编译的算式；只保存函数可点“保存等号定义”。');
+      const preserve=staged.program.definitions.length?[]:exampleFreeNames(source),expanded=term=>window.LambdaLibrary.expand(term,staged.functions,{preserve}),syntax=window.LambdaGuide.compileInterpreterCall(parsed.term,staged.functions,expanded);
+      const result=await window.LambdaCombinatorCompiler.compileTerm(syntax===parsed.term?expanded(parsed.term):syntax,{basis,simplify,specialize,collision,functions:staged.functions,signal:controller.signal,onProgress:()=>{
         encodingProgress.hidden=false;cancelEncoding.hidden=false;encodingProgress.textContent='正在外部编译组合子…';
       }});
       if(controller.signal.aborted||conversionController!==controller||input.value!==source)return;
       const current=workspace.functionEntries();
       if(current.length!==functions.length||current.some((fn,index)=>fn!==functions[index]))throw new C.LambdaError('函数库已修改，请重新编译。');
       if(workspace.collisionPolicy()!==collision)throw new C.LambdaError('重名处理方式已改变，请重新编译。');
-      const imported=workspace.importDefinitions(result.definitions,undefined,{collision});dataEditor.remember(parsed.mappings);
+      const imported=window.LambdaLibrary.importDefinitions(staged.functions,result.definitions,null,{collision});workspace.commitFunctions(imported.functions,functions,collision);dataEditor.remember(staged.mappings);
       input.value=result.source;changed();workspace.persist();
+      if(staged.program.definitions.length)showDefinitions(staged.result);
       $('combinator-status').hidden=false;$('combinator-status').textContent=result.used.length?`已在外部编译${basis==='sk'?'为 SK':basis==='bckw'?'为 BCKW':''}；算式使用 ${result.used.join('、')}。缺少的定义已加入函数库，可编辑和删除。`:'编译完成，输入不需要组合子。';
       if(result.ready.length)$('combinator-status').textContent+=' 已有相同定义，已准备好：'+result.ready.join('、')+'。';
       if(result.reused.length)$('combinator-status').textContent+=' 已直接使用同名函数：'+result.reused.join('、')+'（沿用现有定义）。';
@@ -6608,9 +6734,10 @@
       const add=document.createElement('button'),feedback=document.createElement('span');
       add.type='button';add.id='example-add-library';add.className='button';add.textContent='将此示例函数加入函数库';
       feedback.id='example-library-feedback';feedback.setAttribute('role','status');
+      const exactNote=document.createElement('p');exactNote.className='syntax-note';exactNote.textContent='逐个导入示例原始定义，并逐字核对；同名原文不一致会停止，选择“重名替换”才覆盖。';info.append(exactNote);
       add.addEventListener('click',()=>{
         try{
-          const result=workspace.importDefinitions(doc.symbols,selectedNames);
+          const result=workspace.importDefinitions(doc.symbols,null,{exact:true});
           feedback.textContent=window.LambdaLibrary.importFeedback(result);
           const calls=selectedNames.map(name=>result.bindings[name]??name).filter(name=>result.added.includes(name)||result.replaced.includes(name)||result.ready.includes(name)||result.reused.includes(name));
           if(calls.length)feedback.textContent+=' 可调用：'+calls.join('、')+'。';
@@ -6621,6 +6748,16 @@
     info.hidden=!info.hasChildNodes();
   });
   $('convert').addEventListener('click',convert);$('step').addEventListener('click',advance);$('run').addEventListener('click',()=>run());
+  $('save-inline-definitions').addEventListener('click',async()=>{
+    cancelConversion();const controller=new AbortController();conversionController=controller;const source=input.value,before=workspace.functionEntries(),policy=workspace.collisionPolicy(),button=$('save-inline-definitions');button.disabled=true;$('error-message').hidden=true;
+    try{
+      if(!Definitions.parseProgram(source).definitions.length)throw new C.LambdaError('请先在输入框写“名称 = 表达式”，每行一个定义。');
+      const staged=await prepareDefinitions(source,before,{compileExpression:false,signal:controller.signal,onProgress:literal=>{encodingProgress.hidden=false;cancelEncoding.hidden=false;encodingProgress.textContent=`正在准备函数中的数字编码 ${literal.number}_${literal.name} · ${literal.steps} 步`;}});
+      if(controller.signal.aborted||conversionController!==controller||input.value!==source)return;
+      workspace.commitFunctions(staged.functions,before,policy);dataEditor.remember(staged.mappings);showDefinitions(staged.result);workspace.persist();
+    }catch(error){if(!controller.signal.aborted){$('error-message').textContent=error.message;$('error-message').hidden=false;}}
+    finally{button.disabled=false;if(conversionController===controller)cancelConversion();}
+  });
   $('fast-run').addEventListener('click',()=>run(true));
   $('number-encoding').addEventListener('change',()=>{const previous=state.numberEncoding;state.numberEncoding=$('number-encoding').value;dataEditor.select(state.numberEncoding);if(previous!==state.numberEncoding){changed();queueLiteralPreparation();}else{render();save();}});
   $('decimal-places').addEventListener('input',()=>{const n=$('decimal-places').valueAsNumber;if(!Number.isSafeInteger(n)||n<0){$('decimal-places').setCustomValidity('请输入非负整数');return;}$('decimal-places').setCustomValidity('');state.decimalPlaces=n;if(state.numberEncoding==='decimal')changed();else save();});
@@ -6687,7 +6824,7 @@
   $('speed').addEventListener('change',save);
   dataEditor=window.LambdaDataEncodingEditor.init({getSelection:()=>state.numberEncoding,setSelection:value=>{state.numberEncoding=value;},getNumberFormats:()=>state.numberFormats,expand:term=>workspace?workspace.expand(term):term,queueSave:save,onChange:()=>{if(compilingDefinitions&&(compilingDefinitions.size!==dataEditor.entries().length||dataEditor.entries().some(entry=>compilingDefinitions.get(entry.name)!==entry))){changed();queueLiteralPreparation();}else{render();save();}},currentTerm:()=>state.term&&!state.dirty?F.expand(state.term,state.functionDefinitions):null,loadTerm:(term,name)=>{state.numberEncoding=`custom:${name}`;setSource(C.format(term));},toast});
   formatEditor=window.LambdaInputFormatEditor.init({getSelection:()=>state.numberEncoding,getEntries:()=>dataEditor.entries(),getNumberFormats:()=>state.numberFormats,setNumberFormats:formats=>{state.numberFormats=formats;},setCustomFormat:(name,template)=>dataEditor.setInputFormat(name,template),onChange:()=>{changed();queueLiteralPreparation();},queueSave:save,toast});
-  guide=window.LambdaGuide.init({precision:()=>state.decimalPlaces,save,addFunctions:(definitions,selected)=>workspace.importDefinitions(definitions,selected),load:example=>{
+  guide=window.LambdaGuide.init({precision:()=>state.decimalPlaces,save,addFunctions:(definitions,selected,options)=>workspace.importDefinitions(definitions,selected,options),load:example=>{
     stop();state.mode='free';state.numberEncoding=example.encoding??'church';
     renderMode();setSource(P.inputSourceFor(example,state.decimalPlaces));save();
     input.focus();input.scrollIntoView({block:'center'});

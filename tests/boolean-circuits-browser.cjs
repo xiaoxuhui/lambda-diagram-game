@@ -19,12 +19,12 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
     await page.locator('#mode-guide').click();await page.locator('#guide-example').selectOption(String(P.examples.indexOf(delay)));
     assert.equal(await page.locator('#guide-inputs tbody tr').count(),7);assert.equal(await page.locator('#guide-flow tbody tr').count(),6);
     assert.match(await page.locator('#guide-principle').textContent(),/不是等待一秒/);
-    await page.locator('#guide-add-library').click();await page.locator('#guide-back').click();assert.equal(await page.locator('.function-item').count(),1);
+    await page.locator('#guide-add-library').click();await page.locator('#guide-back').click();assert.equal(await page.locator('.function-item').count(),require('../src/guide.js').lesson(delay).symbols.length);
     await page.locator('#expression').fill('delay 3_church 1_bool 0_bool 1_bool');await page.locator('#convert').click();await page.locator('#step').click();
     const current=await page.locator('#current-expression').textContent();await page.locator('#save-state').click();await page.reload();assert.equal(await page.locator('#current-expression').textContent(),current);assert.equal(await page.locator('#unfold-functions').isChecked(),false);
     await page.locator('#fast-run').click();await page.waitForFunction(()=>document.getElementById('state-badge').textContent==='已到正规形');assert.equal(await page.locator('#decoded').textContent(),'布尔输出 [假，真，假]');
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));assert.deepEqual(errors,[]);
-    console.log(`PASS boolean circuits: gates, adders, ordered inputs, delay, tutorial, one-entry import, saved progress and unfolding stays off (${width}px)`);await context.close();
+    console.log(`PASS boolean circuits: gates, adders, ordered inputs, delay, tutorial, exact named definitions, saved progress and unfolding stays off (${width}px)`);await context.close();
   }
   const page=await browser.newPage();await page.goto(`http://127.0.0.1:${server.address().port}/dist/lambda-lab.html`);assert.equal(await page.locator('#examples optgroup[label="布尔逻辑与电路"] option').count(),20);
   }finally{await browser.close();server.close();}
