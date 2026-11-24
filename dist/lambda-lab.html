@@ -5242,9 +5242,12 @@ double 3_church</code></pre></details>
       feedback(message);
     }
     async function restoreInitial() {
-      let restored=false,text;
+      let restored=false,text,blocked=false;
+      // 浏览器禁用存储时 getItem 会直接抛错，这和「存档内容坏了」不是一回事：
+      // 前者应当照常进空白工作区（只暂停自动写入），后者才需要保护原存档并提示导出。
+      try{lastAuto=localStorage.getItem(AUTO);text=lastAuto||localStorage.getItem(LEGACY);}
+      catch{blocked=true;storageLocked=true;feedback('浏览器不允许读取本地存档，本次照常运行，自动保存已暂停。',true);$('storage-status').textContent='自动保存已暂停';}
       try {
-        lastAuto=localStorage.getItem(AUTO);text=lastAuto||localStorage.getItem(LEGACY);
         if(text){
           storageLocked=true;
           if(new URLSearchParams(location.search).get('recover')==='1'){
@@ -5254,7 +5257,7 @@ double 3_church</code></pre></details>
           }
           restored=true;
           storageLocked=false;
-        }else storageLocked=false;
+        }else if(!blocked) storageLocked=false;
       }catch(e){
         if(e.name==='AbortError'&&text){
           recoverDraft(text,'已取消重放。原存档保留，可点击「恢复已保存状态」重新重放。');

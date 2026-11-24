@@ -167,12 +167,15 @@ const C=require('../src/core.js'),P=require('../src/presets.js');
       const offline=await context.newPage();const requests=[];
       offline.on('pageerror',e=>errors.push(e.message));offline.on('request',r=>{if(/^https?:/.test(r.url()))requests.push(r.url());});
       await offline.goto(pathToFileURL(path.resolve(__dirname,'../dist/lambda-lab.html')).href);
-      await offline.locator('#step').click();assert.equal(await offline.locator('#current-expression').textContent(),'λy.y');
+      // 离线页是后台标签页时 requestAnimationFrame 会被节流，表达式区迟迟不回填，先激活再点。
+      await offline.bringToFront();
+      await offline.locator('#step').click();
+      assert.equal(await offline.locator('#current-expression').textContent(),'λy.y');
       assert.deepEqual(requests,[]);await offline.close();
     });
     await check('inaccessible storage does not break calculation',async()=>{
       const isolated=await browser.newContext();await isolated.addInitScript(()=>{Object.defineProperty(window,'localStorage',{get(){throw Error('storage unavailable');}});});
-      const p=await isolated.newPage();p.on('pageerror',e=>errors.push(e.message));await p.goto(base);await p.locator('#step').click();
+      const p=await isolated.newPage();p.on('pageerror',e=>errors.push(e.message));await p.goto(base);await p.bringToFront();await p.locator('#step').click();
       assert.equal(await p.locator('#current-expression').textContent(),'λy.y');await isolated.close();
     });
     await check('the Lambda interpreter runs in the normal editor and its result survives reload',async()=>{
