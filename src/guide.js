@@ -422,7 +422,7 @@
     if(!doc.compact)doc.compact=name+(args.length?' '+args.map(arg=>'('+arg+')').join(' '):'');
     const roles=[['加法',['第一个加数','第二个加数']],['乘法',['第一个因数','第二个因数']],['乘方',['底数','指数']],['零判断',['待判断的自然数']],['前驱',['原自然数']],['减法',['被减数','减数']],['比较',['第一项','第二项']],['阶乘',['求阶乘的自然数']],['斐波那契',['数列下标']]].find(([prefix])=>example.name.startsWith(prefix))?.[1];
     if(!doc.inputs)doc.inputs=args.map((value,index)=>({name:'p'+(index+1),value,encoding:/^[0-9]+(?:_church)?$/.test(value)?'丘奇自然数':'λ表达式',role:roles?.[index]??'实际输入'+(index+1)}));
-    doc.libraryEntries=[name];doc.entryContract={kind:example.category==='归约与终止'?'program':args.length||doc.inputs.length?'function':'value',name,inputs:doc.inputs.map(input=>({...input})),variadic:!!example.booleanCircuit&&['bits','delay','delayi','delayat','allbits','anybits','parity'].includes(example.booleanCircuit.name)};
+    doc.libraryEntries=[name];doc.entryContract={kind:example.category==='归约与终止'?'program':args.length||doc.inputs.length?'function':'value',name,inputs:doc.inputs.map(input=>({...input})),variadic:!!example.booleanCircuit&&['bits','delay','delayi','delayat','allbits','anybits','parity','memory','memoryout','memoryvalue'].includes(example.booleanCircuit.name)};
     doc.parameterNote=(doc.parameterNote??'外部只传实际数据参数。').replace('加入函数库时只添加入口函数，辅助定义随它封装保存。','')+' 加入函数库会按示例原文逐个保存命名函数，逐字核对名称和表达式；不一致时停止，选择“重名替换”才覆盖。结果中的丘奇数、列表或布尔值自带的选择参数不需要额外传入。';
   }
   let interpreterTemplates;

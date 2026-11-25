@@ -32,6 +32,32 @@ test('serial functions consume the specified number of inputs and preserve list 
   const partial=run('delay',[6,true,false]);assert.equal(partial.type,'abs','missing inputs leave an ordinary waiting function');
   for(let position=0;position<=8;position++)assert.ok(C.equal(run('delayat',[6,position,true,false,true,true,false,true]),C.parse(truth([false,true,false,true,true,false][position-1]??false))),String(position));
 });
+
+test('memory single steps implement every write/hold case through one-tick delay',()=>{
+  for(const state of [false,true])for(const write of [false,true])for(const input of [false,true]){
+    assert.equal(B.read(run('memorystep',[state,write,input])),`（${state?'真':'假'}，${(write?input:state)?'真':'假'}）`);
+    assert.equal(B.read(run('delaystep',[state,input])),`（${state?'真':'假'}，${input?'真':'假'}）`);
+  }
+});
+test('multi-tick memory emits old values, preserves holds and retains the final write',()=>{
+  for(const initial of [false,true])for(let count=0;count<=3;count++)for(let mask=0;mask<4**count;mask++){
+    let state=initial;const args=[count,initial],values=[];
+    for(let tick=0;tick<count;tick++){const write=!!(mask&(1<<(2*tick))),input=!!(mask&(1<<(2*tick+1)));args.push(write,input);values.push(state);if(write)state=input;}
+    const result=run('memory',args),outputs=normal('('+C.format(result)+') (λa.λb.a)'),final=normal('('+C.format(result)+') (λa.λb.b)');
+    assert.ok(C.equal(final,C.parse(truth(state))));assert.ok(C.equal(run('memoryvalue',args),final));assert.ok(C.equal(run('memoryout',args),outputs));
+    const expected=normal(B.program('bits',[String(count),...values.map(truth)]));assert.ok(C.equal(outputs,expected));
+  }
+});
+test('memory carries state between batches, stores non-Boolean data and ignores unwritten divergent input',()=>{
+  const part=run('memory',[2,false,true,true,false,false]),state=normal('('+C.format(part)+') (λa.λb.b)');
+  const next=normal(B.program('memory',['2','('+C.format(state)+')',truth(false),truth(false),truth(true),truth(false)]));
+  assert.equal(B.read(next),'（[真，真]，假）');
+  assert.equal(C.churchNumber(normal(B.program('memoryvalue',['3','2',truth(true),'7',truth(false),'99',truth(true),'0']))),0);
+  const list=normal(B.program('memorystep',['[1,2]',truth(true),'[3,4]'])+' (λa.λb.b)');assert.ok(C.equal(list,C.parse('[3,4]')));
+  const ignored=normal(B.program('memorystep',['7',truth(false),'((λx.x x) (λx.x x))'])+' (λa.λb.b)');assert.equal(C.churchNumber(ignored),7);
+  assert.equal(run('memory',[2,false,true,true]).type,'abs');
+  assert.equal(run('memoryvalue',[1,false,true]).type,'abs');
+});
 test('all circuit examples, guides and imported entry functions perform the same actual computation',()=>{
   for(const example of B.examples){
     const doc=G.lesson(example),names=G.libraryNames(doc),imported=L.importDefinitions([],doc.symbols,names);

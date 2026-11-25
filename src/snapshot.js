@@ -47,7 +47,7 @@
     const encodingEditing=encodingDraft.editing??null;
     if(encodingEditing!==null&&!dataEncodings.some(entry=>entry.name===encodingEditing))fail('正在编辑的数据编码不存在。');
     if(!Array.isArray(raw.completed)||raw.completed.length>P.levels.length||raw.completed.some(i=>!LEVEL_IDS.has(i)))fail('通关进度不合法。');
-    if(!['free','challenge','guide'].includes(raw.mode))fail('游戏模式不合法。');
+    if(!['free','challenge','guide','library'].includes(raw.mode))fail('游戏模式不合法。');
     if(!Number.isInteger(raw.level)||raw.level<0||raw.level>=P.levels.length)fail('关卡编号不合法。');
     const s=raw.session;if(!object(s)||!Number.isSafeInteger(s.steps)||s.steps<0||typeof s.dirty!=='boolean')fail('归约状态不合法。');
     const original=s.original===null?null:ast(s.original);if(!original&&s.steps!==0)fail('没有起始表达式，无法恢复归约。');

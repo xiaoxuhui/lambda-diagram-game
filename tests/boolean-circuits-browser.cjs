@@ -6,8 +6,8 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
   try{for(const width of [1280,390]){
     const context=await browser.newContext({viewport:{width,height:950}}),page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
     await page.goto(`http://127.0.0.1:${server.address().port}`);
-    assert.equal(await page.locator('#examples optgroup[label="布尔逻辑与电路"] option').count(),20);
-    const samples=width===1280?B.examples:B.examples.filter(e=>['halfadd','fulladd','delay','delayi','delayat'].includes(e.booleanCircuit.name));
+    assert.equal(await page.locator('#examples optgroup[label="布尔逻辑与电路"] option').count(),B.examples.length);
+    const samples=width===1280?B.examples:B.examples.filter(e=>['halfadd','fulladd','delay','delayi','delayat','delaystep','memorystep','memory','memoryout','memoryvalue'].includes(e.booleanCircuit.name));
     for(const example of samples){
       await page.locator('#examples').selectOption(String(P.examples.findIndex(e=>e.name===example.name)));
       assert.equal(await page.locator('#unfold-functions').isChecked(),false);assert.equal(await page.locator('[data-unfold-hit]').count(),0);
@@ -23,9 +23,17 @@ process.env.PORT='0';const server=require('../scripts/serve.cjs');
     await page.locator('#expression').fill('delay 3_church 1_bool 0_bool 1_bool');await page.locator('#convert').click();await page.locator('#step').click();
     const current=await page.locator('#current-expression').textContent();await page.locator('#save-state').click();await page.reload();assert.equal(await page.locator('#current-expression').textContent(),current);assert.equal(await page.locator('#unfold-functions').isChecked(),false);
     await page.locator('#fast-run').click();await page.waitForFunction(()=>document.getElementById('state-badge').textContent==='已到正规形');assert.equal(await page.locator('#decoded').textContent(),'布尔输出 [假，真，假]');
+    const memory=P.examples.find(e=>e.booleanCircuit?.name==='memory'),doc=require('../src/guide.js').lesson(memory);
+    await page.locator('#mode-guide').click();await page.locator('#guide-example').selectOption(String(P.examples.indexOf(memory)));
+    assert.equal(await page.locator('#guide-inputs tbody tr').count(),12);assert.equal(await page.locator('#guide-flow tbody tr').count(),5);assert.match(await page.locator('#guide-principle').textContent(),/反馈|下一状态/);assert.match(await page.locator('#guide-boundaries').textContent(),/n=0/);
+    await page.locator('#guide-add-library').click();await page.locator('#guide-back').click();for(const definition of doc.symbols)assert.equal(await page.locator(`.function-item[data-name="${definition.name}"] > code`).textContent(),definition.source);
+    await page.locator('#expression').fill(doc.compact);await page.locator('#convert').click();assert.equal(await page.locator('#step-count').textContent(),'0');await page.locator('#step').click();
+    const memoryFrame=await page.locator('#current-expression').textContent();await page.locator('#save-state').click();await page.reload();assert.equal(await page.locator('#current-expression').textContent(),memoryFrame);assert.equal(await page.locator('#step-count').textContent(),'1');
+    await page.locator('#fast-run').click();await page.waitForFunction(()=>document.getElementById('state-badge').textContent==='已到正规形');assert.equal(await page.locator('#decoded').textContent(),'布尔输出 （[假，真，真，真，假]，真）');
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));assert.deepEqual(errors,[]);
-    console.log(`PASS boolean circuits: gates, adders, ordered inputs, delay, tutorial, exact named definitions, saved progress and unfolding stays off (${width}px)`);await context.close();
+    console.log(`PASS boolean circuits: gates, adders, ordered inputs, delay, memory writes and holds, tutorial, exact named definitions, saved progress and unfolding stays off (${width}px)`);await context.close();
   }
-  const page=await browser.newPage();await page.goto(`http://127.0.0.1:${server.address().port}/dist/lambda-lab.html`);assert.equal(await page.locator('#examples optgroup[label="布尔逻辑与电路"] option').count(),20);
+  const page=await browser.newPage();await page.goto(`http://127.0.0.1:${server.address().port}/dist/lambda-lab.html`);assert.equal(await page.locator('#examples optgroup[label="布尔逻辑与电路"] option').count(),B.examples.length);
+  const memory=P.examples.find(e=>e.booleanCircuit?.name==='memory');await page.locator('#examples').selectOption(String(P.examples.indexOf(memory)));await page.locator('#fast-run').click();await page.waitForFunction(()=>document.getElementById('state-badge').textContent==='已到正规形');assert.equal(await page.locator('#decoded').textContent(),'布尔输出 （[假，真，真，真，假]，真）');
   }finally{await browser.close();server.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;server.close();});

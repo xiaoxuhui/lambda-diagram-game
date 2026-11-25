@@ -88,7 +88,7 @@
     const implicitFunctions=!state.unfoldFunctions&&state.functionDefinitions.length>0;
     if(implicitFunctions)state.dirty=true;
     state.growthWindowMs=s.view.growthWindowMs??Guard.DEFAULT_MS;$('growth-window').value=String(state.growthWindowMs);
-    labPan=s.mode==='guide'?{x:s.view.panX,y:s.view.panY}:null;
+    labPan=['guide','library'].includes(s.mode)?{x:s.view.panX,y:s.view.panY}:null;
     state.numberEncoding=s.view.numberEncoding??'church';state.numberFormats=s.view.numberFormats??{};state.decimalPlaces=s.view.decimalPlaces??6;
     state.decimalDigitsOrder=s.view.decimalDigitsOrder??'reverse';
     decodedTerms=new WeakMap();interpretedSource=null;
@@ -177,7 +177,7 @@
     }
   }
   function renderDiagram(redex, duration, undone) {
-    if(state.mode==='guide')return;
+    if(['guide','library'].includes(state.mode))return;
     const mount=$('diagram-mount');
     const route=state.dirty?null:redex?.path??null;
     diagramView.setEnabled(!state.dirty);
@@ -208,7 +208,7 @@
     $('diagram-viewport').scrollLeft=labPan.x;$('diagram-viewport').scrollTop=labPan.y;labPan=null;
   }
   function applyScale() {
-    if(!state.model||state.mode==='guide') return;
+    if(!state.model||['guide','library'].includes(state.mode)) return;
     const viewport=$('diagram-viewport'),m=state.model;
     if(state.autoFit) state.scale=Math.min(2.2,(viewport.clientWidth-48)/m.width,(viewport.clientHeight-48)/m.height);
     state.scale=Math.max(.02,Math.min(16,state.scale));
@@ -522,7 +522,7 @@
     if(!findReduction()){advance();if(!state.running)return;}
     schedule();
   }
-  function setSource(source) { input.value=source; changed(); convert(); }
+  function setSource(source) { input.value=source; changed(); return convert(); }
   const teachingText=text=>window.LambdaGuide.catalog().text(text);
   function revealAnswer(show) {
     const level=P.levels[state.level];$('challenge-target').hidden=!show;
@@ -550,10 +550,10 @@
     $('level-title').textContent=l.name; $('level-description').textContent=teachingText(l.description);
     revealAnswer(!$('challenge-target').hidden);$('hint').textContent=teachingText(l.hint);
     $('target-kind').textContent=l.targetType?'目标结果（归约至正规形）':'目标正规形';
-    $('progress-text').textContent=state.mode==='challenge'?`${state.completed.size} / ${P.levels.length} 关已完成`:state.mode==='guide'?`${P.examples.length} 个示例原理`:'探索 · 输入 · 归约';
+    $('progress-text').textContent=state.mode==='challenge'?`${state.completed.size} / ${P.levels.length} 关已完成`:state.mode==='guide'?`${P.examples.length} 个示例原理`:state.mode==='library'?'按示例 · 按章节 · 全部加入':'探索 · 输入 · 归约';
   }
   function renderMode() {
-    const reading=state.mode==='guide';
+    const reading=['guide','library'].includes(state.mode);
     if(reading&&!$('lab-screen').hidden){
       viewer?.cancelZoom();diagramView.cancelTransition();
       labPan??={x:$('diagram-viewport').scrollLeft,y:$('diagram-viewport').scrollTop};
@@ -563,7 +563,8 @@
     document.body.classList.toggle('guide-reading',reading);
     const challenge=state.mode==='challenge';$('challenge-panel').hidden=!challenge;
     $('guide-panel').hidden=state.mode!=='guide';
-    for(const [id,mode] of [['mode-free','free'],['mode-challenge','challenge'],['mode-guide','guide']]){
+    $('library-panel').hidden=state.mode!=='library';
+    for(const [id,mode] of [['mode-free','free'],['mode-challenge','challenge'],['mode-guide','guide'],['mode-library','library']]){
       const active=state.mode===mode;$(id).classList.toggle('active',active);$(id).setAttribute('aria-pressed',String(active));
     }
     if(state.mode==='guide')guide.refresh();
@@ -682,9 +683,9 @@
     if(!exampleGroups.has(category)){const group=document.createElement('optgroup');group.label=category;exampleGroups.set(category,group);$('examples').append(group);}
     const option=document.createElement('option');option.value=i;option.textContent=window.LambdaGuide.titleFor(e);exampleGroups.get(category).append(option);
   });
-  $('examples').addEventListener('change',()=>{
+  function loadExample(){
     const value=$('examples').value;if(value==='')return;const example=P.examples[Number(value)];if(!example)return;
-    state.numberEncoding=example.encoding||'church';setSource(P.inputSourceFor(example,state.decimalPlaces));$('examples').value='';
+    state.numberEncoding=example.encoding||'church';const converted=setSource(P.inputSourceFor(example,state.decimalPlaces));
     const truncated=window.LambdaDecimal.precisionOperations.has(example.decimalOperation)&&state.decimalPlaces!==6;
     const expected=example.expectedType==='decimal'?(truncated?'按设置的小数位数截断':`小数 ${example.expected}`):example.expectedType==='polynomial'?`多项式：${example.expected}`:example.expectedType==='rational'?`有理数 ${example.expected}`:example.expected===undefined?'':decode(C.parse(example.expected));
     const info=$('example-info'),parameters=P.parametersFor(example,state.decimalPlaces);
@@ -712,6 +713,18 @@
       workspace.attachCollisionControls(info);info.append(document.createElement('br'),add,document.createElement('br'),feedback);
     }
     info.hidden=!info.hasChildNodes();
+    return converted;
+  }
+  $('examples').addEventListener('change',()=>{
+    $('example-fast-run').disabled=$('examples').value==='';loadExample();
+  });
+  $('example-fast-run').addEventListener('click',async()=>{
+    const value=$('examples').value,example=value===''?null:P.examples[Number(value)];if(!example)return;
+    const button=$('example-fast-run');button.disabled=true;
+    try{
+      state.mode='free';renderMode();
+      if(await loadExample())await run(true);
+    }finally{button.disabled=$('examples').value==='';}
   });
   $('convert').addEventListener('click',convert);$('step').addEventListener('click',advance);$('run').addEventListener('click',()=>run());
   $('save-inline-definitions').addEventListener('click',async()=>{
@@ -777,6 +790,11 @@
     state.mode='guide';renderMode();render();save();
   });
   $('guide-back').addEventListener('click',()=>{state.mode='free';renderMode();render();save();$('mode-guide').focus();});
+  $('mode-library').addEventListener('click',()=>{
+    stop();cancelRewind();cancelConversion();historyJob?.abort();if(valueJob)clearValue();
+    state.mode='library';renderMode();render();save();
+  });
+  $('library-back').addEventListener('click',()=>{state.mode='free';renderMode();render();save();$('mode-library').focus();});
   $('stage-select').addEventListener('change',()=>{
     const stage=P.stages.find(s=>String(s.id)===$('stage-select').value);
     selectLevel(P.levels.findIndex(l=>l.id===stage.levelIds[0]));
@@ -808,6 +826,8 @@
       const after=end<input.value.length&&!/[\s.)\],]/.test(input.value[end])?' ':'';
       insert(before+C.formatName(name)+after);
     }});
+  workspace.attachCollisionControls($('library-collision-options'));
+  window.LambdaExampleLibrary.init({precision:()=>state.decimalPlaces,collisionPolicy:()=>workspace.collisionPolicy(),addFunctions:(definitions,selected,options)=>workspace.importDefinitions(definitions,selected,options)});
   sequenceEditor=window.LambdaSequences.init({functions:()=>workspace.functionEntries(),queueSave:()=>workspace.queueSave(),
     load:source=>{stop();state.mode='free';state.numberEncoding='church';renderMode();input.value=source;changed();save();},
     saveRule:async(name,source)=>{

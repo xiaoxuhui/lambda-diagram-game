@@ -62,6 +62,8 @@ jobs:
       - run: node tests/definitions-browser.cjs
       - run: node tests/exact-example-import-browser.cjs
       - run: node tests/conversion-preserves-source-browser.cjs
+      - run: node tests/example-library-browser.cjs
+      - run: node tests/example-fast-run-browser.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

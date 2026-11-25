@@ -22,6 +22,11 @@
     ['pred','λn.λf.λx.n (λg.λh.h (g f)) (λu.x) (λu.u)','丘奇前驱。'],['iszero','λn.n (λx.FALSE) TRUE','判断丘奇下标是否为零。'],
     ['bitat','λn.λl.iszero n FALSE (l (λh.λr.λk.iszero k h (r (pred k))) (λk.FALSE) (pred n))','从1开始取列表第 n 项，越界或第0项返回假。'],
     ['delayat','λn.λposition.delaycollect n FALSE (bitat position)','先传输入项数和输出位置，再传 n 个布尔值，读取指定拍的延迟输出。'],
+    ['delaystep','λstate.λinput.pair state input','一拍延迟的状态转移，返回（本拍旧值，下一拍状态）。'],
+    ['memorystep','λstate.λwrite.λinput.delaystep state (mux write state input)','单拍存储器：写入为真就保存输入，为假就保持；本拍输出始终是旧状态。'],
+    ['memory','λn.λinitial.n (λr.λstate.λout.λwrite.λinput.(memorystep state write input) (λold.λnext.r next (λtail.out (cons old tail)))) (λstate.λout.pair (out nil) state) initial id','接收拍数、初值和每拍的写入使能与数据，返回（旧值输出列表，最终保存值）。'],
+    ['memoryout','λn.λinitial.n (λr.λstate.λout.λwrite.λinput.(memorystep state write input) (λold.λnext.r next (λtail.out (cons old tail)))) (λstate.λout.out nil) initial id','读取存储器每拍的旧值输出列表。'],
+    ['memoryvalue','λn.λinitial.n (λr.λstate.λwrite.λinput.(memorystep state write input) (λold.λnext.r next)) id initial','只读取最终保存值，不积累输出列表。'],
     ['allbits','λn.n (λr.λa.λb.r (and a b)) (λa.a) TRUE','n 个输入全部为真才返回真；空输入返回真。'],
     ['anybits','λn.n (λr.λa.λb.r (or a b)) (λa.a) FALSE','n 个输入至少一个为真即返回真；空输入返回假。'],
     ['parity','λn.n (λr.λa.λb.r (xor a b)) (λa.a) FALSE','依次异或，真输入个数为奇数时返回真。']
@@ -51,6 +56,11 @@
     ['一拍延迟','delay',[6,...signal],list([false,...signal.slice(0,-1)]),'先写项数，再写各拍输入。每拍输出上一次保存的值，然后保存当前输入；初始值为假。'],
     ['自定初值延迟','delayi',[6,true,...signal],list([true,...signal.slice(0,-1)]),'参数依次是项数、初始值、各拍输入；只改变第一拍输出，之后输出前一拍输入。'],
     ['读取延迟第几项','delayat',[6,4,...signal],true,'先写输入项数6和输出位置4，再写六个布尔输入。第4拍输出的是第3个输入。'],
+    ['一拍延迟单步','delaystep',[false,true],pair(truth(false),truth(true)),'参数是旧状态、输入，返回（本拍输出，下一拍状态）：先读旧值，再保存新值。'],
+    ['存储器单拍','memorystep',[true,false,false],pair(truth(true),truth(true)),'参数是旧状态、写入使能、数据。写入使能为假，即使输入改变也保持原值；结果是（旧值，新状态）。'],
+    ['存储器写入与保持','memory',[5,false,true,true,false,false,false,true,true,false,true,true],pair(list([false,true,true,true,false]),truth(true)),'先写拍数和初值，再逐拍输入“写入使能、数据”。真表示写入，假表示保持，返回（旧值输出列表，最终保存值）。'],
+    ['读取存储器输出','memoryout',[5,false,true,true,false,false,false,true,true,false,true,true],list([false,true,true,true,false]),'每拍先读旧状态，再决定写入或保持；这里只返回各拍旧值组成的列表。'],
+    ['读取存储器最终值','memoryvalue',[5,false,true,true,false,false,false,true,true,false,true,true],true,'最后一拍写入的值要到下一拍才出现在延迟输出里；这个函数直接读取最后保存值。'],
     ['多输入与','allbits',[6,...signal],false,'先写输入数量，再写各个布尔值，逐项累计逻辑与。'],
     ['多输入或','anybits',[6,...signal],true,'先写输入数量，再写各个布尔值，逐项累计逻辑或。'],
     ['奇偶校验','parity',[6,...signal],false,'先写输入数量，再写布尔值；本例四个真输入为偶数，输出假。']
@@ -60,7 +70,27 @@
     return {name:title+' · '+name,category:'布尔逻辑与电路',encoding:'bool',booleanCircuit:{name,args,input,title},term:program(name,raw),expected:typeof expected==='boolean'?truth(expected):expected,description,parameters:input.map((value,index)=>`参数${index+1}：${value}`)};
   });
   const tables={notgate:a=>!a,andgate:(a,b)=>a&&b,orgate:(a,b)=>a||b,nand:(a,b)=>!(a&&b),nor:(a,b)=>!(a||b),xorgate:(a,b)=>a!==b,xnor:(a,b)=>a===b,implies:(a,b)=>!a||b};
+  const memoryNames=new Set(['delaystep','memorystep','memory','memoryout','memoryvalue']);
+  function memoryLesson(example){
+    const {name,args,input}=example.booleanCircuit,entries=reachable(name),entry=registry.get(name),compact=name+' '+input.join(' '),single=name==='delaystep'||name==='memorystep',delay=name==='delaystep';
+    const inputs=input.map((value,index)=>({name:single?['state',...(delay?[]:['write']),'input'][index]:index===0?'n':index===1?'initial':((index%2===0?'write':'data')+Math.floor(index/2)),value,encoding:!single&&index===0?'丘奇自然数':'丘奇布尔',role:single?(delay?['上一拍保存值','本拍输入']:['上一拍保存值','写入使能：真写入，假保持','本拍数据'])[index]:index===0?'拍数 n，后面恰好接收 n 组“写入使能、数据”':index===1?'第一拍之前保存的初始值':index%2===0?`第 ${Math.floor(index/2)} 拍写入使能：真写入，假保持`:`第 ${Math.floor(index/2)} 拍数据：允许写入时才保存`}));
+    let columns,rows;
+    if(single){columns=delay?['旧状态','输入','本拍输出','下一拍状态']:['旧状态','写入使能','输入','本拍输出','下一拍状态'];rows=[];
+      for(const state of [false,true])for(const write of delay?[true]:[false,true])for(const data of [false,true])rows.push([state,...(delay?[]:[write]),data,state,write?data:state].map(value=>value?'真':'假'));
+    }else{columns=['拍数','写入使能','输入数据','本拍旧值输出','拍后保存'];rows=[];let state=args[1];
+      for(let i=0;i<args[0];i++){const write=args[2+2*i],data=args[3+2*i],old=state;if(write)state=data;rows.push([String(i+1),write?'真（写入）':'假（保持）',data?'真':'假',old?'真':'假',state?'真':'假']);}
+    }
+    return {core:name+' = '+entry.source,compact,libraryEntries:[name],symbols:entries.map(({name,source,meaning})=>({name,source,meaning})),featured:[name,'memorystep','delaystep','mux'],inputs,foundation:entries.filter(item=>item.name!==name).map(item=>item.name+' = '+item.source).join('\n'),
+      basics:['一拍延迟保留旧状态：本拍输出旧值，新输入成为下一拍的状态。这里只描述离散拍，不等待真实时间。','用二选一开关把保存值反馈到输入端：写入使能为真时选新数据，为假时选原状态。因此没有写入的拍也会保留数据。','本例写入使能、初值和数据使用 1_bool（真）与 0_bool（假）；拍数使用 _church。数据通道也能保存丘奇数或列表，只有写入使能必须是丘奇布尔。'],
+      overview:'存储器 = 选择新值或反馈旧值 + 一拍延迟。每拍先读旧状态，然后决定下一拍保存什么。',flow:{columns,rows},
+      principle:['状态转移是 output = state，next = write input state。丘奇布尔 write 为真选 input，为假选 state；写入假的数据与关闭写入是两件事。','delaystep state input 返回 pair state input。memorystep 先用 mux write state input 选择下一状态，再交给 delaystep，得到（旧值，下一状态）。没有不动点递归，也没有提前用 JavaScript 算出结果。','memory 用丘奇数 n 生成 n 组接收函数，每组接收写入使能和数据，再把下一状态传到下一组。输出用丘奇列表按拍积累，终点返回（输出列表，最终状态）。memoryout 只积累输出，memoryvalue 只传递状态，避免为最终值构造整份输出记录。','保持只意味着 next = state，不是丢掉本拍。写入在拍后生效，最后一拍的新值在最终状态里；延迟输出还没有包含它。要继续运行，取出最终状态，作为下一次调用的初值。'],
+      steps:[['看调用和结果',example.description,compact+'\n→ '+format(C.parse(example.expected))],[delay?'用序对保存输出与状态':'选择要保存的数据',delay?'序对同时保留旧值与新值，交给读取函数选择。':'写入使能为真选新数据，为假选保存值。',delay?'pair = '+registry.get('pair').source:'mux = '+registry.get('mux').source+'\nmemorystep = '+registry.get('memorystep').source],['一拍延迟保存状态','序对第一项是旧值输出，第二项交给下一拍；单步不会直接改写外部变量。','delaystep = '+registry.get('delaystep').source],['逐拍检查写入和保持','沿表格读取：本拍输出总是旧状态；写入使能决定拍后的保存值。',compact,{columns,rows}],['读取结果并继续','memory 的第一项是旧值列表，第二项是最终状态。用真取第一项、假取第二项。下一批把第二项作为初始值传入。',single?compact+' (λa.λb.a)\n'+compact+' (λa.λb.b)':name==='memory'?compact+' (λa.λb.a)\n'+compact+' (λa.λb.b)':name+' = '+entry.source]],
+      walkthrough:compact+'\n→ '+format(C.parse(example.expected)),encodingText:'丘奇布尔控制写入；序对返回输出与状态，丘奇列表按拍保存输出。',
+      parameterNote:single?'参数按表中顺序传入。结果序对自带的选择参数只在读取某一项时使用。':'先传 n_church 和初值，再传恰好 n 组“写入使能、数据”，共 2 + 2n 个实参。未传完时仍是等待输入的函数，不是存储值。',
+      boundaries:['n=0 时不读取任何写入或数据：memory 返回（空列表，初值），memoryout 返回空列表，memoryvalue 返回初值。','写入使能为假时，新数据不参与下一状态；写入使能为真且数据为假时，会把原来的真值清为假。正规序可跳过未使用的数据，应用序仍会先计算参数。','每次调用都显式接收并返回状态，不会偷偷修改浏览器存档或函数库。只有把返回的新状态传给下一次调用，才会延续同一个存储器。','这是无地址的单值寄存器；数据可以是一整个列表。多地址读写存储器需要另加地址选择与更新规则。'],exercise:'把写入使能都改成 0_bool，确认每拍和最终值都保持初值；再开启一拍写入 0_bool，检查何时清零。'};
+  }
   function lesson(example){
+    if(memoryNames.has(example.booleanCircuit.name))return memoryLesson(example);
     const spec=example.booleanCircuit,{name,args,input,title}=spec,entries=reachable(name),entry=registry.get(name),compact=name+' '+input.join(' '),serial=['bits','delay','delayi','delayat','allbits','anybits','parity'].includes(name),delayed=name.startsWith('delay');
     const roles={mux:['选择位','0路输入','1路输入'],demux:['选择位','数据位'],halfadd:['第一位','第二位'],fulladd:['第一位','第二位','低位进位'],bitcmp:['第一位','第二位']};
     const inputs=input.map((value,index)=>({name:typeof args[index]==='number'?(index===0?'n':'position'):'b'+(index+1),value,encoding:typeof args[index]==='number'?'丘奇自然数':'丘奇布尔',role:serial?(index===0?'输入数量，同时决定接收多少个布尔输入':name==='delayat'&&index===1?'想读取的输出位置（从1开始）':name==='delayi'&&index===1?'第一拍之前保存的初始值':'依次输入的布尔值'):roles[name]?.[index]??'布尔输入'}));
