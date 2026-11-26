@@ -6,6 +6,21 @@
   function findReduction(term=state.term){return state.unfoldFunctions?functionReducer.find(term,state.strategy,state.direction):C.findRedex(term,[],state.strategy,state.direction);}
   function reductionStep(){return state.unfoldFunctions?functionReducer.step(state.term,state.strategy,state.direction):C.step(state.term,state.strategy,state.direction);}
   const $=id=>document.getElementById(id);
+  // Desktop columns stack independently; narrow screens keep common actions first.
+  const compactLayout=matchMedia('(max-width:800px)'),panelOrder=['expression-panel','diagram-panel','execution-panel','function-management','combinator-panel','advanced-run-options','data-options'];
+  const editorColumn=$('editor-column'),visualColumn=$('visual-column'),lineRules=document.querySelector('.rules-card');
+  function arrangePanels(){
+    const focused=document.activeElement,lab=$('lab-screen');
+    if(compactLayout.matches){
+      lab.append(...panelOrder.map($),lineRules);editorColumn.hidden=true;visualColumn.hidden=true;
+    }else{
+      editorColumn.append($('expression-panel'),$('function-management'),$('combinator-panel'));
+      visualColumn.append($('diagram-panel'),$('execution-panel'),$('advanced-run-options'),$('data-options'),lineRules);
+      editorColumn.hidden=false;visualColumn.hidden=false;
+    }
+    if(focused&&lab.contains(focused)&&document.activeElement!==focused)focused.focus({preventScroll:true});
+  }
+  arrangePanels();compactLayout.addEventListener('change',arrangePanels);
   const input=$('expression');
   const Definitions=window.LambdaDefinitions,definitionFeedback=$('inline-definition-feedback');
   const prepareDefinitions=(source,functions,options={})=>Definitions.prepare(source,functions,{collision:workspace?.collisionPolicy()??'skip',encodings:dataEditor.entries(),encoding:state.numberEncoding,numberFormats:state.numberFormats,prepareTerm:(term,entries)=>window.LambdaGuide.compileInterpreterCall(term,entries,value=>window.LambdaLibrary.expand(value,entries)),...options});
@@ -710,7 +725,7 @@
           if(calls.length)feedback.textContent+=' 可调用：'+calls.join('、')+'。';
         }catch(error){feedback.textContent='加入失败：'+error.message;}
       });
-      workspace.attachCollisionControls(info);info.append(document.createElement('br'),add,document.createElement('br'),feedback);
+      info.append(document.createElement('br'),add,document.createElement('br'),feedback);workspace.attachCollisionControls(info);
     }
     info.hidden=!info.hasChildNodes();
     return converted;

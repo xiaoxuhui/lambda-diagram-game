@@ -4,7 +4,7 @@
   function init(api){
     const panel=document.createElement('details');panel.className='input-format-panel';panel.id='input-format-panel';
     panel.innerHTML='<summary id="input-format-title">自定义输入形式</summary><form id="input-format-form"><label for="input-format">输入模板 · {n} 表示数字</label><input id="input-format" placeholder="例如 C{n}、{n}c、[{n}]" autocomplete="off" spellcheck="false"><p id="input-format-preview" class="syntax-note"></p><div class="encoding-actions"><button type="submit" id="save-input-format" class="button">保存输入形式</button><button type="button" id="reset-input-format" class="button">恢复默认</button></div><p id="input-format-error" class="error-message" role="alert" hidden></p></form>';
-    document.getElementById('number-note').after(panel);const $=id=>panel.querySelector(`#${id}`);
+    document.getElementById('custom-data-panel').before(panel);const $=id=>panel.querySelector(`#${id}`);
     let lastSelection=null,lastTemplate=null;
     const current=()=>E.inputFormatFor(api.getSelection(),api.getEntries(),api.getNumberFormats());
     const example=template=>template.replace('{n}',api.getSelection()==='decimal'?'-1.5':api.getSelection()==='int'?'-3':api.getSelection()==='bool'?'1':'3');

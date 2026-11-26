@@ -22,9 +22,9 @@
       }
       parent.insertBefore(group,before);return group;
     }
-    attachCollisionControls($('function-form').parentElement,$('function-form'));
-    attachCollisionControls($('guide-add-library').parentElement,$('guide-add-library'));
-    attachCollisionControls($('combinator-status').parentElement,$('combinator-status'));
+    attachCollisionControls($('function-collision-options'));
+    attachCollisionControls($('guide-panel'));
+    attachCollisionControls($('combinator-collision-options'));
     function cancelReplay(){replayController?.abort();}
     $('cancel-restore').addEventListener('click',cancelReplay);
     restoreDialog.addEventListener('cancel',event=>{event.preventDefault();cancelReplay();});
